@@ -540,7 +540,7 @@ const GLTF=new THREE.GLTFLoader();
 // Higgsfield CDN — required over file://, where browsers block XHR of local files.
 function loadGLB(local,cdn,onLoad,onFail){ GLTF.load(local,onLoad,undefined,()=>{ if(cdn) GLTF.load(cdn,onLoad,undefined,()=>onFail&&onFail()); else onFail&&onFail(); }); }
 const VILLAGER_GLB="assets/glb/villager.glb", VILLAGER_GLB_CDN=GCDN+"fe782d76-8f97-437e-b60d-ae368fd6b5ab.glb";
-let REAPER_GLB="assets/glb/reaper.glb", REAPER_GLB_CDN=null;   // CDN filled once the rigged reaper bakes
+let REAPER_GLB="assets/glb/reaper.glb", REAPER_GLB_CDN=GCDN+"d7070aab-faa3-4322-b2c4-a09fdbfde0ff.glb";   // hooded Reaper husk (non-rigged, glided in code)
 let vProto=null, vClips=null, vReady=false, vFailed=false;
 let rProto=null, rClips=null, rReady=false;                   // rigged Reaper husk
 function loadVillager(cb){
@@ -753,6 +753,7 @@ function buildRail(){
   $('rail').appendChild(mk('▶',!paused&&simSpeed===1,()=>{paused=false;simSpeed=1;buildRail();},'1×'));
   $('rail').appendChild(mk('»',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'3×'));
   $('rail').appendChild(mk('?',false,()=>showHelp(),'How to play'));
+  $('rail').appendChild(mk('✦',false,()=>showRites(),'Rites — spend Writ on upgrades'));
   $('rail').appendChild(mk('♪',!SND.muted,()=>{ SND.resume(); SND.toggleMute(); buildRail(); }, SND.muted?'Sound is off — click for sound':'Mute sound'));
   $('rail').appendChild(mk('⚙',false,()=>showOptions(),'Options'));
 }
@@ -877,8 +878,28 @@ function updateTutorial(){ const g=$('goals'); if(!g) return;
   while(tutIdx<TUT.length && TUT[tutIdx].d()) tutIdx++;
   if(tutIdx>=TUT.length){ tutDone=true; try{localStorage.setItem('sf_tut','done');}catch(e){} g.style.display='none'; if(typeof toast==="function")toast("The foundry stands on its own now.","good"); return; }
   g.style.display='block';
-  g.innerHTML=`<div class="gh">The engine whispers</div><div class="gt">${TUT[tutIdx].t}</div><div class="gp">${tutIdx} / ${TUT.length} rites learned</div>`;
+  g.innerHTML=`<div class="gh">The engine whispers</div><div class="gt">${TUT[tutIdx].t}</div><div class="gp">${tutIdx} / ${TUT.length} steps taken</div>`;
 }
+
+/* research rites: spend Writ on permanent upgrades */
+const UPGRADES=[
+  {id:'tools',  name:'Sharpened Tools', desc:'+25% gathering rate at every post.', cost:60},
+  {id:'callous',name:'Calloused Husks', desc:'+30% carry capacity for all husks.', cost:80},
+  {id:'roads',  name:'Bone Roads',      desc:'+18% extra speed on Bone Paths.',    cost:50},
+  {id:'embers', name:'Banked Embers',   desc:'+40% warmth from the Pyre.',         cost:70},
+  {id:'sigils', name:'Warding Sigils',  desc:'+30% Dread suppression from Wards.',  cost:90},
+];
+function buyRite(id){ const u=UPGRADES.find(x=>x.id===id); if(!u||G.tech[id]) return;
+  if((G.writ||0)<u.cost){ SND.sfx('deny'); toast("Not enough Writ for "+u.name,"bad"); return; }
+  G.writ-=u.cost; G.tech[id]=true; SND.sfx('bell'); toast(u.name+" is bound into the foundry.","good"); saveGame(); renderLedger(); showRites(); }
+function showRites(){ SND.resume();
+  const rows=UPGRADES.map(u=>{ const owned=!!G.tech[u.id], afford=(G.writ||0)>=u.cost;
+    return `<div class="optrow"><span><b style="color:var(--ink-bright)">${u.name}</b><br><span style="font-size:11px;color:var(--ink-dim)">${u.desc}</span></span>`+
+      (owned?`<span class="tag" style="color:var(--rot)">learned</span>`:`<span class="btn"${afford?'':' style="opacity:.45"'} onclick="buyRite('${u.id}')">${u.cost} Writ</span>`)+`</div>`; }).join('');
+  showOverlayHTML(`<h1 style="font-size:24px">RITES OF THE ENGINE</h1><h2>spend Writ to bind deeper knowledge</h2>
+    <div style="margin:12px 0">${rows}</div>
+    <div style="color:var(--ink-dim);font-size:12px;margin:6px 0 10px">Writ in hand: <b style="color:#e8c24a">${Math.floor(G.writ)}</b> &nbsp;·&nbsp; earn it by paying tithes and trading at the Black Market.</div>
+    <span class="btn" onclick="hideOverlay()">Close</span>`); }
 
 /* =====================================================================
    === SIM STEP (early): villagers + hearth flicker ===
@@ -929,7 +950,7 @@ function seedSettlement(){
 function serializeState(){
   return { v:1, seed:WORLD_SEED,
     G:{ stock:Object.assign({},G.stock), writ:G.writ, dread:G.dread, popCap:G.popCap, grow:G.grow, time:G.time||0,
-        quota:{need:G.quota.need,period:G.quota.period,t:G.quota.t,level:G.quota.level} },
+        quota:{need:G.quota.need,period:G.quota.period,t:G.quota.t,level:G.quota.level}, tech:Object.assign({},G.tech||{}) },
     paths:[...PATHS],
     buildings: buildings.map(b=>({k:b.kind,x:b.x,z:b.z,prog:b.prog||0,cyc:b.cyc||0})),
     nodes: nodes.map(n=>({t:n.type,x:n.x,z:n.z,a:n.amount,max:n.max})),
@@ -949,7 +970,7 @@ function applySave(s){
   if(!s||!s.G) return false;
   clearDynamic();
   Object.assign(G.stock,s.G.stock); G.writ=s.G.writ; G.dread=s.G.dread; G.popCap=s.G.popCap; G.grow=s.G.grow; G.time=s.G.time||0; G.over=null; G.breach=0;
-  G.quota={need:s.G.quota.need,period:s.G.quota.period,t:s.G.quota.t,level:s.G.quota.level};
+  G.quota={need:s.G.quota.need,period:s.G.quota.period,t:s.G.quota.t,level:s.G.quota.level}; G.tech=Object.assign({},s.G.tech||{});
   for(const n of (s.nodes||[])){ const nn=placeNode(n.t,n.x,n.z); nn.amount=n.a; nn.max=n.max; if(nn.amount<=0) depleteNode(nn); }
   for(const b of (s.buildings||[])){ const bb=placeBuildingFree(b.k,b.x,b.z); bb.prog=b.prog||0; bb.cyc=b.cyc||0; }
   for(const k of (s.paths||[])){ const rz=(k%4096)-1024, rx=Math.floor(k/4096)-1024; restorePath(rx,rz); }
@@ -1155,7 +1176,7 @@ function nearestNode(type,x,z){ let best=null,bd=1e9; for(const n of nodes){ if(
    ===================================================================== */
 const STORE=260, WIN_LEVEL=8;
 const G={ stock:{}, writ:25, dread:0, warmthRatio:1, popCap:6, over:null,
-  quota:{need:5, period:150, t:150, level:1}, grow:24 };
+  quota:{need:5, period:150, t:150, level:1}, grow:24, tech:{} };
 RES_ORDER.forEach(r=>G.stock[r]=0);
 const buildings=[];
 const CARRY={worker:7,stump:18,reaper:5}, GRATE={worker:5,stump:6,reaper:4};
@@ -1175,6 +1196,14 @@ function storageCap(r){ let cap=STORE; for(const b of buildings){ if(b.kind==="s
 function addStock(r,n){ G.stock[r]=clamp((G.stock[r]||0)+n,0,storageCap(r)); }
 function storeRoom(r){ return (G.stock[r]||0)<storageCap(r); }
 function pileFill(r){ return clamp((G.stock[r]||0)/storageCap(r),0,1); }   // 0..1 of a resource's bin — drives the visible material piles
+// research "Rites": permanent multipliers bought with Writ
+function techMul(kind){ const t=G.tech||{};
+  if(kind==='gather') return t.tools?1.25:1;
+  if(kind==='carry')  return t.callous?1.3:1;
+  if(kind==='path')   return t.roads?1.18:1;
+  if(kind==='warmth') return t.embers?1.4:1;
+  if(kind==='ward')   return t.sigils?1.3:1;
+  return 1; }
 
 /* ---- AI building models: concept renders -> image_to_3d GLBs, loaded at runtime ---- */
 // concept-render card art (local paths; CSS image loads work over file:// and http alike)
@@ -1340,7 +1369,7 @@ function moveHusk(v,tx,tz,dt,stop){
   stop=stop||0.6; const o=v.obj;
   const dx=tx-o.position.x, dz=tz-o.position.z, d=Math.hypot(dx,dz);
   if(d<stop){ if(v.act)v.act.timeScale=0; return true; }
-  const sp=v.speed*(onPath(o.position.x,o.position.z)?1.35:1)*dt;
+  const sp=v.speed*(onPath(o.position.x,o.position.z)?1.35*techMul('path'):1)*dt;
   let nx=o.position.x+(dx/d)*sp, nz=o.position.z+(dz/d)*sp;
   for(const ob of OBS){ const ex=nx-ob.x, ez=nz-ob.z, ed=Math.hypot(ex,ez), R=ob.r+HUSK_R;
     if(ed<R){ if(ed<0.001){ nx=ob.x+R; } else { nx=ob.x+ex/ed*R; nz=ob.z+ez/ed*R; } } }
@@ -1389,10 +1418,11 @@ function stepHusks(dt){
       } else if(v.job==="harvest"){
         const n=v.tnode;
         if(!n||n.amount<=0){ v.job="toNode"; continue; }
-        const rate=GRATE[v.caste]||5; const take=Math.min(rate*dt, n.amount, (CARRY[v.caste]||7)-v.carryAmt);
+        const cap=(CARRY[v.caste]||7)*techMul('carry'), rate=(GRATE[v.caste]||5)*techMul('gather');
+        const take=Math.min(rate*dt, n.amount, cap-v.carryAmt);
         n.amount-=take; v.carryAmt+=take; v.carryRes=b.def.res;
         if(n.amount<=0) depleteNode(n);
-        if(v.carryAmt>=(CARRY[v.caste]||7)-0.01 || (n.amount<=0)) v.job="toDrop";
+        if(v.carryAmt>=cap-0.01 || (n.amount<=0)) v.job="toDrop";
       } else if(v.job==="toDrop"){
         if(moveHusk(v,b.x,b.z,dt,b.def.foot*0.6+1.3)){ addStock(v.carryRes,v.carryAmt); v.carryAmt=0; v.carryRes=null; v.job="toNode"; if(typeof onDeposit==="function")onDeposit(b); }
       }
@@ -1429,7 +1459,7 @@ function stepEconomy(dt){
     if(n.mesh.userData.depleted && n.amount>n.max*0.2){ n.mesh.userData.depleted=false; n.mesh.scale.y/=0.6; } } }
   // warmth: hearths burn wood
   let warmSupply=0;
-  for(const b of buildings){ if(b.kind==="hearth"){ if(G.stock.wood>0){ G.stock.wood=Math.max(0,G.stock.wood-b.def.burn.wood*dt); warmSupply+=b.def.warmth; b.active=true; } else b.active=false; } }
+  for(const b of buildings){ if(b.kind==="hearth"){ if(G.stock.wood>0){ G.stock.wood=Math.max(0,G.stock.wood-b.def.burn.wood*dt); warmSupply+=b.def.warmth*techMul('warmth'); b.active=true; } else b.active=false; } }
   G.warmthRatio=clamp(warmSupply/Math.max(1,pop),0,1.5);
   // food
   G.stock.pith=Math.max(0,G.stock.pith-pop*0.05*dt); const foodOk=G.stock.pith>0.01;
@@ -1446,7 +1476,7 @@ function stepEconomy(dt){
   }
   // dread: industry + backlog vs ward suppression
   let wards=0; for(const b of buildings) if(b.kind==="ward") wards+=1;
-  const decay=0.25+wards*0.6;
+  const decay=0.25+wards*0.6*techMul('ward');
   G.dread=clamp(G.dread+(activeDread*0.6 - decay)*dt,0,100);
   // hauntings
   if(G.dread>55 && rnd()<0.03*dt*(G.dread/100)){ const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ const v=pick(cand); v.resolve=Math.max(0,v.resolve-0.25); SND.sfx('haunt'); if(typeof toast==="function")toast(v.name+" is gripped by a haunting.","bad"); } }

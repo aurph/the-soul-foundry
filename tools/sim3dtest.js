@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -140,6 +140,14 @@ try{ T.G.over=null; T.G.dread=0; T.nodes.length=0; T.G.stock.pith=0; T.G.stock.w
   ok("save/load restores resources & writ", T.G.stock.silica===42&&T.G.writ===77, "sil="+T.G.stock.silica+" writ="+T.G.writ);
   ok("save/load restores quota progress", T.G.quota.level===4, "lvl="+T.G.quota.level);
 }
+
+// --- research rites multiply the economy ---
+{ T.G.tech={}; const baseG=T.techMul('gather'), baseC=T.techMul('carry');
+  ok("techMul defaults to 1x", baseG===1&&baseC===1, "g="+baseG+" c="+baseC);
+  T.G.tech.tools=true; T.G.tech.callous=true;
+  ok("a researched rite raises gather rate", T.techMul('gather')>baseG, baseG+" -> "+T.techMul('gather'));
+  ok("a researched rite raises carry capacity", T.techMul('carry')>baseC, baseC+" -> "+T.techMul('carry'));
+  T.G.tech={}; }
 
 // --- audio engine is headless-safe (sim hooks must never crash without an AudioContext) ---
 { ok("SND sound engine exists", !!T.SND);
