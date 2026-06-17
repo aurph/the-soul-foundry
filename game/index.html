@@ -130,10 +130,15 @@
   .optrow input[type=range]{flex:1;max-width:230px;accent-color:var(--ember)}
   .optrow input[type=checkbox]{width:16px;height:16px;accent-color:var(--ember)}
   .obj-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
-  #goals{position:fixed;left:8px;bottom:122px;z-index:26;max-width:252px;padding:9px 12px;border-radius:8px;display:none}
-  #goals .gh{font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase}
-  #goals .gt{font-size:12.5px;color:var(--ink-bright);line-height:1.42;margin-top:4px}
-  #goals .gp{font-size:10px;color:var(--ink-dim);margin-top:5px;letter-spacing:.5px}
+  #goals{position:fixed;left:8px;bottom:122px;z-index:26;width:296px;max-width:46vw;padding:11px 14px;border-radius:8px;display:none;border-left:3px solid var(--ember)}
+  #goals .gh{font-size:10px;letter-spacing:1.5px;color:var(--ember);text-transform:uppercase}
+  #goals .gt{font-size:13.5px;color:var(--ink-bright);line-height:1.45;margin-top:5px}
+  #goals .gw{font-size:11px;color:var(--ink-dim);line-height:1.4;margin-top:6px;font-style:italic}
+  #goals .gbar{height:4px;background:#0c0d11;border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-top:9px}
+  #goals .gbar>i{display:block;height:100%;background:linear-gradient(90deg,#6f7a55,#d98a3a)}
+  #goals .gp{margin-top:6px;text-align:right}
+  #goals .gskip{font-size:10px;color:var(--ink-dim);cursor:pointer;text-decoration:underline}
+  #goals .gskip:hover{color:var(--ink-bright)}
   #hint{position:fixed;left:50%;top:128px;transform:translateX(-50%);z-index:45;padding:5px 13px;border-radius:5px;
     font-size:12px;color:var(--ember-soft);background:#0d0e12cc;border:1px solid var(--line);pointer-events:none;display:none;white-space:nowrap}
   #dev{position:fixed;left:6px;bottom:116px;color:#6c8;font:11px monospace;z-index:60;display:none}
@@ -852,7 +857,9 @@ function refreshInspect(){
     ins.classList.add('show');
     let body=`<div style="color:var(--ink-dim);margin:4px 0 8px;font-size:11.5px">${d.desc}</div>`;
     if(d.workers>0){ body+=`<div class="row"><span>Workers</span><b>${b.workers.length} / ${d.workers}</b></div>
-      <div style="margin:6px 0"><span class="btn" onclick="addWorker()">+ assign</span> <span class="btn" onclick="remWorker()">− recall</span> <span style="color:var(--ink-dim);font-size:11px">${idleHusks().length} idle</span></div>`; }
+      <div style="margin:6px 0"><span class="btn" onclick="addWorker()">+ assign</span> <span class="btn" onclick="remWorker()">− recall</span> <span style="color:var(--ink-dim);font-size:11px">${idleHusks().length} idle</span></div>`;
+      if(b.workers.length){ body+=`<div class="obj-list">`+b.workers.map(w=>`<span class="tag" title="${cap1(w.caste)} husk">${w.name} · <span style="color:var(--ember-soft)">${huskStateLabel(w)}</span></span>`).join('')+`</div>`; }
+      else body+=`<div style="color:var(--ink-dim);font-size:11px;margin-bottom:4px">No husks here yet — press + assign to staff it.</div>`; }
     if(d.kind==="gather") body+=`<div class="row"><span>Harvests</span><b>${RES[d.res].name}</b></div>`;
     if(d.recipe){ const ins2=Object.entries(d.recipe.in).map(([r,n])=>n+"× "+RES[r].name).join(' + ');
       const outs=Object.entries(d.recipe.out).map(([r,n])=>n+"× "+RES[r].name).join(' + ');
@@ -919,21 +926,45 @@ function optMute(c){ SND.resume(); if(SND.muted!==c)SND.toggleMute(); buildRail(
 function newValley(){ try{ localStorage.removeItem('sf_save'); }catch(e){} location.reload(); }
 
 /* staged tutorial: quiet objectives that advance as the player learns the loop */
+function hasB(k){ return buildings.some(b=>b.kind===k); }
+function staffed(k){ return buildings.some(b=>b.kind===k && b.workers.length>0); }
+// a full, ordered tutorial that walks the player all the way to their first Compute
 const TUT=[
-  {t:"Tap the ground by a glowing field, then raise a gathering post from the dock below.", d:()=>buildings.some(b=>b.def.kind==="gather")},
-  {t:"Keep the husks alive: gather Rot-Pith for food, and keep the Pyre burning Deadwood.", d:()=>(G.stock.pith>5)&&G.warmthRatio>=0.7},
-  {t:"Raise a Soul Furnace, then tap it and press + assign to staff it from idle husks.", d:()=>buildings.some(b=>b.kind==="furnace"&&b.workers.length>0)},
-  {t:"Forge the whole chain — Mill, Assembly, Datacenter — and render your first Compute.", d:()=>(G.stock.compute||0)>0||G.quota.level>1},
-  {t:"Deliver the Quota of Compute before the timer runs out, or Dread surges.", d:()=>G.quota.level>1},
+  {t:"Your foundry already gathers Deadwood and Rot-Pith. Now build toward Compute. Open the GATHERING tab below.",
+   why:"Tabs at the bottom group the buildings: Dwelling, Gathering, Refining, Civic.", d:()=>curTab==="gather"},
+  {t:"Raise a Silica Dredge on a pale silica field, then tap it and press + assign to staff it.",
+   why:"Silica is the first raw matter in the chain. A building does nothing until husks are assigned.", d:()=>staffed("dredge")},
+  {t:"Raise an Ash Vent-Cap on a dark ash field and staff it.",
+   why:"Soul-Ash feeds both the Furnace and the Assembly.", d:()=>staffed("ventcap")},
+  {t:"Raise a Well Rig on a graves field and staff it for Grave-Water.",
+   why:"Grave-Water quenches glass and cools the Datacenter.", d:()=>staffed("wellrig")},
+  {t:"Open the REFINING tab and raise a Soul Furnace, then staff it.",
+   why:"It smelts Silica + Soul-Ash into Cinderglass.", d:()=>staffed("furnace")},
+  {t:"Raise a Glass Mill and staff it.",
+   why:"It mills Cinderglass + Grave-Water into Sigil-Discs.", d:()=>staffed("mill")},
+  {t:"Raise an Assembly Ossuary and staff it.",
+   why:"It binds Sigil-Discs + Soul-Ash into Reliquary Cores.", d:()=>staffed("assembly")},
+  {t:"Raise a Spectral Datacenter and staff it.",
+   why:"It renders Reliquary Cores + Grave-Water into Compute, the engine's quota.", d:()=>staffed("datacenter")},
+  {t:"Now wait. As matter climbs the chain, your first Compute appears in the ledger up top.",
+   why:"Each staffed building consumes its inputs and produces its output over time. Short on a material? Add more gatherers.", d:()=>(G.stock.compute||0)>0},
+  {t:"The foundry breathes. Deliver Compute before each quota timer to hold back Dread. You're on your own now.",
+   why:"", d:()=>G.quota.level>1},
 ];
 let tutIdx=0, tutDone=false;
 function loadTut(){ try{ tutDone=localStorage.getItem('sf_tut')==='done'; }catch(e){} }
+function skipTut(){ tutDone=true; try{localStorage.setItem('sf_tut','done');}catch(e){} const g=$('goals'); if(g)g.style.display='none'; }
 function updateTutorial(){ const g=$('goals'); if(!g) return;
   if(tutDone){ g.style.display='none'; return; }
   while(tutIdx<TUT.length && TUT[tutIdx].d()) tutIdx++;
-  if(tutIdx>=TUT.length){ tutDone=true; try{localStorage.setItem('sf_tut','done');}catch(e){} g.style.display='none'; if(typeof toast==="function")toast("The foundry stands on its own now.","good"); return; }
+  if(tutIdx>=TUT.length){ skipTut(); if(typeof toast==="function")toast("Tutorial complete. The foundry stands on its own now.","good"); return; }
+  const step=TUT[tutIdx];
   g.style.display='block';
-  g.innerHTML=`<div class="gh">The engine whispers</div><div class="gt">${TUT[tutIdx].t}</div><div class="gp">${tutIdx} / ${TUT.length} steps taken</div>`;
+  g.innerHTML=`<div class="gh">Tutorial &middot; step ${tutIdx+1} of ${TUT.length}</div>
+    <div class="gt">${step.t}</div>
+    ${step.why?`<div class="gw">${step.why}</div>`:''}
+    <div class="gbar"><i style="width:${Math.round(tutIdx/TUT.length*100)}%"></i></div>
+    <div class="gp"><span class="gskip" onclick="skipTut()">skip tutorial</span></div>`;
 }
 
 /* research rites: spend Writ on permanent upgrades */
@@ -992,7 +1023,7 @@ function seedSettlement(){
   const grove=nodes.filter(n=>n.type==='grove').sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z))[0];
   let wc=null,pp=null;
   if(grove){ wc=placeBuildingFree("woodcutter",grove.x+2.6,grove.z); pp=placeBuildingFree("pithpost",grove.x-2.6,grove.z); }
-  for(let i=0;i<6;i++){ const a=rr(0,6.28), r=rr(3,8); spawnVillager(Math.cos(a)*r, Math.sin(a)*r, pick(["worker","worker","stump","reaper"])); }
+  for(let i=0;i<9;i++){ const a=rr(0,6.28), r=rr(3,8); spawnVillager(Math.cos(a)*r, Math.sin(a)*r, pick(["worker","worker","stump","reaper"])); }
   const free=villagers.filter(v=>!v.assigned);
   if(wc) for(let i=0;i<3&&free.length;i++) assignHusk(free.shift(),wc);
   if(pp) for(let i=0;i<2&&free.length;i++) assignHusk(free.shift(),pp);
@@ -1512,17 +1543,31 @@ function stepHusks(dt){
         n.amount-=take; v.carryAmt+=take; v.carryRes=b.def.res;
         if(n.amount<=0) depleteNode(n);
         if(v.carryAmt>=cap-0.01 || (n.amount<=0)) v.job="toDrop";
+        workAnim(v,dt);   // clawing at the node
       } else if(v.job==="toDrop"){
         if(moveHusk(v,b.x,b.z,dt,b.def.foot*0.6+1.3)){ addStock(v.carryRes,v.carryAmt); v.carryAmt=0; v.carryRes=null; v.job="toNode"; if(typeof onDeposit==="function")onDeposit(b); }
       }
-    } else { // refine / datacenter / market: stand at a work spot beside the building
+    } else { // refine / datacenter / market: stand at a work spot beside the building and labour
       const i=Math.max(0,b.workers.indexOf(v)); const ws=buildingWorkSpot(b,i);
       v.atWork=moveHusk(v,ws.x,ws.z,dt,0.7);
-      if(v.atWork){ v.obj.rotation.y=lerpAngle(v.obj.rotation.y,Math.atan2(b.x-v.obj.position.x,b.z-v.obj.position.z),0.1); }
+      if(v.atWork){ v.obj.rotation.y=lerpAngle(v.obj.rotation.y,Math.atan2(b.x-v.obj.position.x,b.z-v.obj.position.z),0.1); workAnim(v,dt); }
     }
   }
   separateHusks();
 }
+/* a working motion at a post (so staffed husks labour in place instead of standing or grinding into the wall) */
+function workAnim(v,dt){ const o=v.obj; v.wphase=(v.wphase||0)+dt*5; const s=Math.sin(v.wphase);
+  if(v.act) v.act.timeScale=0;
+  if(v.proc){ const ud=o.userData;
+    if(ud.arms&&ud.arms[0])ud.arms[0].rotation.x=-0.7-Math.max(0,s)*1.0;
+    if(ud.arms&&ud.arms[1])ud.arms[1].rotation.x=-0.7-Math.max(0,-s)*1.0;
+    o.position.y=terrainHeight(o.position.x,o.position.z)+Math.abs(s)*0.04;
+    if(v.caste==="stump") o.rotation.z=Math.sin(v.wphase*0.5)*0.05;
+  } else { o.position.y=terrainHeight(o.position.x,o.position.z)+Math.abs(Math.sin(v.wphase*0.8))*0.045; o.rotation.z=Math.sin(v.wphase*0.45)*0.05; }
+}
+function huskStateLabel(v){ if(!v||!v.assigned) return "idle"; const k=v.assigned.def.kind;
+  if(k==="gather") return v.job==="harvest"?"harvesting":v.job==="toDrop"?"hauling":"fetching";
+  return v.atWork?"working":"walking over"; }
 function depleteNode(n){ if(n.def.renew) return; n.amount=0; if(!n.mesh.userData.depleted){ n.mesh.userData.depleted=true;
   n.mesh.traverse(o=>{ if(o.isMesh&&o.material){ o.material=o.material.clone(); o.material.color&&o.material.color.multiplyScalar(0.5); o.material.emissiveIntensity&&(o.material.emissiveIntensity=0);} });
   n.mesh.scale.y*=0.6; } }
