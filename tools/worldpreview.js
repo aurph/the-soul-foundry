@@ -6,7 +6,6 @@
    faithful Color stub, so the preview is pixel-true to the game and can never
    drift from it. Pure Node (zlib).
 
-   Run:   node tools/worldpreview.js [seed]   -> writes tools/preview.png
    Module: require('./worldpreview') -> { terrainHeight, biomeColor, genRegions, regionAt, HALF, render } */
 const zlib=require('zlib'), fs=require('fs'), vm=require('vm'), path=require('path');
 

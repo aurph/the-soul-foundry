@@ -544,8 +544,8 @@ function bootWorld(seedOverride){
    ===================================================================== */
 const GCDN="https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/";
 const GLTF=new THREE.GLTFLoader();
-// Load a vendored local GLB first (zero external deps when hosted over http); fall back to the
-// Higgsfield CDN — required over file://, where browsers block XHR of local files.
+// Load a vendored local GLB first (zero external deps when hosted over http); fall back to a
+// CDN copy, which is needed over file:// where browsers block XHR of local files.
 function loadGLB(local,cdn,onLoad,onFail){ GLTF.load(local,onLoad,undefined,()=>{ if(cdn) GLTF.load(cdn,onLoad,undefined,()=>onFail&&onFail()); else onFail&&onFail(); }); }
 const VILLAGER_GLB="assets/glb/villager.glb", VILLAGER_GLB_CDN=GCDN+"fe782d76-8f97-437e-b60d-ae368fd6b5ab.glb";
 let REAPER_GLB="assets/glb/reaper.glb", REAPER_GLB_CDN=GCDN+"1e40cd84-913b-4cb4-8f55-5c8e2dc49d74.glb";   // skeletal Reaper husk leaning on a staff (non-rigged, swayed in code)
@@ -1292,7 +1292,7 @@ const BLD_IMG={
   ventcap:"assets/img/ventcap.jpg", wellrig:"assets/img/wellrig.png", salvage:"assets/img/salvage.png",
   market:"assets/img/market.png", stockpile:"assets/img/stockpile.png",
 };
-// AI building models (concept render -> image_to_3d). Local first, Higgsfield CDN fallback for file://.
+// AI building models (concept render -> image_to_3d). Local first, CDN fallback for file://.
 // Hearth + stockpile stay procedural on purpose (their animated flame / dynamic material piles).
 const BLD_GLB={
   den:"assets/glb/den.glb", furnace:"assets/glb/furnace.glb", mill:"assets/glb/mill.glb", assembly:"assets/glb/assembly.glb",

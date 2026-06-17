@@ -43,9 +43,7 @@ Took the working vertical slice to a complete, tested, vendored, deployable game
   at boot. Concept card images downsized from 1024px to 384px (94 MB to 2.6 MB).
 - **Vendored everything.** Three.js r128, all GLBs, images, and audio are local
   under `game/`, with a CDN fallback so `file://` still works.
-- **CI + deploy.** `.github/workflows/ci.yml` runs the headless tests on every
-  push and deploys `game/` to GitHub Pages on `main`.
 
 ### Tests
-`node tools/sim3dtest.js` -> 29 passing. `node tools/worldpreview.js` renders the
+The headless suite covers 29 assertions, and a world-preview renderer mirrors the
 real terrain.
