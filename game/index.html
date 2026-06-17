@@ -327,16 +327,18 @@ function terrainHeight(x,z){
   if(rv<0.045) h-=5*(1-rv/0.045);
   return h;
 }
-const BIOME_HSL={ forest:[0.27,0.16,0.26], silica:[0.10,0.05,0.42], ash:[0.04,0.06,0.17],
-  ruins:[0.60,0.05,0.30], graves:[0.33,0.08,0.28], bog:[0.22,0.16,0.22] };
+const BIOME_HSL={ forest:[0.26,0.24,0.27], silica:[0.10,0.07,0.5], ash:[0.03,0.12,0.15],
+  ruins:[0.58,0.09,0.33], graves:[0.31,0.13,0.31], bog:[0.22,0.22,0.23] };
 function biomeColor(x,z,h,slope){
   const c=new THREE.Color();
-  if(h<-4) c.setHSL(0.08,0.06,0.20); else if(h<-1) c.setHSL(0.09,0.10,0.27);
-  else if(h<6) c.setHSL(0.11,0.10,0.34); else c.setHSL(0.07,0.05,0.42);
+  if(h<-4) c.setHSL(0.08,0.08,0.17); else if(h<-1) c.setHSL(0.09,0.13,0.25);
+  else if(h<6) c.setHSL(0.10,0.14,0.33); else c.setHSL(0.08,0.08,0.45);
   const rg=regionAt(x,z);
   if(rg){ const b=BIOME_HSL[rg.reg.type]; const bc=new THREE.Color().setHSL(b[0],b[1],b[2]);
-    const t=Math.pow(rg.t,0.6)*0.92; c.lerp(bc,t); }
-  c.offsetHSL(0,0,-clamp(slope*0.7,0,0.45)*0.4 + (fbm(x*0.5,z*0.5)-0.5)*0.05);
+    const t=Math.pow(rg.t,0.5)*0.95; c.lerp(bc,t); }
+  // mottled ground: patchy lightness + slight hue drift so the floor reads as textured dirt, not a flat gradient
+  const patch=(fbm(x*0.13+3,z*0.13-2)-0.5)*0.17 + (fbm(x*0.55,z*0.55)-0.5)*0.08;
+  c.offsetHSL((fbm(x*0.09,z*0.09)-0.5)*0.04, (fbm(x*0.21-5,z*0.21)-0.5)*0.12, patch - clamp(slope*0.7,0,0.45)*0.4);
   return c;
 }
 function buildTerrain(){
@@ -491,7 +493,7 @@ function buildMegacityHorizon(){
 /* =====================================================================
    === CAMERA RIG: constrained orbit (drag rotate / wheel zoom / pan) ===
    ===================================================================== */
-const Cam={ target:new THREE.Vector3(0,-1,0), az:Math.PI*0.25, el:0.8, dist:78, minD:22, maxD:200 };
+const Cam={ target:new THREE.Vector3(0,-1,0), az:Math.PI*0.25, el:0.72, dist:48, minD:18, maxD:200 };
 function updateCamera(){
   const ce=clamp(Cam.el,0.5,1.4);
   const cx=Cam.target.x+Cam.dist*Math.cos(ce)*Math.sin(Cam.az);
@@ -1160,7 +1162,7 @@ function placeNode(type,x,z){ const n=makeNode(type); n.x=x; n.z=z; n.mesh.posit
 function makeShard(){ const g=new THREE.Group(); for(let i=0;i<2+rint(3);i++){ const s=new THREE.Mesh(new THREE.ConeGeometry(rr(0.2,0.5),rr(0.9,2.2),4),MAT(0xc8c2b4));
   s.position.set(rr(-0.6,0.6),rr(0.3,0.8),rr(-0.6,0.6)); s.rotation.set(rr(-0.4,0.4),rr(0,6),rr(-0.4,0.4)); g.add(s);} return g; }
 function dropProp(maker,x,z,rot){ const o=maker; o.position.set(x,terrainHeight(x,z),z); if(rot)o.rotation.y=rr(0,6); decoGroup.add(o); }
-function sigilMat(){ const m=emis(0xeae6da); m.emissiveIntensity=0.55; m.fog=true; return m; }
+function sigilMat(){ const m=emis(0xece6d4); m.emissiveIntensity=0.85; m.fog=true; return m; }
 function makeSigilCross(){ const g=new THREE.Group(), m=sigilMat(); const hpost=rr(1.5,2.6);
   const post=new THREE.Mesh(new THREE.BoxGeometry(0.13,hpost,0.13),m); post.position.y=hpost/2; g.add(post);
   const bar=new THREE.Mesh(new THREE.BoxGeometry(rr(0.7,1.15),0.13,0.13),m); bar.position.y=hpost*rr(0.62,0.8); g.add(bar);
@@ -1201,10 +1203,13 @@ function scatterWorld(){
     const r=rnd(); dropProp(r<0.45?makeDeadTree2(rr(0.6,1.2)):r<0.7?makeRock():r<0.86?makeBonePile():makeAshMound(), x,z, r<0.45);
   }
   // Haunted Mound: stark white crosses + sigils staked across the dark land
-  for(let i=0;i<52;i++){ const x=rr(-HALF+4,HALF-4), z=rr(-HALF+4,HALF-4);
-    if(Math.hypot(x,z)<11) continue; if(terrainHeight(x,z)<-3.2) continue;
+  for(let i=0;i<110;i++){ const x=rr(-HALF+4,HALF-4), z=rr(-HALF+4,HALF-4);
+    if(Math.hypot(x,z)<8) continue; if(terrainHeight(x,z)<-3.2) continue;
     dropProp(rnd()<0.74?makeSigilCross():makeSigilRing(), x,z, false);
   }
+  // a stand of stark white crosses + sigils staked right around the settlement (the signature, and highly readable)
+  for(let i=0;i<80;i++){ const a=rr(0,6.28), rad=rr(10,42); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-3.0) continue; dropProp(rnd()<0.72?makeSigilCross():makeSigilRing(), x,z, false); }
   // dead server-towers carry the datacenter/machine motif across the desolation
   for(let i=0;i<26;i++){ const a=rr(0,6.28), r=rr(13,HALF-5); const x=Math.cos(a)*r, z=Math.sin(a)*r;
     if(terrainHeight(x,z)<-3.2||regionAt(x,z)) continue; dropProp(makeServerTower(),x,z,true); }
@@ -1221,9 +1226,10 @@ function scatterGroundDetail(){
     for(let i=0;i<count;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF); const h=terrainHeight(x,z); if(h<(minH||-3.4))continue;
       const s=sfn(); M.makeScale(s.x,s.y,s.z); M.setPosition(x,h+yfn(s),z); im.setMatrixAt(n++,M); }
     im.count=n; im.instanceMatrix.needsUpdate=true; im.frustumCulled=false; scene.add(im); return im; };
-  mk(new THREE.DodecahedronGeometry(0.4,0), MAT(0x2b2d2f), 3200, s=>0.1, ()=>{const a=rr(0.25,1.1);return{x:a,y:a*rr(0.5,1),z:a};});
-  mk(new THREE.ConeGeometry(0.1,0.7,4), MAT(0x2e2b20), 3800, s=>s.y*0.35, ()=>{const a=rr(0.6,1.6);return{x:1,y:a,z:1};});  // dead grass tufts
-  mk(new THREE.IcosahedronGeometry(0.18,0), MAT(0x23252a), 2200, s=>0.08, ()=>{const a=rr(0.4,1.0);return{x:a,y:a*0.6,z:a};});
+  mk(new THREE.DodecahedronGeometry(0.5,0), MAT(0x474a50), 3800, s=>0.12, ()=>{const a=rr(0.35,1.5);return{x:a,y:a*rr(0.5,1),z:a};});      // pale rubble & stones
+  mk(new THREE.ConeGeometry(0.12,0.95,4), MAT(0x3d4231), 4400, s=>s.y*0.4, ()=>{const a=rr(0.7,2.0);return{x:1,y:a,z:1};});           // tufts of dead grass
+  mk(new THREE.IcosahedronGeometry(0.22,0), MAT(0x575347), 2800, s=>0.1, ()=>{const a=rr(0.45,1.3);return{x:a,y:a*0.6,z:a};});         // bone-grey debris
+  mk(new THREE.BoxGeometry(0.5,0.18,0.5), MAT(0x4f463a), 1400, s=>0.06, ()=>{const a=rr(0.6,1.8);return{x:a,y:1,z:a*rr(0.6,1)};});     // flat broken slabs / dirt patches
 }
 function nearestNode(type,x,z){ let best=null,bd=1e9; for(const n of nodes){ if(n.type!==type||n.amount<=0)continue;
   const d=(n.x-x)*(n.x-x)+(n.z-z)*(n.z-z); if(d<bd){bd=d;best=n;} } return best?{node:best,dist:Math.sqrt(bd)}:null; }
