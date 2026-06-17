@@ -1,9 +1,8 @@
 /* Headless economy test for THE SOUL FOUNDRY.
    Stubs THREE + DOM, loads the real game script (minus start()), then drives a
-   full settlement to verify gather->refine->Compute, needs, and no exceptions.
-   Run: node tools/sim3dtest.js                                                */
+   full settlement to verify gather->refine->Compute, needs, and no exceptions. */
 const fs=require('fs'), vm=require('vm'), path=require('path');
-let code=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8')
+let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
 code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions};`;
