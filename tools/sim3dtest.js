@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -19,7 +19,8 @@ function Obj(){return{position:Vec3(),rotation:Vec3(),scale:Scl(),userData:{},ch
 function Col(){return{r:.5,g:.5,b:.5,set(){return this;},setHSL(){return this;},offsetHSL(){return this;},multiplyScalar(){return this;},clone(){return Col();},copy(){return this;},toString(){return"888888";}};}
 function Mat(){return{color:Col(),emissive:Col(),emissiveIntensity:1,side:0,transparent:false,opacity:1,clone(){return Mat();}};}
 function Geo(){return{attributes:{position:{count:0,getX:()=>0,getY:()=>0,getZ:()=>0,setX(){},setY(){},setZ(){},needsUpdate:false},normal:{getX:()=>0,getY:()=>1,getZ:()=>0}},
-  rotateX(){return this;},rotateY(){return this;},computeVertexNormals(){},setAttribute(){}};}
+  parameters:{radius:1,width:1,height:1,depth:1,radiusTop:1,radiusBottom:1},
+  rotateX(){return this;},rotateY(){return this;},translate(){return this;},center(){return this;},computeVertexNormals(){},setAttribute(){},dispose(){}};}
 function Mesh(){const o=Obj();o.isMesh=true;o.material=Mat();o.geometry=Geo();o.clone=function(){const c=Mesh();c.position.copy(o.position);c.rotation.copy(o.rotation);return c;};return o;}
 const geoCtor=function(){return Geo();};
 const THREE={ WebGLRenderer:function(){return{setClearColor(){},outputEncoding:0,setPixelRatio(){},setSize(){},render(){},shadowMap:{}};},
@@ -104,6 +105,55 @@ try{ T.G.over=null; T.G.dread=0; T.nodes.length=0; T.G.stock.pith=0; T.G.stock.w
   for(const seed of [42,7,314,999,55,1234]){ T.genRegions(seed);
     for(let i=0;i<240;i++){ const a=Math.random()*6.283, r=Math.random()*68; const x=Math.cos(a)*r, z=Math.sin(a)*r; total++; if(T.buildingFits(x,z,1.8)) okp++; } }
   ok("most open land is buildable (placement)", okp/total>0.9, (100*okp/total).toFixed(0)+"% of valley buildable across 6 seeds"); }
+
+// --- material repositories / stockpiles (#1 sauce) ---
+{ T.buildings.length=0; T.nodes.length=0; T.G.over=null; T.G.stock.wood=0;
+  const baseCap=T.storageCap("wood");
+  ok("storageCap returns a positive floor", baseCap>0, "base="+baseCap);
+  const sp=T.placeBuildingFree("stockpile",8,8);
+  const raised=T.storageCap("wood");
+  ok("a stockpile raises storage capacity", raised>baseCap, baseCap+" -> "+raised);
+  for(let i=0;i<5000;i++) T.addStock("wood",1);
+  ok("addStock can exceed the base cap once a stockpile stands", T.G.stock.wood>baseCap, "wood="+Math.floor(T.G.stock.wood)+" (base "+baseCap+")");
+  ok("addStock still clamps to the raised cap", T.G.stock.wood<=raised+0.001, "wood="+Math.floor(T.G.stock.wood)+" <= "+raised);
+  T.G.stock.ash=0; ok("pileFill is 0 when empty", T.pileFill("ash")===0, "fill="+T.pileFill("ash"));
+  T.G.stock.wood=raised; ok("pileFill is ~1 when full", Math.abs(T.pileFill("wood")-1)<0.001, "fill="+T.pileFill("wood").toFixed(2));
+  ok("stockpile yard builds 8 material bins", sp.mesh.userData.piles&&sp.mesh.userData.piles.length===8, "bins="+(sp.mesh.userData.piles||[]).length);
+  T.G.stock.wood=raised*0.5; T.updateStockpiles();
+  const woodPile=sp.mesh.userData.piles.find(p=>p.res==="wood");
+  ok("updateStockpiles scales a pile to its fill", woodPile&&Math.abs(woodPile.node.scale.y-0.5)<0.02&&woodPile.node.visible, "scaleY="+(woodPile?woodPile.node.scale.y.toFixed(2):"?"));
+}
+
+// --- save/load round-trips the whole foundry ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null;
+  T.seedSettlement();
+  T.placeNode("grove",-10,0); T.placeBuildingFree("furnace",-3,-3);
+  T.spawnVillager(2,2,"reaper");
+  T.G.stock.silica=42; T.G.writ=77; T.G.dread=33; T.G.quota.level=4;
+  const snap=T.serializeState();
+  const nb=T.buildings.length, nv=T.villagers.filter(v=>!v.dead).length, nn=T.nodes.length;
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.writ=0; T.G.dread=0; T.G.stock.silica=0; T.G.quota.level=1;
+  T.applySave(snap);
+  ok("save/load restores buildings", T.buildings.length===nb, T.buildings.length+"/"+nb);
+  ok("save/load restores villagers", T.villagers.filter(v=>!v.dead).length===nv, T.villagers.length+"/"+nv);
+  ok("save/load restores nodes", T.nodes.length===nn, T.nodes.length+"/"+nn);
+  ok("save/load restores resources & writ", T.G.stock.silica===42&&T.G.writ===77, "sil="+T.G.stock.silica+" writ="+T.G.writ);
+  ok("save/load restores quota progress", T.G.quota.level===4, "lvl="+T.G.quota.level);
+}
+
+// --- audio engine is headless-safe (sim hooks must never crash without an AudioContext) ---
+{ ok("SND sound engine exists", !!T.SND);
+  let threwS=null; try{ T.SND.sfx('bell'); T.SND.sfx('place'); T.SND.sfx('crumble'); T.SND.setTension(0.5); }catch(e){ threwS=e; }
+  ok("SND calls are no-ops when not started (headless-safe)", !threwS && T.SND.started===false, threwS?String(threwS):"started="+T.SND.started); }
+
+// --- world-preview tool renders the REAL terrain (drift guard) ---
+{ const WP=require('./worldpreview');
+  let maxDiff=0; for(const [x,z] of [[0,0],[12,-7],[-20,33],[40,40],[-55,10],[5,60]]) maxDiff=Math.max(maxDiff,Math.abs(WP.terrainHeight(x,z)-T.terrainHeight(x,z)));
+  ok("world-preview terrain matches the game exactly (no drift)", maxDiff<1e-9, "maxDiff="+maxDiff);
+  const tmp=require('path').join(require('os').tmpdir(),'sf_preview_test.png'); let rendered=false;
+  try{ WP.render(42,tmp,64); rendered=require('fs').existsSync(tmp); require('fs').unlinkSync(tmp); }catch(e){ rendered=false; }
+  ok("world-preview renders a PNG without throwing", rendered);
+}
 
 console.log("\n=== "+pass+" passed, "+fail+" failed ===");
 process.exit(fail?1:0);

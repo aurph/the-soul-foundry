@@ -121,6 +121,14 @@
   .modal p{font-size:14px;line-height:1.65;color:var(--ink)}
   .kbd{display:inline-block;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;
     font:11px monospace;color:var(--ink-bright);background:#1c1e25}
+  .optrow{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:8px 0;border-bottom:1px dotted #23252d;font-size:14px;color:var(--ink)}
+  .optrow input[type=range]{flex:1;max-width:230px;accent-color:var(--ember)}
+  .optrow input[type=checkbox]{width:16px;height:16px;accent-color:var(--ember)}
+  .obj-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+  #goals{position:fixed;left:8px;bottom:122px;z-index:26;max-width:252px;padding:9px 12px;border-radius:8px;display:none}
+  #goals .gh{font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase}
+  #goals .gt{font-size:12.5px;color:var(--ink-bright);line-height:1.42;margin-top:4px}
+  #goals .gp{font-size:10px;color:var(--ink-dim);margin-top:5px;letter-spacing:.5px}
   #hint{position:fixed;left:50%;top:128px;transform:translateX(-50%);z-index:45;padding:5px 13px;border-radius:5px;
     font-size:12px;color:var(--ember-soft);background:#0d0e12cc;border:1px solid var(--line);pointer-events:none;display:none;white-space:nowrap}
   #dev{position:fixed;left:6px;bottom:116px;color:#6c8;font:11px monospace;z-index:60;display:none}
@@ -142,6 +150,7 @@
 <div id="quota" class="frame"></div>
 <div id="rail"></div>
 <div id="inspect" class="frame"></div>
+<div id="goals" class="frame"></div>
 <div id="toasts"></div>
 <div id="hint"></div>
 <div id="dev"></div>
@@ -158,10 +167,14 @@
   <div class="msg" id="bootmsg">waking the engine…</div>
 </div>
 
-<!-- Three.js r128 + addons as CLASSIC scripts (work over file://, unlike ES modules) -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<!-- Three.js r128 + addons, vendored locally as CLASSIC scripts (work over file://, unlike ES modules).
+     Each is followed by a document.write CDN fallback in case a local file is missing. -->
+<script src="vendor/three.min.js"></script>
+<script>typeof THREE!=="undefined"||document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/scr'+'ipt>');</script>
+<script src="vendor/GLTFLoader.js"></script>
+<script>(typeof THREE!=="undefined"&&THREE.GLTFLoader)||document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"><\/scr'+'ipt>');</script>
+<script src="vendor/SkeletonUtils.js"></script>
+<script>(typeof THREE!=="undefined"&&THREE.SkeletonUtils)||document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"><\/scr'+'ipt>');</script>
 
 <script>
 /* =====================================================================
@@ -196,6 +209,73 @@ function vnoise(x,y){ const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
   return lerp(lerp(h(xi,yi),h(xi+1,yi),u),lerp(h(xi,yi+1),h(xi+1,yi+1),u),v);
 }
 function fbm(x,y){ let s=0,a=0.5,f=1; for(let i=0;i<4;i++){ s+=a*vnoise(x*f,y*f); f*=2; a*=0.5; } return s; }
+
+/* =====================================================================
+   === SOUND: a WebAudio synth bed + SFX that need ZERO downloads
+   (so audio works over file:// and fully offline), with AI-generated
+   music & sound effects layered on top whenever their files load.
+   ===================================================================== */
+const SND={
+  ctx:null, master:null, sfxGain:null, droneGain:null,
+  started:false, muted:false, musicVol:0.55, sfxVol:0.8,
+  pool:{}, music:null, dread:null, droneNodes:[],
+  // asset urls — null means "synth only"; the build fills these with vendored paths
+  src:{ music:"assets/audio/music.m4a", dread:"assets/audio/dread.m4a", place:"assets/audio/place.mp3",
+        bell:"assets/audio/bell.mp3", crumble:"assets/audio/crumble.mp3", haunt:"assets/audio/haunt.mp3", rise:"assets/audio/rise.mp3" },
+  load(){ try{ const s=localStorage.getItem('sf_audio'); if(s){ const o=JSON.parse(s);
+    if(typeof o.m==='number')this.musicVol=o.m; if(typeof o.s==='number')this.sfxVol=o.s; this.muted=!!o.x; } }catch(e){} },
+  save(){ try{ localStorage.setItem('sf_audio',JSON.stringify({m:this.musicVol,s:this.sfxVol,x:this.muted})); }catch(e){} },
+  // called on the first user gesture (browsers block audio until then)
+  resume(){ if(this.started){ if(this.ctx&&this.ctx.state==="suspended")this.ctx.resume(); return; }
+    this.started=true; this.load();
+    try{ const AC=window.AudioContext||window.webkitAudioContext; if(AC){ this.ctx=new AC();
+      this.master=this.ctx.createGain(); this.master.gain.value=this.muted?0:1; this.master.connect(this.ctx.destination);
+      this.sfxGain=this.ctx.createGain(); this.sfxGain.gain.value=this.sfxVol; this.sfxGain.connect(this.master);
+      this.startDrone(); } }catch(e){}
+    this.startMusic();
+  },
+  mkEl(url,loop,vol){ try{ const a=document.createElement('audio'); a.src=url; a.loop=!!loop; a.preload="auto";
+    a.volume=(this.muted?0:1)*(vol==null?1:vol); return a; }catch(e){ return null; } },
+  startMusic(){ try{ if(this.src.music){ this.music=this.mkEl(this.src.music,true,this.musicVol); if(this.music){ const p=this.music.play(); if(p&&p.catch)p.catch(()=>{}); } }
+    if(this.src.dread){ this.dread=this.mkEl(this.src.dread,true,0); if(this.dread){ const p=this.dread.play(); if(p&&p.catch)p.catch(()=>{}); } } }catch(e){} },
+  // crossfade an optional 'dread' music layer up as Dread rises
+  setTension(t){ try{ if(this.dread)this.dread.volume=(this.muted?0:1)*this.musicVol*clamp(t,0,1)*0.9;
+    if(this.music)this.music.volume=(this.muted?0:1)*this.musicVol*(1-clamp(t,0,1)*0.5); }catch(e){} },
+  sfx(name){ if(!this.started||this.muted) return; const url=this.src[name];
+    if(url){ this.playEl(name,url); } else { this.synth(name); } },
+  playEl(name,url){ try{ let pool=this.pool[name]; if(!pool){ pool=this.pool[name]=[this.mkEl(url,false,this.sfxVol),this.mkEl(url,false,this.sfxVol),this.mkEl(url,false,this.sfxVol)]; }
+    const a=pool.find(e=>e&&(e.paused||e.ended))||pool[0]; if(a){ a.volume=this.muted?0:this.sfxVol; a.currentTime=0; const p=a.play(); if(p&&p.catch)p.catch(()=>this.synth(name)); } }catch(e){ this.synth(name); } },
+  /* ---- pure-synth SFX + ambient (no assets needed) ---- */
+  envOsc(o,g,a,d,glideTo){ const now=this.ctx.currentTime; if(glideTo)o.frequency.exponentialRampToValueAtTime(glideTo,now+a+d);
+    const gn=this.ctx.createGain(); gn.gain.setValueAtTime(0.0001,now); gn.gain.exponentialRampToValueAtTime(g,now+a); gn.gain.exponentialRampToValueAtTime(0.0001,now+a+d);
+    o.connect(gn); gn.connect(this.sfxGain); o.start(now); o.stop(now+a+d+0.05); },
+  tone(freq,type,g,a,d,glideTo){ if(!this.ctx)return; const o=this.ctx.createOscillator(); o.type=type||"sine"; o.frequency.setValueAtTime(freq,this.ctx.currentTime); this.envOsc(o,g,a,d,glideTo); },
+  noise(g,a,d,lp){ if(!this.ctx)return; const len=Math.floor(this.ctx.sampleRate*(a+d+0.1)); const buf=this.ctx.createBuffer(1,len,this.ctx.sampleRate); const ch=buf.getChannelData(0); for(let i=0;i<len;i++)ch[i]=Math.random()*2-1;
+    const n=this.ctx.createBufferSource(); n.buffer=buf; const f=this.ctx.createBiquadFilter(); f.type="lowpass"; f.frequency.value=lp||1200;
+    const now=this.ctx.currentTime; const gn=this.ctx.createGain(); gn.gain.setValueAtTime(0.0001,now); gn.gain.exponentialRampToValueAtTime(g,now+a); gn.gain.exponentialRampToValueAtTime(0.0001,now+a+d);
+    n.connect(f); f.connect(gn); gn.connect(this.sfxGain); n.start(now); n.stop(now+a+d+0.12); },
+  synth(name){ if(!this.ctx)return; switch(name){
+    case "place":   this.tone(72,"sine",0.5,0.004,0.2,42); this.noise(0.28,0.004,0.16,700); break;
+    case "bell":    this.tone(180,"sine",0.35,0.005,1.7); this.tone(271,"sine",0.16,0.005,1.4); this.tone(417,"sine",0.08,0.005,1.0); break;
+    case "crumble": this.noise(0.4,0.005,0.5,2600); this.tone(120,"sawtooth",0.12,0.01,0.4,48); break;
+    case "haunt":   this.tone(330,"sine",0.12,0.4,1.3,292); this.tone(495,"triangle",0.06,0.5,1.0,470); break;
+    case "rise":    this.tone(88,"sine",0.26,0.5,0.8,165); break;
+    case "click":   this.tone(840,"square",0.04,0.002,0.04); break;
+    case "deny":    this.tone(150,"square",0.12,0.005,0.16,90); break;
+    case "win":     [262,330,392,523].forEach((f,i)=>setTimeout(()=>this.tone(f,"sine",0.25,0.01,0.8),i*150)); break;
+    case "lose":    [220,175,131,98].forEach((f,i)=>setTimeout(()=>this.tone(f,"sawtooth",0.2,0.02,0.9,f*0.6),i*210)); break;
+  } },
+  startDrone(){ if(!this.ctx)return; const base=this.ctx.createGain(); base.gain.value=0.10; base.connect(this.master); this.droneGain=base;
+    [55,55.35,82.5].forEach((fr,i)=>{ const o=this.ctx.createOscillator(); o.type=i<2?"sine":"triangle"; o.frequency.value=fr;
+      const g=this.ctx.createGain(); g.gain.value=i<2?0.5:0.16; o.connect(g); g.connect(base); o.start(); this.droneNodes.push(o);
+      const lfo=this.ctx.createOscillator(); lfo.frequency.value=0.05+i*0.027; const lg=this.ctx.createGain(); lg.gain.value=1.4; lfo.connect(lg); lg.connect(o.frequency); lfo.start(); });
+    const len=Math.floor(this.ctx.sampleRate*4); const buf=this.ctx.createBuffer(1,len,this.ctx.sampleRate); const ch=buf.getChannelData(0); for(let i=0;i<len;i++)ch[i]=Math.random()*2-1;
+    const n=this.ctx.createBufferSource(); n.buffer=buf; n.loop=true; const f=this.ctx.createBiquadFilter(); f.type="lowpass"; f.frequency.value=360; const g=this.ctx.createGain(); g.gain.value=0.05; n.connect(f); f.connect(g); g.connect(base); n.start(); },
+  setMusicVol(v){ this.musicVol=clamp(v,0,1); if(this.music)this.music.volume=this.muted?0:this.musicVol; this.save(); },
+  setSfxVol(v){ this.sfxVol=clamp(v,0,1); if(this.sfxGain)this.sfxGain.gain.value=this.sfxVol; this.save(); },
+  toggleMute(){ this.muted=!this.muted; if(this.master)this.master.gain.value=this.muted?0:1; if(this.music)this.music.volume=this.muted?0:this.musicVol; this.save(); return this.muted; },
+};
+SND.load();
 
 /* =====================================================================
    === WORLD: renderer, scene, lighting, fog, terrain, atmosphere ===
@@ -374,25 +454,27 @@ function buildMegacityHorizon(){
   const darker=new THREE.MeshStandardMaterial({color:0x0c0e14,flatShading:true,roughness:1,metalness:0.2});
   const riftMat=new THREE.MeshBasicMaterial({color:0x2f6f78});
   const grp=new THREE.Group(); scene.add(grp);
-  // three concentric belts of broken towers at increasing distance (parallax depth)
+  // three concentric belts of broken towers (parallax depth). Towers are INSTANCED — ~150 of them
+  // collapse to 2 draw calls instead of 150 meshes.
   const belts=[{rad:150,n:60,hmin:24,hmax:70,mat:dark},{rad:200,n:50,hmin:40,hmax:120,mat:dark},{rad:270,n:42,hmin:60,hmax:180,mat:darker}];
+  const total=belts.reduce((s,b)=>s+b.n,0), box=new THREE.BoxGeometry(1,1,1);
+  const towersDark=new THREE.InstancedMesh(box,dark,total), towersDk=new THREE.InstancedMesh(box,darker,total);
+  let nd=0,nk=0; const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),P=new THREE.Vector3(),S=new THREE.Vector3();
   for(const b of belts){
     for(let i=0;i<b.n;i++){
       const a=(i/b.n)*6.283+rr(-0.05,0.05), rad=b.rad+rr(-25,25);
       const h=rr(b.hmin,b.hmax), w=rr(8,22), d=rr(8,22);
-      const tower=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),b.mat);
-      // shear/tilt some towers like they're collapsing
-      tower.position.set(Math.cos(a)*rad, h/2-10, Math.sin(a)*rad);
-      tower.rotation.y=rr(0,6); tower.rotation.z=rr(-0.16,0.16);
-      grp.add(tower);
-      // crown some with a broken cap or antenna
+      const px=Math.cos(a)*rad, py=h/2-10, pz=Math.sin(a)*rad, ry=rr(0,6), rz=rr(-0.16,0.16);
+      E.set(0,ry,rz); Q.setFromEuler(E); P.set(px,py,pz); S.set(w,h,d); M.compose(P,Q,S);
+      if(b.mat===darker) towersDk.setMatrixAt(nk++,M); else towersDark.setMatrixAt(nd++,M);
       if(rnd()<0.4){ const cap=new THREE.Mesh(new THREE.CylinderGeometry(0,w*0.4,rr(10,30),4),b.mat);
-        cap.position.set(tower.position.x,tower.position.y+h/2,tower.position.z); cap.rotation.copy(tower.rotation); grp.add(cap); }
-      // faint vertical rift seams of cyan on nearer belt
+        cap.position.set(px,py+h/2,pz); cap.rotation.set(0,ry,rz); grp.add(cap); }
       if(b.rad<210 && rnd()<0.5){ const seam=new THREE.Mesh(new THREE.BoxGeometry(0.6,h*rr(0.3,0.7),0.6),riftMat);
-        seam.position.set(tower.position.x,tower.position.y+rr(-h*0.2,h*0.2),tower.position.z+d*0.5); grp.add(seam); }
+        seam.position.set(px,py+rr(-h*0.2,h*0.2),pz+d*0.5); grp.add(seam); }
     }
   }
+  towersDark.count=nd; towersDk.count=nk; towersDark.instanceMatrix.needsUpdate=true; towersDk.instanceMatrix.needsUpdate=true;
+  towersDark.frustumCulled=false; towersDk.frustumCulled=false; grp.add(towersDark); grp.add(towersDk);
   // a colossal fallen ring-structure half-sunk on the far horizon (the dead arcology's halo)
   const ring=new THREE.Mesh(new THREE.TorusGeometry(120,9,8,40),darker);
   ring.position.set(-120,40,-230); ring.rotation.set(1.15,0.5,0.3); grp.add(ring);
@@ -425,7 +507,7 @@ let mixers=[];   // animation mixers (villagers)
 let _grainCv=null,_grainCtx=null,_grainT=0;
 function drawGrain(){ if(!_grainCv){ _grainCv=document.getElementById('grain'); if(!_grainCv)return; _grainCtx=_grainCv.getContext('2d'); _grainCv.width=160; _grainCv.height=100; }
   const id=_grainCtx.createImageData(160,100), d=id.data; for(let i=0;i<d.length;i+=4){ const v=(Math.random()*255)|0; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } _grainCtx.putImageData(id,0,0); }
-function tickRender(dt){ stepAsh(dt); for(const m of mixers) m.update(dt); _grainT+=dt; if(_grainT>0.055){ _grainT=0; drawGrain(); } }
+function tickRender(dt){ stepAsh(dt); for(const m of mixers) m.update(dt); if(typeof updateStockpiles==="function") updateStockpiles(); _grainT+=dt; if(_grainT>0.055){ _grainT=0; drawGrain(); } }
 function loop(now){
   requestAnimationFrame(loop);
   let real=(now-_last)/1000; _last=now; if(real>0.2) real=0.2;
@@ -437,10 +519,10 @@ function loop(now){
   renderer.render(scene,camera);
 }
 
-function bootWorld(){
+function bootWorld(seedOverride){
   bootmsg("raising the valley…");
-  WORLD_SEED=((Date.now())%1e6)|0; RNG=mulberry32(WORLD_SEED); genRegions(WORLD_SEED);
-  resize(); buildTerrain(); buildEnvironment(); scatterWorld(); buildAsh(); loadBuildingGLBs();
+  WORLD_SEED=(seedOverride!=null?seedOverride:((Date.now())%1e6))|0; RNG=mulberry32(WORLD_SEED); genRegions(WORLD_SEED);
+  resize(); buildTerrain(); buildEnvironment(); scatterWorld(); buildAsh();
   Cam.target.set(0,terrainHeight(0,0),0);
   updateCamera();
   // reveal
@@ -452,13 +534,20 @@ function bootWorld(){
 /* =====================================================================
    === VILLAGERS: load rigged GLB (walk) + procedural fallback ===
    ===================================================================== */
-const VILLAGER_GLB="https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/fe782d76-8f97-437e-b60d-ae368fd6b5ab.glb";
+const GCDN="https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/";
 const GLTF=new THREE.GLTFLoader();
+// Load a vendored local GLB first (zero external deps when hosted over http); fall back to the
+// Higgsfield CDN — required over file://, where browsers block XHR of local files.
+function loadGLB(local,cdn,onLoad,onFail){ GLTF.load(local,onLoad,undefined,()=>{ if(cdn) GLTF.load(cdn,onLoad,undefined,()=>onFail&&onFail()); else onFail&&onFail(); }); }
+const VILLAGER_GLB="assets/glb/villager.glb", VILLAGER_GLB_CDN=GCDN+"fe782d76-8f97-437e-b60d-ae368fd6b5ab.glb";
+let REAPER_GLB="assets/glb/reaper.glb", REAPER_GLB_CDN=null;   // CDN filled once the rigged reaper bakes
 let vProto=null, vClips=null, vReady=false, vFailed=false;
+let rProto=null, rClips=null, rReady=false;                   // rigged Reaper husk
 function loadVillager(cb){
   bootmsg("binding the husks…");
-  GLTF.load(VILLAGER_GLB, g=>{ vProto=g.scene; vClips=g.animations||[]; vReady=true; cb&&cb(true); },
-    undefined, ()=>{ vFailed=true; cb&&cb(false); });
+  loadGLB(REAPER_GLB,REAPER_GLB_CDN, g=>{ rProto=g.scene; rClips=g.animations||[]; rReady=true; }, ()=>{});
+  loadGLB(VILLAGER_GLB,VILLAGER_GLB_CDN, g=>{ vProto=g.scene; vClips=g.animations||[]; vReady=true; cb&&cb(true); },
+    ()=>{ vFailed=true; cb&&cb(false); });
 }
 const WOOD=[0x2b2620,0x33291f,0x222a22,0x39301f], CLOTH=[0x1b1c1f,0x232019,0x191a17];
 function makeProcVillager(caste){
@@ -497,20 +586,25 @@ function makeProcVillager(caste){
 }
 const villagers=[];
 function spawnVillager(x,z,caste){
-  let obj,mixer=null,act=null,proc=false;
-  if(vReady && vProto){
-    obj=THREE.SkeletonUtils.clone(vProto);
+  caste=caste||"worker";
+  let obj,mixer=null,act=null,proc=false, proto=null, clips=null, staticGLB=false;
+  if(caste==="reaper"){ if(rReady && rProto){ proto=rProto; clips=rClips; } }       // AI Reaper husk (non-rigged cloaked mesh, swayed in code); else the hand-built hooded husk below
+  else if(caste!=="stump" && vReady && vProto){ proto=vProto; clips=vClips; }        // workers use the rigged worker GLB; stump is always the bespoke procedural log
+  if(proto){
+    obj=THREE.SkeletonUtils.clone(proto);
     obj.traverse(o=>{ if(o.isMesh){ o.frustumCulled=false; if(o.material){o.material=o.material.clone(); o.material.side=THREE.DoubleSide;} } });
     let h=0; try{ const box=new THREE.Box3().setFromObject(obj); h=box.max.y-box.min.y; }catch(e){}
     // skinned-mesh bounding boxes are unreliable; only trust a sane height, else fixed scale. Clamp hard so it can NEVER be giant.
-    let s=(h>0.3&&h<8)?(1.5/h):1.0; s=clamp(s,0.25,2.0);
+    let s=(h>0.3&&h<8)?((caste==="reaper"?1.7:1.5)/h):1.0; s=clamp(s,0.25,2.0);
     obj.scale.setScalar(s);
-    mixer=new THREE.AnimationMixer(obj); mixers.push(mixer);
-    if(vClips.length){ act=mixer.clipAction(vClips[0]); act.play(); act.timeScale=0; }
-  } else { obj=makeProcVillager(caste||"worker"); proc=true; }
+    if(clips&&clips.length){ mixer=new THREE.AnimationMixer(obj); mixers.push(mixer); act=mixer.clipAction(clips[0]); act.play(); act.timeScale=0; }
+    else staticGLB=true;   // non-rigged AI mesh (the cloaked Reaper) — glide & sway it procedurally
+  } else { obj=makeProcVillager(caste); proc=true; }
   obj.position.set(x,terrainHeight(x,z),z);
+  // carried-load indicator: a small block shown while hauling, tinted to the resource — makes the supply chain legible
+  const carry=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.34,0.34),MAT(0x6b5a40)); carry.visible=false; carry.position.set(0,1.05,0.32); obj.add(carry);
   scene.add(obj);
-  const v={obj,mixer,act,proc,caste:caste||"worker",
+  const v={obj,mixer,act,proc,staticGLB,caste,carryMesh:carry,
     name:villagerName(), job:"idle",
     speed:(caste==="stump"?rr(1.2,1.7):caste==="reaper"?rr(2.8,3.4):rr(2.4,3.0)), phase:rr(0,9),
     state:"wander", tx:x,tz:z, restock:0, resolve:rr(0.55,0.9), warmth:rr(0.5,0.9)};
@@ -582,7 +676,7 @@ function updateInput(dt){
 }
 function clampTarget(){ Cam.target.x=clamp(Cam.target.x,-HALF,HALF); Cam.target.z=clamp(Cam.target.z,-HALF,HALF);
   Cam.target.y=terrainHeight(Cam.target.x,Cam.target.z); }
-canvas.addEventListener('pointerdown',e=>{ canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+canvas.addEventListener('pointerdown',e=>{ SND.resume(); canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(ptrs.size===2){ const a=[...ptrs.values()]; distSt=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y); pinch0=Cam.dist; dragMode='pinch'; }
   else { dragMode=(e.button===2||e.shiftKey)?'pan':'orbit'; dStart={x:e.clientX,y:e.clientY,az:Cam.az,el:Cam.el,t:Cam.target.clone(),moved:false}; }
 });
@@ -603,7 +697,7 @@ function endPtr(e){ const wasDrag=dStart&&dStart.moved; ptrs.delete(e.pointerId)
 canvas.addEventListener('pointerup',endPtr); canvas.addEventListener('pointercancel',endPtr);
 canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); if(placeKind){placeKind=null;setHint('');buildDock();} });
 canvas.addEventListener('wheel',e=>{ e.preventDefault(); Cam.dist=clamp(Cam.dist*(e.deltaY<0?0.9:1.11),Cam.minD,Cam.maxD); },{passive:false});
-addEventListener('keydown',e=>{ keys.add(e.code);
+addEventListener('keydown',e=>{ SND.resume(); keys.add(e.code);
   if(e.code==='Space'){e.preventDefault(); paused=!paused; if(typeof buildRail==='function')buildRail();}
   else if(e.code==='Escape'){ if(placeKind){placeKind=null;setHint('');buildDock();} else if(typeof clearInspect==='function')clearInspect(); }
   else if(e.code==='Digit1'){simSpeed=1;paused=false;buildRail&&buildRail();}
@@ -618,8 +712,8 @@ function pickAt(sx,sy){
   if(placeKind){ const p=groundPoint(sx,sy); if(!p) return;
     if(BLD[placeKind].kind==='path'){ addPath(p.x,p.z); renderLedger(); return; }
     const b=placeBuilding(placeKind,p.x,p.z);
-    if(b){ renderLedger(); buildDock(); toast(BLD[placeKind].name+" raised."); if(!canAfford(BLD[placeKind].cost)){ placeKind=null; setHint(''); buildDock(); } }
-    else toast("Can't build there — too close to something, or off the valley.","bad");
+    if(b){ SND.sfx('place'); renderLedger(); buildDock(); toast(BLD[placeKind].name+" raised."); if(!canAfford(BLD[placeKind].cost)){ placeKind=null; setHint(''); buildDock(); } }
+    else { SND.sfx('deny'); toast("Can't build there — too close to something, or off the valley.","bad"); }
     return; }
   const vh=ray.intersectObjects(villagers.filter(v=>!v.dead).map(v=>v.obj),true);
   if(vh.length){ let r=vh[0].object; while(r.parent&&!villagers.find(v=>v.obj===r)) r=r.parent;
@@ -659,6 +753,8 @@ function buildRail(){
   $('rail').appendChild(mk('▶',!paused&&simSpeed===1,()=>{paused=false;simSpeed=1;buildRail();},'1×'));
   $('rail').appendChild(mk('»',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'3×'));
   $('rail').appendChild(mk('?',false,()=>showHelp(),'How to play'));
+  $('rail').appendChild(mk('♪',!SND.muted,()=>{ SND.resume(); SND.toggleMute(); buildRail(); }, SND.muted?'Sound is off — click for sound':'Mute sound'));
+  $('rail').appendChild(mk('⚙',false,()=>showOptions(),'Options'));
 }
 
 /* build menu */
@@ -673,7 +769,7 @@ function buildDock(){
       :`background:#${def.kind==='refine'||def.kind==='datacenter'?'2a2d33':def.kind==='gather'?'2b2519':'33312c'}`;
     card.innerHTML=`<div class="th" style="${thumb}"></div>
       <div class="nm">${def.name}</div><div class="ct">${costStr}</div>`;
-    card.onclick=()=>{ if(!canAfford(def.cost)){ toast("Not enough materials for "+def.name,"bad"); return; } placeKind=(placeKind===k?null:k); buildDock(); setHint(placeKind?("Click the ground to raise "+def.name+" · Esc cancels"):""); };
+    card.onclick=()=>{ SND.resume(); if(!canAfford(def.cost)){ SND.sfx('deny'); toast("Not enough materials for "+def.name,"bad"); return; } SND.sfx('click'); placeKind=(placeKind===k?null:k); buildDock(); setHint(placeKind?("Click the ground to raise "+def.name+" · Esc cancels"):""); };
     row.appendChild(card); }
 }
 function setHint(t){ const h=$('hint'); if(t){h.textContent=t;h.style.display='block';} else h.style.display='none'; }
@@ -739,12 +835,63 @@ function showEnd(win,why){ showOverlayHTML(win?
 function showOverlayHTML(h){ $('modal').innerHTML=h; $('ov').classList.add('show'); }
 function hideOverlay(){ $('ov').classList.remove('show'); }
 
+/* film-grain / VHS intensity (persisted) — the owner wants this subtle */
+function getGrain(){ try{ const s=localStorage.getItem('sf_grain'); return s==null?0.32:clamp(+s,0,1); }catch(e){ return 0.32; } }
+function setGrain(level){ level=clamp(level,0,1); try{ const g=document.getElementById('grain'); if(g)g.style.opacity=(level*0.11).toFixed(3);
+  const v=document.getElementById('vhs'); if(v)v.style.opacity=(0.18+level*0.62).toFixed(2); localStorage.setItem('sf_grain',String(level)); }catch(e){} }
+
+/* options menu (audio mixer + grain + save/load) */
+function showOptions(){ SND.resume(); const gl=getGrain();
+  showOverlayHTML(`<h1 style="font-size:24px">OPTIONS</h1><h2>the engine's settings</h2>
+  <div style="margin:14px 0">
+    <label class="optrow"><span>Music</span><input type="range" min="0" max="100" value="${Math.round(SND.musicVol*100)}" oninput="optMusic(this.value)"></label>
+    <label class="optrow"><span>Sound effects</span><input type="range" min="0" max="100" value="${Math.round(SND.sfxVol*100)}" oninput="optSfx(this.value)"></label>
+    <label class="optrow"><span>Film grain &amp; scanlines</span><input type="range" min="0" max="100" value="${Math.round(gl*100)}" oninput="optGrain(this.value)"></label>
+    <label class="optrow"><span>Mute everything</span><input type="checkbox" ${SND.muted?'checked':''} onchange="optMute(this.checked)"></label>
+  </div>
+  <div class="obj-list">
+    <span class="btn" onclick="saveGame();toast('The foundry is saved.','good')">Save foundry</span>
+    <span class="btn" onclick="hideOverlay();loadGame()">Load foundry</span>
+    <span class="btn bad" onclick="newValley()">Abandon — new valley</span>
+    <span class="btn" onclick="hideOverlay()">Close</span>
+  </div>
+  <p style="color:var(--ink-dim);font-size:11px;margin-top:10px">The foundry also saves itself quietly as you play.</p>`); }
+function optMusic(v){ SND.resume(); SND.setMusicVol(v/100); }
+function optSfx(v){ SND.resume(); SND.setSfxVol(v/100); SND.sfx('click'); }
+function optGrain(v){ setGrain(v/100); }
+function optMute(c){ SND.resume(); if(SND.muted!==c)SND.toggleMute(); buildRail(); }
+function newValley(){ try{ localStorage.removeItem('sf_save'); }catch(e){} location.reload(); }
+
+/* staged tutorial: quiet objectives that advance as the player learns the loop */
+const TUT=[
+  {t:"Tap the ground by a glowing field, then raise a gathering post from the dock below.", d:()=>buildings.some(b=>b.def.kind==="gather")},
+  {t:"Keep the husks alive: gather Rot-Pith for food, and keep the Pyre burning Deadwood.", d:()=>(G.stock.pith>5)&&G.warmthRatio>=0.7},
+  {t:"Raise a Soul Furnace, then tap it and press + assign to staff it from idle husks.", d:()=>buildings.some(b=>b.kind==="furnace"&&b.workers.length>0)},
+  {t:"Forge the whole chain — Mill, Assembly, Datacenter — and render your first Compute.", d:()=>(G.stock.compute||0)>0||G.quota.level>1},
+  {t:"Deliver the Quota of Compute before the timer runs out, or Dread surges.", d:()=>G.quota.level>1},
+];
+let tutIdx=0, tutDone=false;
+function loadTut(){ try{ tutDone=localStorage.getItem('sf_tut')==='done'; }catch(e){} }
+function updateTutorial(){ const g=$('goals'); if(!g) return;
+  if(tutDone){ g.style.display='none'; return; }
+  while(tutIdx<TUT.length && TUT[tutIdx].d()) tutIdx++;
+  if(tutIdx>=TUT.length){ tutDone=true; try{localStorage.setItem('sf_tut','done');}catch(e){} g.style.display='none'; if(typeof toast==="function")toast("The foundry stands on its own now.","good"); return; }
+  g.style.display='block';
+  g.innerHTML=`<div class="gh">The engine whispers</div><div class="gt">${TUT[tutIdx].t}</div><div class="gp">${tutIdx} / ${TUT.length} rites learned</div>`;
+}
+
 /* =====================================================================
    === SIM STEP (early): villagers + hearth flicker ===
    ===================================================================== */
 let _ledgerT=0;
 function simStep(dt){
   stepEconomy(dt); stepHusks(dt);
+  G.autosaveT=(G.autosaveT==null?25:G.autosaveT)-dt; if(G.autosaveT<=0){ G.autosaveT=25; saveGame(); }
+  // weather: a slow drift between clear air and ashfall — atmosphere, and a little tension
+  G.wx=(G.wx||0)+dt*0.015; const af=clamp((Math.sin(G.wx)+Math.sin(G.wx*0.37)-0.55)/1.1,0,1);
+  if(scene.fog) scene.fog.density=0.0072+af*0.0075;
+  if(ash&&ash.material) ash.material.opacity=0.42+af*0.46;
+  const heavy=af>0.62; if(heavy&&!G._ashOn){ G._ashOn=true; if(typeof toast==="function")toast("Ashfall sweeps down over the valley.","bad"); } else if(!heavy){ G._ashOn=false; }
   if(selected&&!selected.dead&&selected.obj){ Cam.target.lerp(new THREE.Vector3(selected.obj.position.x,selected.obj.position.y+0.6,selected.obj.position.z),0.05); }
   for(const b of buildings){ const ud=b.mesh.userData;
     if(b.kind==="hearth"&&ud.light){ const t=performance.now();
@@ -752,18 +899,19 @@ function simStep(dt){
       if(ud.flame){ ud.flame.scale.set(1+Math.sin(t/120)*0.08,1+Math.sin(t/80)*0.18,1+Math.cos(t/100)*0.08); ud.flame.rotation.y=Math.sin(t/200)*0.25; }
       if(ud.tongues){ ud.tongues[0].scale.y=1+Math.sin(t/70)*0.2; ud.tongues[2].scale.y=1+Math.sin(t/45)*0.35; } }
     if(ud.glow){ ud.glow.material.emissiveIntensity=(b.active?0.9:0.35)+Math.sin(performance.now()/200+b.x)*0.2; } }
-  _ledgerT-=dt; if(_ledgerT<=0){ _ledgerT=0.35; renderLedger(); renderQuota(); if((selected&&!selected.dead)||selBld) refreshInspect(); }
+  _ledgerT-=dt; if(_ledgerT<=0){ _ledgerT=0.35; renderLedger(); renderQuota(); SND.setTension(G.dread/100); if(typeof updateTutorial==="function")updateTutorial(); if((selected&&!selected.dead)||selBld) refreshInspect(); }
 }
 
 /* =====================================================================
    === BOOT / START ===
    ===================================================================== */
-function placeBuildingFree(k,x,z){ const def=BLD[k]; const mesh=makeBuildingMesh(k,def); mesh.position.set(x,terrainHeight(x,z),z);
-  scene.add(mesh); const b={kind:k,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0}; buildings.push(b); return b; }
+function placeBuildingFree(k,x,z){ const def=BLD[k]; ensureBuildingGLB(k); const mesh=makeBuildingMesh(k,def); mesh.position.set(x,terrainHeight(x,z),z);
+  scene.add(mesh); const b={kind:k,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0}; buildings.push(b); groundBuilding(b); return b; }
 function seedSettlement(){
   G.stock.wood=70; G.stock.relic=30; G.stock.pith=42; G.stock.silica=8;
   placeBuildingFree("hearth",0,0);
   placeBuildingFree("den",7,4); placeBuildingFree("den",-7,4);
+  placeBuildingFree("stockpile",0,-7);   // a central yard so your stores are visible from the first moment
   // starter gathering op at the nearest grove so the valley is working the moment you arrive
   const grove=nodes.filter(n=>n.type==='grove').sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z))[0];
   let wc=null,pp=null;
@@ -774,13 +922,57 @@ function seedSettlement(){
   if(pp) for(let i=0;i<2&&free.length;i++) assignHusk(free.shift(),pp);
   renderLedger(); buildRail(); buildDock(); renderQuota();
 }
+
+/* =====================================================================
+   === SAVE / LOAD: the foundry persists itself to localStorage ===
+   ===================================================================== */
+function serializeState(){
+  return { v:1, seed:WORLD_SEED,
+    G:{ stock:Object.assign({},G.stock), writ:G.writ, dread:G.dread, popCap:G.popCap, grow:G.grow, time:G.time||0,
+        quota:{need:G.quota.need,period:G.quota.period,t:G.quota.t,level:G.quota.level} },
+    paths:[...PATHS],
+    buildings: buildings.map(b=>({k:b.kind,x:b.x,z:b.z,prog:b.prog||0,cyc:b.cyc||0})),
+    nodes: nodes.map(n=>({t:n.type,x:n.x,z:n.z,a:n.amount,max:n.max})),
+    villagers: villagers.filter(v=>!v.dead).map(v=>({c:v.caste,x:v.obj.position.x,z:v.obj.position.z,r:v.resolve,
+        b:v.assigned?buildings.indexOf(v.assigned):-1, cr:v.carryRes||null, ca:v.carryAmt||0, job:v.job||"idle"})) };
+}
+function restorePath(rx,rz){ const k=pathKey(rx,rz); if(PATHS.has(k))return; PATHS.add(k);
+  if(!pathGroup){ pathGroup=new THREE.Group(); scene.add(pathGroup); }
+  const q=new THREE.Mesh(new THREE.BoxGeometry(1.15,0.14,1.15),MAT(0x3a342a)); q.position.set(rx,terrainHeight(rx,rz)+0.07,rz); pathGroup.add(q); }
+function clearDynamic(){
+  for(const b of buildings) scene.remove(b.mesh); buildings.length=0;
+  for(const v of villagers) scene.remove(v.obj); villagers.length=0;
+  for(const n of nodes) scene.remove(n.mesh); nodes.length=0;
+  PATHS.clear(); if(pathGroup){ scene.remove(pathGroup); pathGroup=null; }
+}
+function applySave(s){
+  if(!s||!s.G) return false;
+  clearDynamic();
+  Object.assign(G.stock,s.G.stock); G.writ=s.G.writ; G.dread=s.G.dread; G.popCap=s.G.popCap; G.grow=s.G.grow; G.time=s.G.time||0; G.over=null; G.breach=0;
+  G.quota={need:s.G.quota.need,period:s.G.quota.period,t:s.G.quota.t,level:s.G.quota.level};
+  for(const n of (s.nodes||[])){ const nn=placeNode(n.t,n.x,n.z); nn.amount=n.a; nn.max=n.max; if(nn.amount<=0) depleteNode(nn); }
+  for(const b of (s.buildings||[])){ const bb=placeBuildingFree(b.k,b.x,b.z); bb.prog=b.prog||0; bb.cyc=b.cyc||0; }
+  for(const k of (s.paths||[])){ const rz=(k%4096)-1024, rx=Math.floor(k/4096)-1024; restorePath(rx,rz); }
+  for(const vd of (s.villagers||[])){ const v=spawnVillager(vd.x,vd.z,vd.c); v.resolve=vd.r; v.carryRes=vd.cr||null; v.carryAmt=vd.ca||0; v.job=vd.job||"idle";
+    if(vd.b>=0 && buildings[vd.b]) assignHusk(v,buildings[vd.b]); }
+  if(typeof renderLedger==="function"){ renderLedger(); renderQuota(); buildRail(); buildDock(); }
+  return true;
+}
+function saveGame(){ try{ localStorage.setItem('sf_save',JSON.stringify(serializeState())); return true; }catch(e){ return false; } }
+function readSave(){ try{ const s=localStorage.getItem('sf_save'); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function loadGame(){ const s=readSave(); if(!s||!s.buildings||!s.buildings.length) return false;
+  try{ applySave(s); if(typeof toast==="function") toast("The foundry stirs from where you left it."); return true; }
+  catch(e){ if(console&&console.warn)console.warn("load failed",e); return false; } }
+
 function start(){
+  setGrain(getGrain()); loadTut();
+  const save=readSave();
   loadVillager(ok=>{
-    bootWorld();
-    seedSettlement();
-    setTimeout(()=>{ try{ showHelp(); }catch(e){} }, 700);
+    bootWorld(save?save.seed:null);
+    if(!(save&&loadGame())){ seedSettlement(); setTimeout(()=>{ try{ showHelp(); }catch(e){} }, 700); }
   });
 }
+addEventListener('beforeunload',()=>{ try{ if(!G.over) saveGame(); }catch(e){} });
 function toast(msg,type){ const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg;
   $('toasts').appendChild(t); setTimeout(()=>{t.style.transition='opacity .5s';t.style.opacity=0;setTimeout(()=>t.remove(),500);},3200); }
 start();
@@ -834,10 +1026,12 @@ const BLD={
     desc:"Suppresses Dread in a wide radius."},
   market:{name:"Black Market",kind:"market",cost:{wood:30,relic:8},foot:1.8,workers:1,
     desc:"Trades surplus goods for Writ, and Writ for what you lack."},
+  stockpile:{name:"Reliquary Yard",kind:"stockpile",cost:{wood:22,relic:6},foot:2.4,workers:0,store:140,
+    desc:"A storage yard. Raises how much the foundry can hoard, and lays your gathered matter out as visible piles — logs, sand, ash, water, salvage and refined cores — that rise and fall with your stores."},
   path:{name:"Bone Path",kind:"path",cost:{wood:2},foot:1,workers:0,
     desc:"Lay a path; click-drag to extend it. Husks move ~35% faster over paths — connect your fields to the foundry."},
 };
-const BLD_ORDER=["hearth","den","path","woodcutter","pithpost","dredge","ventcap","wellrig","salvage","furnace","mill","assembly","datacenter","ward","market"];
+const BLD_ORDER=["hearth","den","path","woodcutter","pithpost","dredge","ventcap","wellrig","salvage","furnace","mill","assembly","datacenter","stockpile","ward","market"];
 const TABS=[["dwell","Dwelling"],["gather","Gathering"],["refine","Refining"],["civic","Civic"]];
 function bldTab(k){ const d=BLD[k]; if(d.kind==="hearth"||d.kind==="den")return"dwell"; if(d.kind==="gather")return"gather";
   if(d.kind==="refine"||d.kind==="datacenter")return"refine"; return"civic"; }
@@ -976,30 +1170,43 @@ function addPath(x,z){ const rx=Math.round(x),rz=Math.round(z),k=pathKey(rx,rz);
 
 function canAfford(cost){ for(const r in cost) if((G.stock[r]||0)<cost[r]) return false; return true; }
 function payCost(cost){ for(const r in cost) G.stock[r]-=cost[r]; }
-function addStock(r,n){ G.stock[r]=clamp((G.stock[r]||0)+n,0,STORE); }
-function storeRoom(r){ return (G.stock[r]||0)<STORE; }
+// storage capacity is dynamic: a base, plus every Reliquary Yard (stockpile) you raise
+function storageCap(r){ let cap=STORE; for(const b of buildings){ if(b.kind==="stockpile") cap+=b.def.store||0; } return cap; }
+function addStock(r,n){ G.stock[r]=clamp((G.stock[r]||0)+n,0,storageCap(r)); }
+function storeRoom(r){ return (G.stock[r]||0)<storageCap(r); }
+function pileFill(r){ return clamp((G.stock[r]||0)/storageCap(r),0,1); }   // 0..1 of a resource's bin — drives the visible material piles
 
 /* ---- AI building models: concept renders -> image_to_3d GLBs, loaded at runtime ---- */
-const ICDN="https://d8j0ntlcm91z4.cloudfront.net/user_3FGRwpuuF0RYijMgnIoCtazurOY/";
+// concept-render card art (local paths; CSS image loads work over file:// and http alike)
 const BLD_IMG={
-  den:ICDN+"hf_20260617_172000_0e8438f2-7290-487c-a5ca-6d2d55e81482.png",
-  furnace:ICDN+"hf_20260617_172002_ac23c6db-2d4e-4efd-acaf-b635803b50bd.png",
-  mill:ICDN+"hf_20260617_172005_8ecf5dfa-90d5-4f31-86e5-004b6c87c48d.png",
-  assembly:ICDN+"hf_20260617_172007_b7bd69cd-d740-442a-bf8c-52f25d0d2374.png",
-  datacenter:ICDN+"hf_20260617_172019_8095db35-eb5b-48c3-9ba8-4d36ded30e3a.png",
-  ward:ICDN+"hf_20260617_172021_a5444f51-7b6b-436a-8f64-ddca39c91601.png",
+  den:"assets/img/den.png", furnace:"assets/img/furnace.png", mill:"assets/img/mill.png", assembly:"assets/img/assembly.png",
+  datacenter:"assets/img/datacenter2.png", ward:"assets/img/ward.png", hearth:"assets/img/hearth.png",
+  woodcutter:"assets/img/woodcutter.png", pithpost:"assets/img/pithpost.png", dredge:"assets/img/dredge.png",
+  ventcap:"assets/img/ventcap.jpg", wellrig:"assets/img/wellrig.png", salvage:"assets/img/salvage.png",
+  market:"assets/img/market.png", stockpile:"assets/img/stockpile.png",
 };
-const GCDN="https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/";
-const BLD_GLB={   // AI building models (concept render -> image_to_3d), loaded at runtime
-  den:GCDN+"313cdc68-2ae3-4f96-838a-2a64fdba6915.glb",
-  furnace:GCDN+"a115d2bf-ab62-4d8a-ac8b-2708b3546d94.glb",
-  mill:GCDN+"63e2f9f1-03d2-46df-ac42-3bdfdf2676e3.glb",
-  assembly:GCDN+"056aae17-a731-43e1-8c00-bcce9959b5e2.glb",
-  datacenter:GCDN+"791f4ad7-d523-4522-a6b2-a4c5f83f6c28.glb",
-  ward:GCDN+"1e022908-5cf5-4d9e-9d60-e9995b53799c.glb",
+// AI building models (concept render -> image_to_3d). Local first, Higgsfield CDN fallback for file://.
+// Hearth + stockpile stay procedural on purpose (their animated flame / dynamic material piles).
+const BLD_GLB={
+  den:"assets/glb/den.glb", furnace:"assets/glb/furnace.glb", mill:"assets/glb/mill.glb", assembly:"assets/glb/assembly.glb",
+  datacenter:"assets/glb/datacenter2.glb", ward:"assets/glb/ward.glb",
+  woodcutter:"assets/glb/woodcutter.glb", wellrig:"assets/glb/wellrig.glb", salvage:"assets/glb/salvage.glb", market:"assets/glb/market.glb",
+  pithpost:"assets/glb/pithpost.glb", dredge:"assets/glb/dredge.glb", ventcap:"assets/glb/ventcap.glb",
 };
-const bldBank={};
-function loadBuildingGLBs(){ for(const k in BLD_GLB){ (function(kk){ GLTF.load(BLD_GLB[kk], g=>{ bldBank[kk]=g.scene; swapBuildingMeshes(kk); }, undefined, ()=>{}); })(k); } }
+const BLD_GLB_CDN={
+  den:GCDN+"313cdc68-2ae3-4f96-838a-2a64fdba6915.glb", furnace:GCDN+"a115d2bf-ab62-4d8a-ac8b-2708b3546d94.glb",
+  mill:GCDN+"63e2f9f1-03d2-46df-ac42-3bdfdf2676e3.glb", assembly:GCDN+"056aae17-a731-43e1-8c00-bcce9959b5e2.glb",
+  datacenter:GCDN+"6261e375-4861-4928-ab93-53f7e65d8b00.glb", ward:GCDN+"1e022908-5cf5-4d9e-9d60-e9995b53799c.glb",
+  woodcutter:GCDN+"df17a501-c35b-452d-b4ed-82da088c4791.glb", wellrig:GCDN+"1687827a-f60a-43d0-a7d4-cb6f813f9076.glb",
+  salvage:GCDN+"cbdc07eb-b691-4731-b322-26bb0fa0c10d.glb", market:GCDN+"dfcf36c9-eeee-4511-88b8-99f2e4b8aadc.glb",
+  dredge:GCDN+"5c7db5d2-c50f-4fbb-bed0-7f0e3c2f03f0.glb", ventcap:GCDN+"0c183f5f-9b88-4a68-9686-9901ece8f9d4.glb",
+  pithpost:GCDN+"3663218e-aabc-4435-9513-2fa9102f1214.glb",
+};
+const bldBank={}, bldLoading={};
+// lazy: a building's AI model streams in the first time you raise that type — keeps first load light,
+// and the procedural mesh stands in until the GLB arrives and swaps itself in.
+function ensureBuildingGLB(kind){ if(!BLD_GLB[kind]||bldBank[kind]||bldLoading[kind]) return; bldLoading[kind]=true;
+  loadGLB(BLD_GLB[kind], BLD_GLB_CDN[kind], g=>{ bldBank[kind]=g.scene; swapBuildingMeshes(kind); }, ()=>{}); }
 function makeBuildingGLB(kind,def){
   const src=bldBank[kind]; let obj; try{ obj=THREE.SkeletonUtils?THREE.SkeletonUtils.clone(src):src.clone(true); }catch(e){ obj=src.clone(true); }
   obj.traverse(o=>{ if(o.isMesh){ o.frustumCulled=false; } });
@@ -1010,8 +1217,47 @@ function makeBuildingGLB(kind,def){
 }
 function swapBuildingMeshes(kind){ for(const b of buildings){ if(b.kind!==kind) continue;
   const np=makeBuildingGLB(kind,b.def); np.position.copy(b.mesh.position); scene.remove(b.mesh); b.mesh=np; scene.add(np); } }
+/* ---- material stockpiles: a yard whose piles physically rise & fall with your stores (the #1 'sauce') ---- */
+const PILE_RES=["wood","pith","silica","ash","water","relic","glass","core"];
+function pileGeo(res){ switch(res){
+  case "silica": return {g:new THREE.ConeGeometry(0.46,1.0,5), h:1.0};         // pale sand heap
+  case "ash":    return {g:new THREE.ConeGeometry(0.52,0.8,6), h:0.8};         // soul-ash mound
+  case "pith":   return {g:new THREE.SphereGeometry(0.42,6,5), h:0.84};        // rot-pith sacks
+  case "water":  return {g:new THREE.CylinderGeometry(0.4,0.42,1.0,8), h:1.0}; // grave-water cistern
+  case "wood":   return {g:new THREE.BoxGeometry(0.8,1.0,0.54), h:1.0};        // split-log stack
+  case "relic":  return {g:new THREE.BoxGeometry(0.66,1.0,0.66), h:1.0};       // salvage crates
+  case "glass":  return {g:new THREE.IcosahedronGeometry(0.48,0), h:0.96};     // cinderglass shards
+  default:       return {g:new THREE.IcosahedronGeometry(0.4,0), h:0.8};       // reliquary cores
+}}
+function makeStockpile(def){
+  const g=new THREE.Group();
+  const timber=MAT(0x2b251c), plank=MAT(0x37322b);
+  const W=3.8, D=2.2;
+  const plat=new THREE.Mesh(new THREE.BoxGeometry(W,0.18,D),plank); plat.position.y=0.1; g.add(plat);
+  for(const sx of [-1,1]) for(const sz of [-1,1]){ const post=new THREE.Mesh(new THREE.BoxGeometry(0.16,1.6,0.16),timber);
+    post.position.set(sx*(W/2-0.16),0.9,sz*(D/2-0.16)); g.add(post); }
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(W,0.14,0.14),timber); beam.position.set(0,1.62,-(D/2-0.16)); g.add(beam);
+  const beam2=beam.clone(); beam2.position.z=(D/2-0.16); g.add(beam2);
+  const tarp=new THREE.Mesh(new THREE.BoxGeometry(W*0.95,0.05,D*0.52),MAT(0x221f19)); tarp.position.set(0,1.56,-(D*0.2)); tarp.rotation.x=-0.13; g.add(tarp);
+  const sig=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.52,0.05),sigilMat()); sig.position.set(-(W/2-0.16),1.05,(D/2-0.16)); g.add(sig);
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.05,0.05),sigilMat()); bar.position.set(-(W/2-0.16),1.16,(D/2-0.16)); g.add(bar);
+  const piles=[]; const cols=4, cellX=W/cols, cellZ=D/2, top=0.2;
+  PILE_RES.forEach((res,i)=>{ const cx=-(W/2)+cellX*((i%cols)+0.5), cz=-(D/2)+cellZ*(((i/cols)|0)+0.5);
+    const bin=new THREE.Mesh(new THREE.BoxGeometry(cellX*0.82,0.12,cellZ*0.8),MAT(0x1e1b15)); bin.position.set(cx,top,cz); g.add(bin);
+    const pg=pileGeo(res); try{ pg.g.translate(0,pg.h/2,0); }catch(e){}   // anchor at base so it grows upward
+    const opt=(res==="water")?{metalness:0.3,roughness:0.35}:null;
+    const pile=new THREE.Mesh(pg.g, MAT(RES[res].col,opt)); pile.position.set(cx,top+0.06,cz); pile.scale.y=0.02; pile.visible=false;
+    g.add(pile); piles.push({res,node:pile}); });
+  g.userData.piles=piles; g.userData.isStockpile=true;
+  return g;
+}
+// scale each pile to its bin's fill every frame — the economy made physical
+function updateStockpiles(){ for(const b of buildings){ if(b.kind!=="stockpile"||!b.mesh||!b.mesh.userData.piles) continue;
+  for(const p of b.mesh.userData.piles){ const f=pileFill(p.res); p.node.visible=f>0.012; p.node.scale.y=Math.max(0.02,f); } } }
+
 /* ---- procedural building meshes (fallback until/if the GLB loads) ---- */
 function makeBuildingMesh(kind,def){
+  if(kind==="stockpile") return makeStockpile(def);
   if(bldBank[kind]) return makeBuildingGLB(kind,def);
   const g=new THREE.Group(); const stone=MAT(0x35332e), timber=MAT(0x2b251c), iron=MAT(0x1c1f22,{metalness:0.3}), win=emis(0xe8973a);
   const f=def.foot;
@@ -1045,6 +1291,27 @@ function makeBuildingMesh(kind,def){
     const coin=new THREE.Mesh(new THREE.IcosahedronGeometry(0.16,0),emis(0xe8c24a)); coin.material.emissiveIntensity=0.6; coin.position.set(0,1.0,f*0.3); g.add(coin); }
   return g;
 }
+/* settle a placed building into the world: face the Pyre, sink a foundation skirt, scatter matching debris */
+function groundBuilding(b){
+  const def=b.def, m=b.mesh; if(def.kind==="path") return;
+  if(b.kind!=="hearth") m.rotation.y = Math.atan2(-b.x,-b.z) + rr(-0.28,0.28);   // turn to face the settlement centre
+  const fr=(def.foot||1.6)*0.92;
+  if(b.kind!=="hearth" && b.kind!=="stockpile"){   // these carry their own stone base
+    const skirt=new THREE.Mesh(new THREE.CylinderGeometry(fr*0.96,fr*1.16,0.55,8),MAT(0x191712)); skirt.position.y=-0.18; m.add(skirt);
+    for(let i=0;i<5;i++){ const a=rr(0,6.28); const st=new THREE.Mesh(new THREE.DodecahedronGeometry(rr(0.16,0.32),0),MAT(0x23252b));
+      st.position.set(Math.cos(a)*fr,rr(-0.05,0.12),Math.sin(a)*fr); st.rotation.set(rr(0,3),rr(0,3),rr(0,3)); m.add(st); } }
+  scatterAround(b,fr);
+}
+function scatterAround(b,fr){
+  const def=b.def; const R=fr+0.7, n=2+rint(3);
+  for(let i=0;i<n;i++){ const a=rr(0,6.28), d=R+rr(0,1.1), x=b.x+Math.cos(a)*d, z=b.z+Math.sin(a)*d; if(terrainHeight(x,z)<-3.2) continue;
+    const r=rnd(); let o;
+    if(def.kind==="gather") o=(r<0.5)?makeBonePile():makeShard();
+    else if(def.kind==="refine"||def.kind==="datacenter") o=(r<0.45)?makeWreck():(r<0.75?makeServerTower():makeBonePile());
+    else o=(r<0.5)?makeBonePile():makeRock();
+    dropProp(o,x,z,true); }
+  if(rnd()<0.7){ const a=rr(0,6.28), d=R+0.3; dropProp(rnd()<0.6?makeSigilCross():makeSigilRing(), b.x+Math.cos(a)*d, b.z+Math.sin(a)*d, false); }
+}
 function buildingFits(x,z,foot){
   if(Math.hypot(x,z)>HALF-foot) return false;
   if(terrainHeight(x,z)<-15) return false;          // only the very deepest ash-river channels are unbuildable
@@ -1054,10 +1321,10 @@ function buildingFits(x,z,foot){
 }
 function placeBuilding(kind,x,z){
   const def=BLD[kind]; if(!buildingFits(x,z,def.foot)) return null; if(!canAfford(def.cost)) return null;
-  payCost(def.cost);
+  payCost(def.cost); ensureBuildingGLB(kind);
   const mesh=makeBuildingMesh(kind,def); mesh.position.set(x,terrainHeight(x,z),z); scene.add(mesh);
   const b={kind,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0};
-  buildings.push(b); return b;
+  buildings.push(b); groundBuilding(b); return b;
 }
 function buildingWorkSpot(b,i){ const ang=(i/Math.max(1,b.def.workers))*6.28; const r=b.def.foot*0.8+0.6;
   return {x:b.x+Math.cos(ang)*r, z:b.z+Math.sin(ang)*r}; }
@@ -1083,7 +1350,9 @@ function moveHusk(v,tx,tz,dt,stop){
   if(v.proc){ const ud=o.userData,rate=(v.caste==="stump")?5:9; v.phase+=dt*rate; const sw=Math.sin(v.phase)*0.5;
     if(ud.legs[0])ud.legs[0].rotation.x=sw; if(ud.legs[1])ud.legs[1].rotation.x=-sw;
     if(ud.arms[0])ud.arms[0].rotation.x=-sw*0.6; if(ud.arms[1])ud.arms[1].rotation.x=sw*0.6;
-    if(v.caste==="stump")o.rotation.z=Math.sin(v.phase)*0.16; else o.position.y+=Math.abs(Math.sin(v.phase))*0.05; }
+    if(v.caste==="stump"){ o.rotation.z=Math.sin(v.phase)*0.2; o.rotation.x=Math.sin(v.phase*0.5)*0.07; o.position.y+=Math.abs(Math.sin(v.phase))*0.09; } // bespoke log heave/tilt
+    else o.position.y+=Math.abs(Math.sin(v.phase))*0.05; }
+  if(v.staticGLB){ v.phase+=dt*5; o.position.y+=Math.abs(Math.sin(v.phase))*0.05; o.rotation.z=Math.sin(v.phase*0.5)*0.05; } // cloaked Reaper glide
   return false;
 }
 function separateHusks(){
@@ -1099,6 +1368,10 @@ function stepHusks(dt){
   rebuildObstacles();
   for(const v of villagers){
     if(v.dead) continue;
+    if(v.carryMesh){ const carrying=v.carryAmt>0.1; v.carryMesh.visible=carrying;
+      if(carrying){ const col=(v.carryRes&&RES[v.carryRes])?RES[v.carryRes].col:0x6b5a40;
+        if(v.carryMesh.material&&v.carryMesh.material.color&&v.carryMesh.material.color.setHex)v.carryMesh.material.color.setHex(col);
+        const s=0.5+Math.min(1,v.carryAmt/12)*0.85; v.carryMesh.scale.set(s,s,s); } }
     const b=v.assigned;
     if(!b){ // idle: mostly stand; occasionally shuffle a short way near the pyre
       v.restock-=dt;
@@ -1135,6 +1408,18 @@ function depleteNode(n){ if(n.def.renew) return; n.amount=0; if(!n.mesh.userData
   n.mesh.traverse(o=>{ if(o.isMesh&&o.material){ o.material=o.material.clone(); o.material.color&&o.material.color.multiplyScalar(0.5); o.material.emissiveIntensity&&(o.material.emissiveIntensity=0);} });
   n.mesh.scale.y*=0.6; } }
 
+/* ---- random events: the dead world intrudes ---- */
+const EVENTS=[
+  {n:"A wanderer drags salvage in from the dead cities.", bad:false, f:()=>addStock('relic',rr(16,32))},
+  {n:"A buried cache of silica is unearthed beneath the ash.", bad:false, f:()=>addStock('silica',rr(22,44))},
+  {n:"Grave-water seeps up cold through the cracks.", bad:false, f:()=>addStock('water',rr(16,30))},
+  {n:"A dead grove is found still standing — deadwood for the taking.", bad:false, f:()=>addStock('wood',rr(20,40))},
+  {n:"The backlog of the unprocessed dead presses in. Dread rises.", bad:true, f:()=>{ G.dread=clamp(G.dread+11,0,100); }},
+  {n:"A cold wind scatters the Pyre's warmth.", bad:true, f:()=>{ G.stock.wood=Math.max(0,G.stock.wood-rr(6,14)); }},
+  {n:"A lone husk wanders out of the waste to join the foundry.", bad:false, f:()=>{ const a=villagers.filter(v=>!v.dead); if(a.length<G.popCap){ const hb=buildings.find(b=>b.kind==="hearth"); spawnVillager((hb?hb.x:0)+rr(-4,4),(hb?hb.z:0)+rr(-4,4),pick(["worker","stump","reaper"])); SND.sfx('rise'); } }},
+];
+function fireEvent(){ const e=pick(EVENTS); e.f(); if(typeof toast==="function")toast(e.n, e.bad?"bad":"good"); if(e.bad)SND.sfx('haunt'); }
+
 /* ---- the economy tick ---- */
 function stepEconomy(dt){
   if(G.over) return;
@@ -1164,7 +1449,7 @@ function stepEconomy(dt){
   const decay=0.25+wards*0.6;
   G.dread=clamp(G.dread+(activeDread*0.6 - decay)*dt,0,100);
   // hauntings
-  if(G.dread>55 && rnd()<0.03*dt*(G.dread/100)){ const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ const v=pick(cand); v.resolve=Math.max(0,v.resolve-0.25); if(typeof toast==="function")toast(v.name+" is gripped by a haunting.","bad"); } }
+  if(G.dread>55 && rnd()<0.03*dt*(G.dread/100)){ const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ const v=pick(cand); v.resolve=Math.max(0,v.resolve-0.25); SND.sfx('haunt'); if(typeof toast==="function")toast(v.name+" is gripped by a haunting.","bad"); } }
   // resolve per husk
   for(const v of villagers){ if(v.dead) continue;
     const good=foodOk&&G.warmthRatio>=0.7;
@@ -1176,25 +1461,27 @@ function stepEconomy(dt){
     const alive=villagers.filter(v=>!v.dead); const avg=alive.reduce((a,v)=>a+v.resolve,0)/Math.max(1,alive.length);
     const cap=6+buildings.filter(b=>b.kind==="den").reduce((a,b)=>a+b.def.houses,0); G.popCap=cap;
     if(avg>0.65 && alive.length<cap && G.stock.pith>8){ const hb=buildings.find(b=>b.kind==="hearth"); const cx=hb?hb.x:0,cz=hb?hb.z:0;
-      spawnVillager(cx+rr(-4,4),cz+rr(-4,4),pick(["worker","worker","stump","reaper"])); toast("A husk rises to join the foundry.","good"); } }
+      spawnVillager(cx+rr(-4,4),cz+rr(-4,4),pick(["worker","worker","stump","reaper"])); SND.sfx('rise'); toast("A husk rises to join the foundry.","good"); } }
   // quota
   G.quota.t-=dt;
   if(G.quota.t<=0){ const need=G.quota.need;
     if((G.stock.compute||0)>=need){ G.stock.compute-=need; G.writ+=need*8; G.dread=Math.max(0,G.dread-12); G.quota.level++;
-      G.quota.need=Math.ceil(need*1.4); toast("Quota met. The engine endures. (Tithe paid: "+(need*8)+" writ)","good");
+      G.quota.need=Math.ceil(need*1.4); SND.sfx('bell'); toast("Quota met. The engine endures. (Tithe paid: "+(need*8)+" writ)","good");
       if(G.quota.level>WIN_LEVEL) endGame(true); }
-    else { G.dread=clamp(G.dread+26,0,100); toast("Quota missed — the backlog of the dead swells. Dread surges.","bad"); }
+    else { G.dread=clamp(G.dread+26,0,100); SND.sfx('deny'); toast("Quota missed — the backlog of the dead swells. Dread surges.","bad"); }
     G.quota.t=G.quota.period;
   }
+  // random events
+  G.eventT=(G.eventT==null?60:G.eventT)-dt; if(G.eventT<=0 && G.time>15){ G.eventT=rr(55,95); fireEvent(); }
   // lose conditions
   if(villagers.filter(v=>!v.dead).length===0 && G.time>20) endGame(false,"extinct");
   if(G.dread>=100){ G.breach=(G.breach||0)+dt; if(G.breach>=15) endGame(false,"breach"); } else G.breach=0;
   G.time=(G.time||0)+dt;
 }
-function crumble(v){ v.dead=true; scene.remove(v.obj); if(v.assigned){ const a=v.assigned.workers,k=a.indexOf(v); if(k>=0)a.splice(k,1);}
+function crumble(v){ v.dead=true; SND.sfx('crumble'); scene.remove(v.obj); if(v.assigned){ const a=v.assigned.workers,k=a.indexOf(v); if(k>=0)a.splice(k,1);}
   const idx=villagers.indexOf(v); if(idx>=0)villagers.splice(idx,1); if(selected===v)clearInspect();
   toast("A husk crumbles back to ash.","bad"); }
-function endGame(win,why){ if(G.over)return; G.over=win?"win":"lose"; paused=true;
+function endGame(win,why){ if(G.over)return; G.over=win?"win":"lose"; paused=true; SND.sfx(win?'win':'lose');
   if(typeof showEnd==="function") showEnd(win,why); }
 
 /* === SECTION:CORE_END === */
