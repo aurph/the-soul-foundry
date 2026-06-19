@@ -785,21 +785,19 @@ let selected=null, selBld=null, selNode=null, placeKind=null, curTab="dwell";
 const cap1=s=>s[0].toUpperCase()+s.slice(1);
 
 const STAT_HELP={
-  husks:"Bound dead working the foundry, and your population cap. If it reaches zero, you lose.",
-  warmth:"The Pyre's warmth against your population. Below 70%, husks lose resolve and crumble. Keep Deadwood burning.",
-  dread:"The backlog of unprocessed dead. Rises with heavy industry and missed quotas; Ward Obelisks suppress it. Sustained 100% means you lose.",
+  husks:"Bound dead working the foundry, and your population cap. Bind more at the Pyre; if they all crumble, you lose.",
+  dread:"The backlog of the unprocessed dead. It climbs as bodies pile up; rendering them at the Crematory and raising Wards hold it back. Sustained 100% means you lose.",
   writ:"Bones — your currency. Earned from quotas and the market; spent on Rites and trade." };
-const RES_HELP={ wood:"Burned by the Pyre for warmth; builds most structures.", pith:"The only food the husks will eat.",
-  silica:"Smelted with Soul-Ash into Cinderglass.", ash:"Feeds the Furnace and the Assembly.",
-  water:"Quenches glass and cools the Datacenter.", relic:"The only metal left; builds the refiners.",
-  glass:"Milled with Grave-Water into Sigil-Discs.", wafer:"Bound with Soul-Ash into Reliquary Cores.",
-  core:"Rendered with Grave-Water into Compute.", compute:"The quota the engine demands. Deliver it or drown in Dread." };
+const RES_HELP={ dead:"Corpses — the raw matter. Exhume cemeteries and the wastes, then render them.", bonesil:"Bone-silica (quartz sand) — smelted into ingots.",
+  soulash:"Soul-ash (flux) — feeds the Furnace and Ossuary, and patches your husks.", ichor:"Ichor — coolant for the datacenters.",
+  ingot:"Silicon ingot — sliced into wafers.", wafer:"Wafer — etched into dies.",
+  die:"Etched die — packaged into cores.", core:"Reliquary core (the chip) — rendered into Compute.",
+  power:"Power — the datacenters are starving for it.", compute:"The quota the engine demands. Deliver it or drown in Dread." };
 function renderLedger(){
   const pop=villagers.filter(v=>!v.dead).length;
   const chip=(v,l,c,t)=>`<div class="stat" title="${t||''}"><span><span class="v" style="${c?'color:'+c:''}">${v}</span> <span class="lbl">${l}</span></span></div>`;
   let h=`<div class="stat shopbtn" title="Market — buy &amp; sell for Bones" onclick="showShop()"><span class="v" style="font-size:17px">🏪</span></div><div class="sep"></div>`
     +chip(pop+"/"+G.popCap,"Husks",pop<2?'#9e3b2c':'',STAT_HELP.husks)
-    +chip(Math.round(G.warmthRatio*100)+"%","Warmth",G.warmthRatio<0.7?'#9e3b2c':'#d98a3a',STAT_HELP.warmth)
     +chip(Math.round(G.dread)+"%","Dread",G.dread>55?'#9e3b2c':'#7d8a5a',STAT_HELP.dread)
     +chip(Math.floor(G.writ),"Bones",'#e8c24a',STAT_HELP.writ)
     +`<div class="sep"></div>`;
@@ -809,18 +807,21 @@ function renderLedger(){
 }
 function renderQuota(){
   const q=G.quota, t=Math.max(0,Math.ceil(q.t));
-  const dpct=Math.round(G.dread);
+  const graceT=(G.graceT==null?150:G.graceT);
+  if((G.time||0)<graceT){ $('quota').innerHTML=`<b>GRACE</b> &nbsp; the engine is patient &nbsp;·&nbsp; first tithe in <span style="color:var(--ink)">${Math.ceil(graceT-(G.time||0))}s</span>`; return; }
   $('quota').innerHTML=`<b>QUOTA · Tithe ${q.level}/${WIN_LEVEL}</b> &nbsp; deliver <b>${q.need}</b> Compute &nbsp;·&nbsp; have ${Math.floor(G.stock.compute||0)} &nbsp;·&nbsp; <span style="color:${t<25?'#9e3b2c':'var(--ink)'}">${t}s</span>`;
 }
 // surface the single most pressing problem, with its cause and the fix — so the player always knows WHY
 function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.classList.remove('show'); return; }
   const pop=villagers.filter(v=>!v.dead).length, assigned=villagers.filter(v=>!v.dead&&v.assigned).length;
   let msg='';
-  if(pop>0 && (G.stock.pith||0)<=0.5) msg="The husks are starving. Raise a Pith Harrow on a grove for Rot-Pith — with no food their resolve fails and they crumble to ash.";
-  else if(pop>0 && G.warmthRatio<0.7) msg="The Pyre is going cold. Keep Deadwood in store (a Splitter's Post on a grove) — without warmth, husks lose resolve.";
-  else if(G.dread>=75) msg="Dread is near breaching. Raise Ward Obelisks and deliver Compute, or the unprocessed dead overrun the valley.";
-  else if(pop>0 && assigned===0) msg="Your husks stand idle. Tap a gathering post or refiner and press + assign to put them to work.";
-  else if(G.quota.t<35 && (G.stock.compute||0)<G.quota.need) msg="Quota due soon and Compute is short. Staff the Datacenter and the chain feeding it.";
+  if(pop===0) msg="No husks bound. Open the Binding Pyre at the centre and bind one — 1 corpse + 2 Compute.";
+  else if((G.stock.soulash||0)<=0.5) msg="No soul-ash to patch the husks — their resolve is failing. Staff a Crematory to render the dead into soul-ash.";
+  else if(!buildings.some(b=>b.def.kind==="gather"&&b.workers.length>0)) msg="Nothing feeds the line. Raise a Grave-Exhumer on a cemetery and staff it to bring in the dead.";
+  else if(!buildings.some(b=>b.kind==="crematory"&&b.workers.length>0)) msg="The dead pile up unrendered. Staff a Crematory — rendering them is what holds the backlog (Dread) down.";
+  else if(G.dread>=75) msg="Dread is near breaching. Render the dead faster and raise Ward Obelisks, or the backlog overruns you.";
+  else if(pop>0 && assigned===0) msg="Your husks stand idle. Tap a building and press + assign to put them to work.";
+  else if(G.quota.t<35 && (G.stock.compute||0)<G.quota.need && (G.time||0)>=(G.graceT==null?150:G.graceT)) msg="Quota due soon and Compute is short. Staff the Datacenter and the chain feeding it.";
   if(msg){ el.textContent="⚠ "+msg; el.classList.add('show'); } else el.classList.remove('show'); }
 function buildRail(){
   $('rail').innerHTML='';
@@ -880,12 +881,17 @@ function refreshInspect(){
     if(d.kind==="gather") body+=`<div class="row"><span>Harvests</span><b>${RES[d.res].name}</b></div>`;
     if(d.recipe){ const ins2=Object.entries(d.recipe.in).map(([r,n])=>n+"× "+RES[r].name).join(' + ');
       const outs=Object.entries(d.recipe.out).map(([r,n])=>n+"× "+RES[r].name).join(' + ');
+      const ok=Object.keys(d.recipe.out)[0], oneOut=d.recipe.out[ok];
       body+=`<div class="row"><span>Recipe</span><b style="font-size:11px">${ins2} → ${outs}</b></div>
-      <div class="barwrap"><div class="t">${b.active?'working':'idle'}</div><div class="pbar"><i style="width:${Math.round((b.prog/d.recipe.time)*100)}%;background:linear-gradient(90deg,#6f7a55,#e8c24a)"></i></div></div>
-      <div class="row"><span>Produced</span><b>${b.cyc||0}</b></div>`; }
-    if(d.kind==="hearth") body+=`<div class="row"><span>Status</span><b>${b.active?'burning wood':'cold — no wood'}</b></div>`;
+      <div class="row"><span>Throughput</span><b style="font-size:11px">${oneOut}× ${RES[ok].name} every ${d.recipe.time.toFixed(1)}s · ${b.workers.length}/${d.workers} husks</b></div>
+      <div class="barwrap"><div class="t">${b.active?'working':'idle — needs inputs or husks'}</div><div class="pbar"><i style="width:${Math.round((b.prog/d.recipe.time)*100)}%;background:linear-gradient(90deg,#6f7a55,#e8c24a)"></i></div></div>
+      <div class="row"><span>Made so far</span><b>${b.cyc||0}</b></div>`; }
+    if(d.kind==="bind"){ const pop=villagers.filter(v=>!v.dead).length;
+      body+=`<div class="row"><span>Husks bound</span><b>${pop} / ${G.popCap||6}</b></div>
+      <div style="margin:7px 0"><span class="btn" onclick="bindHusk()">Bind a husk &middot; 1 corpse + 2 Compute</span></div>
+      <div style="color:var(--ink-dim);font-size:11px">Husks are bound here from the dead. They decay without soul-ash upkeep, and never breed on their own.</div>`; }
     if(d.kind==="market") body+=`<div style="margin-top:6px"><span class="btn" onclick="showShop()">Open the market</span></div><div style="color:var(--ink-dim);font-size:11px;margin-top:4px">Buy and sell goods for Bones.</div>`;
-    body+=`<div style="margin-top:10px"><span class="btn bad" onclick="demolishSel()">Demolish</span></div>`;
+    body+=`<div style="margin-top:10px"><span class="btn bad" onclick="demolishSel()">Demolish (reclaims half)</span></div>`;
     ins.innerHTML=`<div class="hd"><h3>${d.name}</h3><span class="x" onclick="clearInspect()">✕</span></div><div class="bd">${body}</div>`;
   } else if(selNode){ const n=selNode; ins.classList.add('show');
     const gives=n.def.gives.map(r=>RES[r].name).join(', ');
@@ -904,7 +910,7 @@ function demolishSel(){ if(!selBld)return; const b=selBld; b.workers.slice().for
   for(const r in b.def.cost) addStock(r,Math.floor(b.def.cost[r]*0.5)); scene.remove(b.mesh); const i=buildings.indexOf(b); if(i>=0)buildings.splice(i,1); clearInspect(); renderLedger(); buildDock(); toast("Structure dismantled (half materials reclaimed)."); }
 function sellRes(r){ if((G.stock[r]||0)>=1){ G.stock[r]-=1; G.writ+=2; SND.sfx('click'); renderLedger(); if($('ov').classList.contains('show'))showShop(); } else SND.sfx('deny'); }
 function buyRes(r){ if((G.writ||0)>=4){ G.writ-=4; addStock(r,1); SND.sfx('click'); renderLedger(); showShop(); } else { SND.sfx('deny'); toast("Not enough Bones.","bad"); } }
-const SHOP_GOODS=["wood","pith","silica","ash","water","relic","glass"];
+const SHOP_GOODS=["dead","bonesil","soulash","ichor","ingot","wafer","die"];
 function showShop(){ SND.resume();
   const row=(r)=>`<div class="optrow"><span><span style="color:#${RES[r].col.toString(16).padStart(6,'0')}">${RES[r].name}</span> <span style="color:var(--ink-dim);font-size:11px">&middot; have ${Math.floor(G.stock[r]||0)}</span></span>`+
     `<span><span class="btn" style="font-size:11px;padding:4px 8px" onclick="buyRes('${r}')">buy 4</span> <span class="btn" style="font-size:11px;padding:4px 8px" onclick="sellRes('${r}')">sell 2</span></span></div>`;
@@ -913,16 +919,21 @@ function showShop(){ SND.resume();
     `<div style="color:var(--ink-dim);font-size:12px;margin-bottom:10px">Bones in hand: <b style="color:#e8c24a">${Math.floor(G.writ)}</b> &nbsp;&middot;&nbsp; buy 4 / sell 2 per unit</div>`+
     `<span class="btn" onclick="hideOverlay()">Close</span>`); }
 
+function setTempo(t){ G.tempo=t;
+  if(t==='slow'){ G.basePressure=0.4; G.graceT=240; G.quota.period=210; }
+  else if(t==='harsh'){ G.basePressure=0.95; G.graceT=90; G.quota.period=120; }
+  else { t='standard'; G.basePressure=0.6; G.graceT=150; G.quota.period=150; }
+  G.quota.t=G.quota.period; if(typeof toast==="function")toast("Tempo set: "+t+". The grace runs, then the tithes begin.","good"); }
 function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDRY</h1>
-  <p>A dead world. An agentic engine persists by computing — and computing needs the dead rendered into <b>Compute</b>. With no living workers left, it binds the husks of the extinct and drives them to build a foundry.</p>
+  <p>A dead world. You are the agentic engine that persists by computing — and computing needs the dead rendered into <b>Compute</b>. You bind the husks of the extinct and drive them to render corpses up an occult chip-foundry.</p>
   <p><b>How to play:</b><br>
-  • <b>Build</b> from the dock at the bottom; click the ground to place. Most cost Deadwood / Salvage.<br>
-  • <b>Gathering posts</b> (Splitter, Pith Harrow, Dredge, Vent-Cap, Well, Salvage) send husks to harvest nodes on the land.<br>
-  • <b>Refiners</b> (Furnace → Mill → Assembly → Datacenter) turn raw into Compute. Click one, press <b>+ assign</b> to staff it from idle husks.<br>
-  • Keep <b>The Pyre</b> fed with wood (warmth) and gather <b>Rot-Pith</b> (food) — without them, husks crumble.<br>
-  • Deliver the <b>Quota</b> of Compute before each timer, or <b>Dread</b> surges. Build <b>Ward Obelisks</b> to suppress it.<br>
+  • <b>Exhume the dead</b> — raise a Grave-Exhumer on a cemetery (or a Waste-Dredge on the wastes) and staff it.<br>
+  • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Sigil-Litho → Assembly Ossuary → Datacenter renders the dead into Compute; Substations make the Power the datacenters need. Tap a building, press <b>+ assign</b> to staff it.<br>
+  • <b>Bind husks</b> at the Binding Pyre (1 corpse + 2 Compute) — bound, never born. Soul-ash keeps them from crumbling.<br>
+  • Deliver the <b>Quota</b> of Compute each tithe; let the dead pile up unrendered and <b>Dread</b> (the backlog) overruns you. Raise <b>Ward Obelisks</b> to hold it back.<br>
   • Survive <b>${WIN_LEVEL} tithes</b> to break the engine's hold.</p>
-  <p><span class="kbd">drag</span> orbit · <span class="kbd">scroll</span> zoom · <span class="kbd">WASD</span> pan · <span class="kbd">Esc</span> cancel · <span class="kbd">Space</span> pause</p>
+  <p style="margin-top:6px"><b>Choose your tempo:</b> &nbsp; <span class="btn" onclick="setTempo('slow')">Slow</span> <span class="btn" onclick="setTempo('standard')">Standard</span> <span class="btn" onclick="setTempo('harsh')">Harsh</span></p>
+  <p><span class="kbd">drag</span> orbit · <span class="kbd">scroll</span> zoom · <span class="kbd">WASD</span> pan · <span class="kbd">Space</span> begin / pause</p>
   <p><span class="btn" onclick="hideOverlay()">Begin</span></p>`); }
 function showEnd(win,why){ showOverlayHTML(win?
   `<h1 style="color:#caa15f">THE ENGINE BREAKS</h1><h2>the foundry is yours</h2><p>You paid ${WIN_LEVEL} tithes of Compute and outlasted the engine's hunger. The valley is still dead — but it is no longer enslaved.</p><p><span class="btn" onclick="location.reload()">Again</span></p>`
@@ -962,25 +973,25 @@ function hasB(k){ return buildings.some(b=>b.kind===k); }
 function staffed(k){ return buildings.some(b=>b.kind===k && b.workers.length>0); }
 // a full, ordered tutorial that walks the player all the way to their first Compute
 const TUT=[
-  {t:"Your foundry already gathers Deadwood and Rot-Pith. Now build toward Compute. Open the GATHERING tab below.",
-   why:"Tabs at the bottom group the buildings: Dwelling, Gathering, Refining, Civic.", d:()=>curTab==="gather"},
-  {t:"Raise a Silica Dredge on a pale silica field, then tap it and press + assign to staff it.",
-   why:"Silica is the first raw matter in the chain. A building does nothing until husks are assigned.", d:()=>staffed("dredge")},
-  {t:"Raise an Ash Vent-Cap on a dark ash field and staff it.",
-   why:"Soul-Ash feeds both the Furnace and the Assembly.", d:()=>staffed("ventcap")},
-  {t:"Raise a Well Rig on a graves field and staff it for Grave-Water.",
-   why:"Grave-Water quenches glass and cools the Datacenter.", d:()=>staffed("wellrig")},
+  {t:"You start already exhuming and rendering the dead. Build the chain to Compute — open the GATHERING tab below.",
+   why:"You can also bind more husks at the Binding Pyre (centre): 1 corpse + 2 Compute. They never breed on their own.", d:()=>curTab==="gather"},
+  {t:"Make sure a Crematory is staffed — tap it and press + assign.",
+   why:"It renders corpses into bone-silica, soul-ash and ichor — and rendering the dead is what holds the backlog (Dread) down. Soul-ash also patches your husks.", d:()=>staffed("crematory")},
   {t:"Open the REFINING tab and raise a Soul Furnace, then staff it.",
-   why:"It smelts Silica + Soul-Ash into Cinderglass.", d:()=>staffed("furnace")},
-  {t:"Raise a Glass Mill and staff it.",
-   why:"It mills Cinderglass + Grave-Water into Sigil-Discs.", d:()=>staffed("mill")},
+   why:"Bone-silica + soul-ash → a silicon ingot.", d:()=>staffed("furnace")},
+  {t:"Raise a Wafer Mill and staff it.",
+   why:"The ingot is sliced into wafers.", d:()=>staffed("mill")},
+  {t:"Raise a Sigil-Litho and staff it.",
+   why:"Wafers are etched into dies — the circuits.", d:()=>staffed("litho")},
   {t:"Raise an Assembly Ossuary and staff it.",
-   why:"It binds Sigil-Discs + Soul-Ash into Reliquary Cores.", d:()=>staffed("assembly")},
+   why:"Dies + soul-ash are packaged into reliquary cores — the chips.", d:()=>staffed("ossuary")},
+  {t:"Raise a Substation and staff it — the datacenters need Power.",
+   why:"Soul-ash burns into Power. No power, no Compute.", d:()=>staffed("substation")},
   {t:"Raise a Spectral Datacenter and staff it.",
-   why:"It renders Reliquary Cores + Grave-Water into Compute, the engine's quota.", d:()=>staffed("datacenter")},
-  {t:"Now wait. As matter climbs the chain, your first Compute appears in the ledger up top.",
-   why:"Each staffed building consumes its inputs and produces its output over time. Short on a material? Add more gatherers.", d:()=>(G.stock.compute||0)>0},
-  {t:"The foundry breathes. Deliver Compute before each quota timer to hold back Dread. You're on your own now.",
+   why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>staffed("datacenter")},
+  {t:"Now wait — your first Compute appears in the ledger up top.",
+   why:"Short on a material? Add gatherers or another refiner. Short on husks? Bind more at the Pyre.", d:()=>(G.stock.compute||0)>0},
+  {t:"The foundry breathes. Pay each tithe of Compute once the grace ends, and keep rendering the dead. You're on your own now.",
    why:"", d:()=>G.quota.level>1},
 ];
 let tutIdx=0, tutDone=false;
@@ -1033,7 +1044,7 @@ function simStep(dt){
   const heavy=af>0.62; if(heavy&&!G._ashOn){ G._ashOn=true; if(typeof toast==="function")toast("Ashfall sweeps down over the valley.","bad"); } else if(!heavy){ G._ashOn=false; }
   if(selected&&!selected.dead&&selected.obj){ Cam.target.lerp(new THREE.Vector3(selected.obj.position.x,selected.obj.position.y+0.6,selected.obj.position.z),0.05); }
   for(const b of buildings){ const ud=b.mesh.userData;
-    if(b.kind==="hearth"&&ud.light){ const t=performance.now();
+    if(b.kind==="pyre"&&ud.light){ const t=performance.now();
       ud.light.intensity=(b.active?2.8:0.5)+Math.sin(t/110)*0.5+Math.sin(t/53)*0.3;
       if(ud.flame){ ud.flame.scale.set(1+Math.sin(t/120)*0.08,1+Math.sin(t/80)*0.18,1+Math.cos(t/100)*0.08); ud.flame.rotation.y=Math.sin(t/200)*0.25; }
       if(ud.tongues){ ud.tongues[0].scale.y=1+Math.sin(t/70)*0.2; ud.tongues[2].scale.y=1+Math.sin(t/45)*0.35; } }
@@ -1047,18 +1058,18 @@ function simStep(dt){
 function placeBuildingFree(k,x,z){ const def=BLD[k]; ensureBuildingGLB(k); const mesh=makeBuildingMesh(k,def); mesh.position.set(x,terrainHeight(x,z),z);
   scene.add(mesh); const b={kind:k,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0}; buildings.push(b); groundBuilding(b); return b; }
 function seedSettlement(){
-  G.stock.wood=70; G.stock.relic=30; G.stock.pith=42; G.stock.silica=8;
-  placeBuildingFree("hearth",0,0);
+  G.stock.dead=60; G.stock.soulash=14; G.stock.bonesil=8; G.stock.ichor=6; G.stock.compute=8;
+  placeBuildingFree("pyre",0,0);
   placeBuildingFree("den",7,4); placeBuildingFree("den",-7,4);
-  placeBuildingFree("stockpile",0,-7);   // a central yard so your stores are visible from the first moment
-  // starter gathering op at the nearest grove so the valley is working the moment you arrive
-  const grove=nodes.filter(n=>n.type==='grove').sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z))[0];
-  let wc=null,pp=null;
-  if(grove){ wc=placeBuildingFree("woodcutter",grove.x+2.6,grove.z); pp=placeBuildingFree("pithpost",grove.x-2.6,grove.z); }
+  placeBuildingFree("stockpile",0,-7);   // the hub — visible from the first moment
+  // a starter Grave-Exhumer on the nearest cemetery + a Crematory by the hub, so the line breathes on arrival
+  const grave=nodes.filter(n=>n.type==='grave').sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z))[0];
+  let ex=null; if(grave){ ex=placeBuildingFree("exhumer",grave.x+2.6,grave.z); }
+  const cre=placeBuildingFree("crematory",4,4);
   for(let i=0;i<9;i++){ const a=rr(0,6.28), r=rr(3,8); spawnVillager(Math.cos(a)*r, Math.sin(a)*r, pick(["worker","worker","stump","reaper"])); }
   const free=villagers.filter(v=>!v.assigned);
-  if(wc) for(let i=0;i<3&&free.length;i++) assignHusk(free.shift(),wc);
-  if(pp) for(let i=0;i<2&&free.length;i++) assignHusk(free.shift(),pp);
+  if(ex) for(let i=0;i<3&&free.length;i++) assignHusk(free.shift(),ex);
+  for(let i=0;i<3&&free.length;i++) assignHusk(free.shift(),cre);
   renderLedger(); buildRail(); buildDock(); renderQuota();
 }
 
@@ -1122,59 +1133,55 @@ start();
    === CONFIG: resources, resource-node types, buildings ===
    ===================================================================== */
 const RES={
-  wood:{name:"Deadwood",col:0x6b5a40}, pith:{name:"Rot-Pith",col:0x7d8a5a},
-  silica:{name:"Silica",col:0xb9b0a0}, ash:{name:"Soul-Ash",col:0x8d8aa0},
-  water:{name:"Grave-Water",col:0x5fa0b0}, relic:{name:"Salvage",col:0xb8884e},
-  glass:{name:"Cinderglass",col:0x8fa0b8}, wafer:{name:"Sigil-Disc",col:0x6fae9b},
-  core:{name:"Reliquary Core",col:0xb25fae}, compute:{name:"Compute",col:0xe8d24a},
+  dead:{name:"Corpses",col:0x8a8170}, bonesil:{name:"Bone-Silica",col:0xb9b0a0},
+  soulash:{name:"Soul-Ash",col:0x8d8aa0}, ichor:{name:"Ichor",col:0x5fa0b0},
+  ingot:{name:"Silicon Ingot",col:0x9aa0a8}, wafer:{name:"Wafer",col:0x6fae9b},
+  die:{name:"Etched Die",col:0xb6c24a}, core:{name:"Reliquary Core",col:0xb25fae},
+  power:{name:"Power",col:0xe8a23a}, compute:{name:"Compute",col:0xe8d24a},
 };
-const RES_ORDER=["wood","pith","silica","ash","water","relic","glass","wafer","core","compute"];
-// nodes scattered on the land; gatherers harvest them
+const RES_ORDER=["dead","bonesil","soulash","ichor","ingot","wafer","die","core","power","compute"];
+// the dead are harvested from cemeteries and the corpse-wastes; everything else is rendered from them
 const NODE={
-  grove:{name:"Deadwood Grove",gives:["wood","pith"],amount:[180,160],col:0x6b5a40,renew:0.9},
-  dune:{name:"Silica Dune",gives:["silica"],amount:[300],col:0xb9b0a0},
-  vent:{name:"Soul-Ash Vent",gives:["ash"],amount:[260],col:0x8d8aa0},
-  well:{name:"Grave-Well",gives:["water"],amount:[400],col:0x5fa0b0,renew:1.4},
-  ruin:{name:"Salvage Ruin",gives:["relic"],amount:[140],col:0xb8884e},
+  grave:{name:"Cemetery",gives:["dead"],amount:[160],col:0x8a8170,renew:0.6},
+  waste:{name:"Corpse-Waste",gives:["dead"],amount:[420],col:0x6b6256},
 };
 // buildings. kind: gather(harvests nodes of nodeType) | refine(recipe) | hearth | den | ward | market | datacenter | stockpile
 const BLD={
-  hearth:{name:"The Pyre",kind:"hearth",cost:{},foot:2.4,workers:0,warmth:18,burn:{wood:0.25},
-    desc:"A bound flame that burns deadwood to keep the husks warm. Let it gutter out and resolve fails."},
-  den:{name:"Bone Den",kind:"den",cost:{wood:18},foot:1.8,workers:0,houses:4,
-    desc:"Shelters husks and lets the engine bind more of the dead. Raises population cap."},
-  woodcutter:{name:"Splitter's Post",kind:"gather",nodeType:"grove",res:"wood",cost:{wood:10},foot:1.6,workers:3,
-    desc:"Husks fell the dead groves for wood."},
-  pithpost:{name:"Pith Harrow",kind:"gather",nodeType:"grove",res:"pith",cost:{wood:14},foot:1.6,workers:3,
-    desc:"Husks scrape rot-pith from the groves — the only thing the dead will eat."},
-  dredge:{name:"Silica Dredge",kind:"gather",nodeType:"dune",res:"silica",cost:{wood:16,relic:4},foot:1.8,workers:3,
-    desc:"Hauls pale silica from the dunes."},
-  ventcap:{name:"Ash Vent-Cap",kind:"gather",nodeType:"vent",res:"ash",cost:{wood:16,relic:6},foot:1.8,workers:3,
-    desc:"Caps a soul-ash vent and draws the matter of the dead."},
-  wellrig:{name:"Well Rig",kind:"gather",nodeType:"well",res:"water",cost:{wood:18,relic:4},foot:1.8,workers:2,
-    desc:"Draws cold grave-water for the higher crafts."},
-  salvage:{name:"Salvage Yard",kind:"gather",nodeType:"ruin",res:"relic",cost:{wood:20},foot:1.8,workers:3,
-    desc:"Strips the ruins for salvage — the only metal left."},
-  furnace:{name:"Soul Furnace",kind:"refine",cost:{wood:28,relic:8},foot:2.0,workers:3,dread:0.5,
-    recipe:{in:{silica:2,ash:1},out:{glass:1},time:3.2},desc:"Smelts silica and soul-ash into cinderglass."},
-  mill:{name:"Glass Mill",kind:"refine",cost:{wood:30,relic:12},foot:2.0,workers:3,dread:0.6,
-    recipe:{in:{glass:1,water:1},out:{wafer:1},time:3.6},desc:"Slices and quenches cinderglass into sigil-discs."},
-  assembly:{name:"Assembly Ossuary",kind:"refine",cost:{wood:38,relic:20},foot:2.2,workers:4,dread:0.9,
-    recipe:{in:{wafer:1,ash:1},out:{core:1},time:4.4},desc:"Binds discs and ash into reliquary cores."},
-  datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{wood:60,relic:40},foot:2.6,workers:5,dread:1.3,
-    recipe:{in:{core:1,water:1},out:{compute:3},time:4.6},desc:"Renders cores into Compute — the quota the engine demands."},
-  ward:{name:"Ward Obelisk",kind:"ward",cost:{wood:24,relic:10},foot:1.4,workers:0,ward:14,
-    desc:"Suppresses Dread in a wide radius."},
-  market:{name:"Black Market",kind:"market",cost:{wood:30,relic:8},foot:1.8,workers:1,
+  pyre:{name:"The Binding Pyre",kind:"bind",cost:{},foot:2.4,workers:0,
+    desc:"The engine's fire. Bind a fresh husk here from a corpse and a little Compute. Without husks, nothing moves."},
+  den:{name:"Bone Den",kind:"den",cost:{dead:16},foot:1.8,workers:0,houses:4,
+    desc:"Shelters bound husks and raises how many the engine can hold at once."},
+  exhumer:{name:"Grave-Exhumer",kind:"gather",nodeType:"grave",res:"dead",cost:{dead:6},foot:1.6,workers:3,
+    desc:"Husks dig the cemeteries and drag up the dead."},
+  dredge:{name:"Waste-Dredge",kind:"gather",nodeType:"waste",res:"dead",cost:{dead:12},foot:1.8,workers:3,
+    desc:"Drags bodies in from the corpse-wastes — farther out, but deep."},
+  crematory:{name:"Crematory",kind:"refine",cost:{dead:14},foot:2.0,workers:3,dread:0,render:true,
+    recipe:{in:{dead:2},out:{bonesil:1,soulash:1,ichor:1},time:3.0},
+    desc:"Renders corpses into bone-silica (sand), soul-ash (flux) and ichor (coolant). Rendering the dead is also what holds the backlog down."},
+  furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4},foot:2.0,workers:3,dread:0.4,
+    recipe:{in:{bonesil:2,soulash:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica and soul-ash into a silicon ingot."},
+  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6},foot:2.0,workers:3,dread:0.5,
+    recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers."},
+  litho:{name:"Sigil-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
+    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches sigil-circuits into the wafer — photolithography by another name."},
+  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10},foot:2.2,workers:4,dread:0.8,
+    recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores — the processors."},
+  substation:{name:"Substation",kind:"refine",cost:{dead:16,soulash:4},foot:1.8,workers:2,dread:0.5,
+    recipe:{in:{soulash:1},out:{power:2},time:3.0},desc:"Burns soul-ash for Power. The datacenters are starving for it."},
+  datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:50,soulash:18},foot:2.6,workers:5,dread:1.2,
+    recipe:{in:{core:1,power:1,ichor:1},out:{compute:3},time:4.6},desc:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota."},
+  ward:{name:"Ward Obelisk",kind:"ward",cost:{dead:20,soulash:8},foot:1.4,workers:0,ward:14,
+    desc:"Holds back the backlog of the unprocessed dead in a wide radius."},
+  market:{name:"Black Market",kind:"market",cost:{dead:24},foot:1.8,workers:1,
     desc:"Trades surplus goods for Bones, and Bones for what you lack."},
-  stockpile:{name:"Reliquary Yard",kind:"stockpile",cost:{wood:22,relic:6},foot:2.4,workers:0,store:140,
-    desc:"A storage yard. Raises how much the foundry can hoard, and lays your gathered matter out as visible piles — logs, sand, ash, water, salvage and refined cores — that rise and fall with your stores."},
-  path:{name:"Bone Path",kind:"path",cost:{wood:2},foot:1,workers:0,
-    desc:"Lay a path; click-drag to extend it. Husks move ~35% faster over paths — connect your fields to the foundry."},
+  stockpile:{name:"Reliquary Yard",kind:"stockpile",cost:{dead:18},foot:2.4,workers:0,store:140,
+    desc:"The foundry's hub: gatherers deliver the dead here and refiners draw from it. Its piles rise and fall with your stores."},
+  path:{name:"Bone Path",kind:"path",cost:{dead:1},foot:1,workers:0,
+    desc:"Lay a path; click-drag to extend it. Husks move ~35% faster over paths."},
 };
-const BLD_ORDER=["hearth","den","path","woodcutter","pithpost","dredge","ventcap","wellrig","salvage","furnace","mill","assembly","datacenter","stockpile","ward","market"];
+const BLD_ORDER=["pyre","den","path","exhumer","dredge","crematory","furnace","mill","litho","ossuary","substation","datacenter","stockpile","ward","market"];
 const TABS=[["dwell","Dwelling"],["gather","Gathering"],["refine","Refining"],["civic","Civic"]];
-function bldTab(k){ const d=BLD[k]; if(d.kind==="hearth"||d.kind==="den")return"dwell"; if(d.kind==="gather")return"gather";
+function bldTab(k){ const d=BLD[k]; if(d.kind==="bind"||d.kind==="den")return"dwell"; if(d.kind==="gather")return"gather";
   if(d.kind==="refine"||d.kind==="datacenter")return"refine"; return"civic"; }
 
 /* =====================================================================
@@ -1206,19 +1213,21 @@ function makeAshMound(){ const m=MAT(0x2a2722); const s=rr(0.8,2.0);
 
 function makeNode(type){
   const def=NODE[type]; const g=new THREE.Group(); g.userData.depleted=false;
-  if(type==="grove"){ for(let i=0;i<4+rint(3);i++){ const t=makeDeadTree2(rr(0.8,1.3)); t.position.set(rr(-2.2,2.2),0,rr(-2.2,2.2)); g.add(t);}
-    for(let i=0;i<5;i++){ const f=new THREE.Mesh(new THREE.IcosahedronGeometry(rr(0.12,0.26),0),emis(0x6f8a4a)); f.material.emissiveIntensity=0.5;
-      f.position.set(rr(-2,2),0.12,rr(-2,2)); g.add(f);} }
-  else if(type==="dune"){ const mound=new THREE.Mesh(new THREE.SphereGeometry(2.4,8,6,0,6.283,0,1.4),MAT(0x9a9080)); mound.scale.y=0.45; mound.position.y=0.1; g.add(mound);
-    for(let i=0;i<7;i++){ const sh=new THREE.Mesh(new THREE.ConeGeometry(rr(0.2,0.5),rr(0.8,2.0),4),MAT(0xc8c2b4)); sh.position.set(rr(-2,2),rr(0.3,0.8),rr(-2,2)); sh.rotation.set(rr(-0.5,0.5),rr(0,6),rr(-0.5,0.5)); g.add(sh);} }
-  else if(type==="vent"){ const lip=new THREE.Mesh(new THREE.TorusGeometry(1.6,0.5,6,12),MAT(0x1a1814)); lip.rotation.x=Math.PI/2; lip.position.y=0.2; g.add(lip);
-    const core=new THREE.Mesh(new THREE.CircleGeometry(1.3,12),emis(0xc9772a)); core.material.emissiveIntensity=0.6; core.rotation.x=-Math.PI/2; core.position.y=0.05; g.add(core);
-    const gl=new THREE.PointLight(0xc9772a,0.8,12,2); gl.position.y=0.6; g.add(gl); }
-  else if(type==="well"){ const ring=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.5,1.0,10,1,true),MAT(0x3a3a40)); ring.position.y=0.5; g.add(ring);
-    const water=new THREE.Mesh(new THREE.CircleGeometry(1.2,12),MAT(0x12303a,{metalness:0.4,roughness:0.3})); water.rotation.x=-Math.PI/2; water.position.y=0.7; g.add(water); }
-  else { for(let i=0;i<4+rint(4);i++){ const b=new THREE.Mesh(new THREE.BoxGeometry(rr(1,3),rr(1,4),rr(1,2.5)),MAT(0x202327,{metalness:0.3}));
-      b.position.set(rr(-2,2),rr(0.5,2),rr(-2,2)); b.rotation.set(rr(-0.3,0.3),rr(0,6),rr(-0.3,0.3)); g.add(b);}
-    const seam=new THREE.Mesh(new THREE.BoxGeometry(0.1,rr(1.5,3),0.1),new THREE.MeshBasicMaterial({color:0x2f6f78})); seam.position.set(rr(-1,1),rr(1,2),rr(-1,1)); g.add(seam); }
+  if(type==="grave"){
+    // a cute little cemetery: leaning headstones, white crosses, fresh dirt mounds
+    const dirt=MAT(0x37302a), stone=MAT(0x70696090>>4||0x6b6660), white=MAT(0xece6d4);
+    const plot=new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.7,0.22,10),dirt); plot.position.y=0.11; g.add(plot);
+    for(let i=0;i<6+rint(3);i++){ const a=rr(0,6.28), d=rr(0.4,2.1), x=Math.cos(a)*d, z=Math.sin(a)*d, ry=rr(0,6);
+      if(rnd()<0.5){ const hs=new THREE.Mesh(new THREE.BoxGeometry(rr(0.32,0.5),rr(0.5,0.8),0.13),stone); hs.position.set(x,0.4,z); hs.rotation.set(rr(-0.12,0.12),ry,rr(-0.16,0.16)); g.add(hs); }
+      else { const post=new THREE.Mesh(new THREE.BoxGeometry(0.1,rr(0.6,0.9),0.1),white); post.position.set(x,0.42,z); post.rotation.y=ry; g.add(post);
+        const bar=new THREE.Mesh(new THREE.BoxGeometry(rr(0.3,0.46),0.1,0.1),white); bar.position.set(x,0.62,z); bar.rotation.y=ry; g.add(bar); }
+      const mound=new THREE.Mesh(new THREE.SphereGeometry(rr(0.3,0.5),6,4,0,6.283,0,1.3),dirt); mound.scale.y=0.4; mound.position.set(x*0.55,0.14,z*0.55); g.add(mound); }
+  }
+  else { // corpse-waste: a low heap of shrouded bodies dragged in from the desolation
+    const dirt=MAT(0x2a2620);
+    const base=new THREE.Mesh(new THREE.SphereGeometry(2.2,8,6,0,6.283,0,1.4),dirt); base.scale.y=0.4; base.position.y=0.1; g.add(base);
+    for(let i=0;i<7+rint(5);i++){ const b=new THREE.Mesh(new THREE.BoxGeometry(rr(0.5,0.9),rr(0.3,0.5),rr(0.4,0.7)),MAT(pick([0x4a4438,0x3a352c,0x52493a])));
+      b.position.set(rr(-1.6,1.6),rr(0.2,0.95),rr(-1.6,1.6)); b.rotation.set(rr(-0.4,0.4),rr(0,6),rr(-0.3,0.3)); g.add(b);} }
   const amt=def.amount[0]*rr(0.8,1.2);
   return {type,def,mesh:g,amount:amt,max:amt};
 }
@@ -1255,15 +1264,15 @@ function scatterWorld(){
     const nNodes=2+(rg()*2|0);
     const addNodes=(type,n)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(0.7); if(terrainHeight(x,z)<-3.2)continue; placeNode(type,x,z); } };
     const addProps=(maker,n,rot)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(1.0); if(terrainHeight(x,z)<-3.2)continue; dropProp(maker(),x,z,rot); } };
-    if(g.type==='forest'){ addNodes('grove',nNodes+1); addProps(()=>makeDeadTree2(rr(0.7,1.5)),20,true); addProps(()=>makeBonePile(),3); }
-    else if(g.type==='silica'){ addNodes('dune',3); addProps(()=>makeShard(),16,true); addProps(()=>makeRock(),5); }
-    else if(g.type==='ash'){ addNodes('vent',3); addProps(()=>makeAshMound(),16); addProps(()=>makeDeadTree2(rr(0.6,1.0)),4,true); }
-    else if(g.type==='ruins'){ addNodes('ruin',2); addProps(()=>makeWreck(),8,true); addProps(()=>makeMonolith(),3); addProps(()=>makeServerTower(),6,true); }
-    else if(g.type==='graves'){ addNodes('well',2); addProps(()=>makeBonePile(),16); addProps(()=>makeRock(),4); }
-    else { addNodes('grove',2); addProps(()=>makeAshMound(),9); addProps(()=>makeDeadTree2(rr(0.6,1.1)),9,true); }
+    if(g.type==='forest'){ addNodes('grave',nNodes+1); addProps(()=>makeDeadTree2(rr(0.7,1.5)),20,true); addProps(()=>makeBonePile(),3); }
+    else if(g.type==='silica'){ addNodes('waste',3); addProps(()=>makeShard(),16,true); addProps(()=>makeRock(),5); }
+    else if(g.type==='ash'){ addNodes('waste',3); addProps(()=>makeAshMound(),16); addProps(()=>makeDeadTree2(rr(0.6,1.0)),4,true); }
+    else if(g.type==='ruins'){ addNodes('waste',2); addProps(()=>makeWreck(),8,true); addProps(()=>makeMonolith(),3); addProps(()=>makeServerTower(),6,true); }
+    else if(g.type==='graves'){ addNodes('grave',3); addProps(()=>makeBonePile(),16); addProps(()=>makeRock(),4); }
+    else { addNodes('grave',2); addProps(()=>makeAshMound(),9); addProps(()=>makeDeadTree2(rr(0.6,1.1)),9,true); }
   }
   // a tight ring of resource deposits right around the settlement — close, visible objects you can reach at once
-  const closeRing=[['grove',0],['dune',1],['vent',2],['well',3],['grove',4],['ruin',5]];
+  const closeRing=[['grave',0],['grave',1],['waste',2],['grave',3],['grave',4],['waste',5]];
   for(const cr of closeRing){ const a=(cr[1]/6)*6.283+rr(-0.35,0.35), rad=rr(13,21), x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0) continue; placeNode(cr[0],x,z); }
   // ambient props across the open land (denser, closer to centre — leave only a small build clearing)
@@ -1320,7 +1329,7 @@ function nearestNode(type,x,z){ let best=null,bd=1e9; for(const n of nodes){ if(
 // the stockpile is the physical hub: gatherers deliver raw matter here, refiners fetch from here
 function nearestStockpile(x,z){ let best=null,bd=1e9; for(const b of buildings){ if(b.kind!=="stockpile")continue;
   const d=(b.x-x)*(b.x-x)+(b.z-z)*(b.z-z); if(d<bd){bd=d;best=b;} } return best; }
-function hubAt(x,z){ return nearestStockpile(x,z) || buildings.find(b=>b.kind==="hearth") || {x:0,z:0,def:{foot:2.2}}; }
+function hubAt(x,z){ return nearestStockpile(x,z) || buildings.find(b=>b.kind==="pyre") || {x:0,z:0,def:{foot:2.2}}; }
 
 /* =====================================================================
    === ECONOMY: state, buildings, jobs, needs, quota, dread ===
@@ -1336,7 +1345,7 @@ function pathKey(x,z){ return (Math.round(x)+1024)*4096+(Math.round(z)+1024); }
 function onPath(x,z){ return PATHS.has(pathKey(x,z)); }
 function addPath(x,z){ const rx=Math.round(x),rz=Math.round(z),k=pathKey(rx,rz);
   if(PATHS.has(k)||Math.hypot(rx,rz)>HALF-1||terrainHeight(rx,rz)<-3.4) return false;
-  if((G.stock.wood||0)<BLD.path.cost.wood) return false; G.stock.wood-=BLD.path.cost.wood; PATHS.add(k);
+  if((G.stock.dead||0)<(BLD.path.cost.dead||0)) return false; G.stock.dead-=(BLD.path.cost.dead||0); PATHS.add(k);
   if(!pathGroup){ pathGroup=new THREE.Group(); scene.add(pathGroup); }
   const q=new THREE.Mesh(new THREE.BoxGeometry(1.15,0.14,1.15),MAT(0x3a342a)); q.position.set(rx,terrainHeight(rx,rz)+0.07,rz); pathGroup.add(q); return true; }
 
@@ -1398,16 +1407,16 @@ function makeBuildingGLB(kind,def){
 function swapBuildingMeshes(kind){ for(const b of buildings){ if(b.kind!==kind) continue;
   const np=makeBuildingGLB(kind,b.def); np.position.copy(b.mesh.position); scene.remove(b.mesh); b.mesh=np; scene.add(np); } }
 /* ---- material stockpiles: a yard whose piles physically rise & fall with your stores (the #1 'sauce') ---- */
-const PILE_RES=["wood","pith","silica","ash","water","relic","glass","core"];
+const PILE_RES=["dead","bonesil","soulash","ichor","ingot","wafer","die","core"];
 function pileGeo(res){ switch(res){
-  case "silica": return {g:new THREE.ConeGeometry(0.46,1.0,5), h:1.0};         // pale sand heap
-  case "ash":    return {g:new THREE.ConeGeometry(0.52,0.8,6), h:0.8};         // soul-ash mound
-  case "pith":   return {g:new THREE.SphereGeometry(0.42,6,5), h:0.84};        // rot-pith sacks
-  case "water":  return {g:new THREE.CylinderGeometry(0.4,0.42,1.0,8), h:1.0}; // grave-water cistern
-  case "wood":   return {g:new THREE.BoxGeometry(0.8,1.0,0.54), h:1.0};        // split-log stack
-  case "relic":  return {g:new THREE.BoxGeometry(0.66,1.0,0.66), h:1.0};       // salvage crates
-  case "glass":  return {g:new THREE.IcosahedronGeometry(0.48,0), h:0.96};     // cinderglass shards
-  default:       return {g:new THREE.IcosahedronGeometry(0.4,0), h:0.8};       // reliquary cores
+  case "dead":    return {g:new THREE.SphereGeometry(0.46,6,5), h:0.9};         // a heap of corpses
+  case "bonesil": return {g:new THREE.ConeGeometry(0.46,1.0,5), h:1.0};         // pale bone-silica sand
+  case "soulash": return {g:new THREE.ConeGeometry(0.52,0.8,6), h:0.8};         // soul-ash mound
+  case "ichor":   return {g:new THREE.CylinderGeometry(0.4,0.42,1.0,8), h:1.0}; // ichor cistern (coolant)
+  case "ingot":   return {g:new THREE.BoxGeometry(0.8,1.0,0.5), h:1.0};         // silicon ingots
+  case "wafer":   return {g:new THREE.BoxGeometry(0.7,1.0,0.7), h:1.0};         // wafer cassettes
+  case "die":     return {g:new THREE.IcosahedronGeometry(0.46,0), h:0.92};     // etched dies
+  default:        return {g:new THREE.IcosahedronGeometry(0.4,0), h:0.8};       // reliquary cores
 }}
 function makeStockpile(def){
   const g=new THREE.Group();
@@ -1441,7 +1450,7 @@ function makeBuildingMesh(kind,def){
   if(bldBank[kind]) return makeBuildingGLB(kind,def);
   const g=new THREE.Group(); const stone=MAT(0x35332e), timber=MAT(0x2b251c), iron=MAT(0x1c1f22,{metalness:0.3}), win=emis(0xe8973a);
   const f=def.foot;
-  if(kind==="hearth"){ const base=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.75,0.5,10),MAT(0x2a2620)); base.position.y=0.25; g.add(base);
+  if(kind==="pyre"){ const base=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.75,0.5,10),MAT(0x2a2620)); base.position.y=0.25; g.add(base);
     const ring=new THREE.Mesh(new THREE.TorusGeometry(1.35,0.3,6,12),MAT(0x1c1914)); ring.rotation.x=Math.PI/2; ring.position.y=0.5; g.add(ring);
     for(let i=0;i<4;i++){ const lg=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,1.5,5),MAT(0x130e0a)); lg.position.set(Math.cos(i*1.57)*0.4,0.55,Math.sin(i*1.57)*0.4); lg.rotation.set(0,i*1.57,0.95); g.add(lg); }
     const flame=new THREE.Group(); flame.position.y=0.55; g.add(flame);
@@ -1474,9 +1483,9 @@ function makeBuildingMesh(kind,def){
 /* settle a placed building into the world: face the Pyre, sink a foundation skirt, scatter matching debris */
 function groundBuilding(b){
   const def=b.def, m=b.mesh; if(def.kind==="path") return;
-  if(b.kind!=="hearth") m.rotation.y = Math.atan2(-b.x,-b.z) + rr(-0.28,0.28);   // turn to face the settlement centre
+  if(b.kind!=="pyre") m.rotation.y = Math.atan2(-b.x,-b.z) + rr(-0.28,0.28);   // turn to face the settlement centre
   const fr=(def.foot||1.6)*0.92;
-  if(b.kind!=="hearth" && b.kind!=="stockpile"){   // these carry their own stone base
+  if(b.kind!=="pyre" && b.kind!=="stockpile"){   // these carry their own stone base
     const skirt=new THREE.Mesh(new THREE.CylinderGeometry(fr*0.96,fr*1.16,0.55,8),MAT(0x191712)); skirt.position.y=-0.18; m.add(skirt);
     for(let i=0;i<5;i++){ const a=rr(0,6.28); const st=new THREE.Mesh(new THREE.DodecahedronGeometry(rr(0.16,0.32),0),MAT(0x23252b));
       st.position.set(Math.cos(a)*fr,rr(-0.05,0.12),Math.sin(a)*fr); st.rotation.set(rr(0,3),rr(0,3),rr(0,3)); m.add(st); } }
@@ -1567,7 +1576,7 @@ function stepHusks(dt){
     if(!b){ // idle until assigned: stand still, only the rare slow shuffle near the Pyre
       v.restock-=dt;
       if(v.restock<=0){ v.restock=rr(16,34);
-        if(rnd()<0.12){ const hb=buildings.find(x=>x.kind==="hearth"); const cx=hb?hb.x:0,cz=hb?hb.z:0; v.tx=cx+rr(-5,5); v.tz=cz+rr(-5,5); }
+        if(rnd()<0.12){ const hb=buildings.find(x=>x.kind==="pyre"); const cx=hb?hb.x:0,cz=hb?hb.z:0; v.tx=cx+rr(-5,5); v.tz=cz+rr(-5,5); }
         else { v.tx=v.obj.position.x; v.tz=v.obj.position.z; } }
       moveHusk(v,v.tx,v.tz,dt,0.9); continue;
     }
@@ -1625,13 +1634,12 @@ function depleteNode(n){ if(n.def.renew) return; n.amount=0; if(!n.mesh.userData
 
 /* ---- random events: the dead world intrudes ---- */
 const EVENTS=[
-  {n:"A wanderer drags salvage in from the dead cities.", bad:false, f:()=>addStock('relic',rr(16,32))},
-  {n:"A buried cache of silica is unearthed beneath the ash.", bad:false, f:()=>addStock('silica',rr(22,44))},
-  {n:"Grave-water seeps up cold through the cracks.", bad:false, f:()=>addStock('water',rr(16,30))},
-  {n:"A dead grove is found still standing — deadwood for the taking.", bad:false, f:()=>addStock('wood',rr(20,40))},
+  {n:"A mass grave is uncovered — a windfall of the dead.", bad:false, f:()=>addStock('dead',rr(22,42))},
+  {n:"A buried cache of soul-ash is found beneath the ruins.", bad:false, f:()=>addStock('soulash',rr(16,30))},
+  {n:"Ichor wells up cold through the cracks.", bad:false, f:()=>addStock('ichor',rr(14,26))},
+  {n:"A seam of bone-silica is unearthed.", bad:false, f:()=>addStock('bonesil',rr(18,34))},
   {n:"The backlog of the unprocessed dead presses in. Dread rises.", bad:true, f:()=>{ G.dread=clamp(G.dread+11,0,100); }},
-  {n:"A cold wind scatters the Pyre's warmth.", bad:true, f:()=>{ G.stock.wood=Math.max(0,G.stock.wood-rr(6,14)); }},
-  {n:"A lone husk wanders out of the waste to join the foundry.", bad:false, f:()=>{ const a=villagers.filter(v=>!v.dead); if(a.length<G.popCap){ const hb=buildings.find(b=>b.kind==="hearth"); spawnVillager((hb?hb.x:0)+rr(-4,4),(hb?hb.z:0)+rr(-4,4),pick(["worker","stump","reaper"])); SND.sfx('rise'); } }},
+  {n:"A power surge guts the grid.", bad:true, f:()=>{ G.stock.power=Math.max(0,(G.stock.power||0)-rr(6,14)); }},
 ];
 function fireEvent(){ const e=pick(EVENTS); e.f(); if(typeof toast==="function")toast(e.n, e.bad?"bad":"good"); if(e.bad)SND.sfx('haunt'); }
 
@@ -1642,50 +1650,44 @@ function stepEconomy(dt){
   // renewable nodes (groves/wells) slowly regrow so food + water are sustainable; finite ones push expansion
   for(const n of nodes){ if(n.def.renew && n.amount<n.max){ n.amount=Math.min(n.max,n.amount+n.def.renew*dt);
     if(n.mesh.userData.depleted && n.amount>n.max*0.2){ n.mesh.userData.depleted=false; n.mesh.scale.y/=0.6; } } }
-  // warmth: hearths burn wood
-  let warmSupply=0;
-  for(const b of buildings){ if(b.kind==="hearth"){ if(G.stock.wood>0){ G.stock.wood=Math.max(0,G.stock.wood-b.def.burn.wood*dt); warmSupply+=b.def.warmth*techMul('warmth'); b.active=true; } else b.active=false; } }
-  G.warmthRatio=clamp(warmSupply/Math.max(1,pop),0,1.5);
-  // food
-  G.stock.pith=Math.max(0,G.stock.pith-pop*0.05*dt); const foodOk=G.stock.pith>0.01;
-  // production (refine/datacenter)
-  let activeDread=0;
+  // husk upkeep: the engine patches its husks with a trickle of soul-ash. Forgiving, so you don't lose fast.
+  const upkeepOk=(G.stock.soulash||0)>0.01;
+  if(upkeepOk) G.stock.soulash=Math.max(0,G.stock.soulash-pop*0.015*dt);
+  // production (refine/datacenter); track crematories rendering the dead — that's what holds the backlog down
+  let renderers=0;
   for(const b of buildings){
     if(b.def.kind!=="refine"&&b.def.kind!=="datacenter") continue;
     const present=b.workers.filter(w=>w.atWork&&!w.dead).length;
     const rec=b.def.recipe; const inOk=Object.keys(rec.in).every(r=>(G.stock[r]||0)>=rec.in[r]);
     const outOk=Object.keys(rec.out).every(r=>storeRoom(r));
-    if(present>0&&inOk&&outOk){ b.active=true; b.prog+=dt; activeDread+=b.def.dread;
+    if(present>0&&inOk&&outOk){ b.active=true; b.prog+=dt; if(b.def.render)renderers++;
       if(b.prog>=rec.time){ b.prog-=rec.time; for(const r in rec.in)G.stock[r]-=rec.in[r]; for(const r in rec.out)addStock(r,rec.out[r]); b.cyc++; } }
-    else { b.active=false; }
+    else b.active=false;
   }
-  // dread: industry + backlog vs ward suppression
+  // Dread = the backlog of the unprocessed dead. It climbs as bodies pile up; rendering them (Crematories) + Wards hold it back.
+  // No pressure during the opening grace, so a new player can find their feet.
+  const grace=(G.time||0) < (G.graceT==null?150:G.graceT);
   let wards=0; for(const b of buildings) if(b.kind==="ward") wards+=1;
-  const decay=0.25+wards*0.6*techMul('ward');
-  G.dread=clamp(G.dread+(activeDread*0.6 - decay)*dt,0,100);
+  const basePressure=grace?0:(G.basePressure||0.6);
+  G.dread=clamp(G.dread + (basePressure - renderers*1.0 - wards*0.6*techMul('ward'))*dt, 0,100);
   // hauntings
   if(G.dread>55 && rnd()<0.03*dt*(G.dread/100)){ const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ const v=pick(cand); v.resolve=Math.max(0,v.resolve-0.25); SND.sfx('haunt'); if(typeof toast==="function")toast(v.name+" is gripped by a haunting.","bad"); } }
-  // resolve per husk
+  // husk resolve: slow decay without soul-ash upkeep, recovers with it
   for(const v of villagers){ if(v.dead) continue;
-    const good=foodOk&&G.warmthRatio>=0.7;
-    v.resolve=clamp(v.resolve+(good?0.02:-0.045)*dt,0,1);
+    v.resolve=clamp(v.resolve+(upkeepOk?0.02:-0.012)*dt,0,1);
     if(v.resolve<=0){ crumble(v); }
   }
-  // population growth
-  G.grow-=dt; if(G.grow<=0){ G.grow=24;
-    const alive=villagers.filter(v=>!v.dead); const avg=alive.reduce((a,v)=>a+v.resolve,0)/Math.max(1,alive.length);
-    const cap=6+buildings.filter(b=>b.kind==="den").reduce((a,b)=>a+b.def.houses,0); G.popCap=cap;
-    if(avg>0.65 && alive.length<cap && G.stock.pith>8){ const hb=buildings.find(b=>b.kind==="hearth"); const cx=hb?hb.x:0,cz=hb?hb.z:0;
-      spawnVillager(cx+rr(-4,4),cz+rr(-4,4),pick(["worker","worker","stump","reaper"])); SND.sfx('rise'); toast("A husk rises to join the foundry.","good"); } }
-  // quota
-  G.quota.t-=dt;
+  // population cap from dens — husks are BOUND at the Pyre, never spawned for free
+  G.popCap=6+buildings.filter(b=>b.kind==="den").reduce((a,b)=>a+b.def.houses,0);
+  // quota — frozen during the opening grace
+  if(!grace){ G.quota.t-=dt;
   if(G.quota.t<=0){ const need=G.quota.need;
     if((G.stock.compute||0)>=need){ G.stock.compute-=need; G.writ+=need*8; G.dread=Math.max(0,G.dread-12); G.quota.level++;
       G.quota.need=Math.ceil(need*1.4); SND.sfx('bell'); toast("Quota met. The engine endures. (Tithe paid: "+(need*8)+" Bones)","good");
       if(G.quota.level>WIN_LEVEL) endGame(true); }
     else { G.dread=clamp(G.dread+26,0,100); SND.sfx('deny'); toast("Quota missed — the backlog of the dead swells. Dread surges.","bad"); }
     G.quota.t=G.quota.period;
-  }
+  } }
   // random events
   G.eventT=(G.eventT==null?60:G.eventT)-dt; if(G.eventT<=0 && G.time>15){ G.eventT=rr(55,95); fireEvent(); }
   // lose conditions
@@ -1696,6 +1698,16 @@ function stepEconomy(dt){
 function crumble(v){ v.dead=true; SND.sfx('crumble'); scene.remove(v.obj); if(v.assigned){ const a=v.assigned.workers,k=a.indexOf(v); if(k>=0)a.splice(k,1);}
   const idx=villagers.indexOf(v); if(idx>=0)villagers.splice(idx,1); if(selected===v)clearInspect();
   toast("A husk crumbles back to ash.","bad"); }
+// husks are BOUND at the Pyre from a corpse + Compute — never spawned for free
+function bindHusk(){
+  const cap=6+buildings.filter(b=>b.kind==="den").reduce((a,b)=>a+b.def.houses,0);
+  if(villagers.filter(v=>!v.dead).length>=cap){ SND.sfx('deny'); toast("No room for another husk — raise a Bone Den.","bad"); return false; }
+  if((G.stock.dead||0)<1 || (G.stock.compute||0)<2){ SND.sfx('deny'); toast("Binding a husk needs 1 corpse and 2 Compute.","bad"); return false; }
+  G.stock.dead-=1; G.stock.compute-=2;
+  const p=buildings.find(b=>b.kind==="pyre")||{x:0,z:0};
+  spawnVillager(p.x+rr(-4,4),p.z+rr(-4,4),pick(["worker","worker","stump","reaper"])); SND.sfx('rise');
+  if(typeof renderLedger==="function")renderLedger(); if(typeof refreshInspect==="function")refreshInspect();
+  toast("A husk is bound to the foundry.","good"); return true; }
 function endGame(win,why){ if(G.over)return; G.over=win?"win":"lose"; paused=true; SND.sfx(win?'win':'lose'); try{ localStorage.removeItem('sf_save'); }catch(e){}   // clear the autosave so Again/reload starts a fresh valley, not the moment before defeat
   if(typeof showEnd==="function") showEnd(win,why); }
 

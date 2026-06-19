@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -50,55 +50,59 @@ const T=sandbox.__T;
 
 let pass=0,fail=0; const ok=(n,c,x="")=>{(c?pass++:fail++);console.log((c?"  PASS ":"  FAIL ")+n+(x?"  "+x:""));};
 ok("internals exposed",!!T); if(!T){console.log("aborting");process.exit(1);}
+ok("economy re-themed to the dead + chip chain", !!(T.RES.dead&&T.RES.bonesil&&T.RES.core&&T.RES.power)&&!T.RES.silica, "");
 
 // --- build a full, well-fed settlement ---
 let threw=null;
 try{
   T.seedSettlement();
-  // generous stock so we can build the whole chain and not starve during the test
-  Object.assign(T.G.stock,{wood:400,relic:300,pith:400,silica:0,ash:0,water:0});
-  // nodes near the centre
-  T.placeNode("grove",-12,0); T.placeNode("grove",12,0); T.placeNode("grove",-16,6); T.placeNode("grove",16,-6);
-  T.placeNode("dune",0,-14); T.placeNode("vent",0,14); T.placeNode("well",16,10); T.placeNode("well",-16,-10);
-  // gathering posts beside their nodes
-  const wc=T.placeBuildingFree("woodcutter",-12,3), pp=T.placeBuildingFree("pithpost",12,3),
-        dr=T.placeBuildingFree("dredge",0,-11), vc=T.placeBuildingFree("ventcap",0,11), wr=T.placeBuildingFree("wellrig",13,10);
-  // refiners
-  const fu=T.placeBuildingFree("furnace",-4,-4), mi=T.placeBuildingFree("mill",4,-4),
-        as=T.placeBuildingFree("assembly",-4,5), dc=T.placeBuildingFree("datacenter",5,5);
-  // wards to keep dread suppressed (a sustainable colony, like real play)
-  T.placeBuildingFree("ward",-10,-8); T.placeBuildingFree("ward",10,8); T.placeBuildingFree("ward",-10,8);
+  // generous stock so the whole chain runs without stalling during the test
+  Object.assign(T.G.stock,{dead:600,bonesil:200,soulash:300,ichor:200,ingot:0,wafer:0,die:0,core:0,power:0,compute:0});
+  // cemeteries + corpse-wastes near the centre (the dead are the raw)
+  T.placeNode("grave",-12,0); T.placeNode("grave",12,0); T.placeNode("waste",-16,6); T.placeNode("waste",16,-6);
+  // gather posts harvesting the dead
+  const ex=T.placeBuildingFree("exhumer",-12,3), wd=T.placeBuildingFree("dredge",16,-3);
+  // the chip supply chain
+  const cr=T.placeBuildingFree("crematory",-4,-4), fu=T.placeBuildingFree("furnace",4,-4),
+        mi=T.placeBuildingFree("mill",-4,5), li=T.placeBuildingFree("litho",4,5),
+        os=T.placeBuildingFree("ossuary",-8,0), su=T.placeBuildingFree("substation",8,0),
+        dc=T.placeBuildingFree("datacenter",0,8);
+  T.placeBuildingFree("ward",-10,-8);
   // a big bound workforce
-  for(let i=0;i<22;i++) T.spawnVillager((i%9-4)*2, (((i/9)|0)-2)*2, ["worker","worker","stump","reaper"][i%4]);
+  for(let i=0;i<28;i++) T.spawnVillager((i%9-4)*2, (((i/9)|0)-2)*2, ["worker","worker","stump","reaper"][i%4]);
   const idle=()=>T.villagers.filter(v=>!v.dead&&!v.assigned);
   function staff(b,n){ for(let k=0;k<n;k++){ const f=idle()[0]; if(f) T.assignHusk(f,b); } }
-  staff(wc,3); staff(pp,3); staff(dr,3); staff(vc,3); staff(wr,2);
-  staff(fu,3); staff(mi,3); staff(as,4); staff(dc,5);
+  staff(ex,3); staff(wd,3); staff(cr,3); staff(fu,3); staff(mi,3); staff(li,3); staff(os,4); staff(su,2); staff(dc,5);
 }catch(e){ threw=e; }
 ok("settlement builds without throwing",!threw,threw?String(threw.stack||threw):"");
 
 // --- run ~5 simulated minutes ---
-let maxC=0,maxCore=0,maxGlass=0,maxWafer=0; threw=null;
+let maxC=0,maxCore=0,maxIngot=0,maxWafer=0,maxDie=0,maxPower=0; threw=null;
 try{ for(let s=0;s<30*300;s++){ T.stepHusks(1/30); T.stepEconomy(1/30);
-  maxGlass=Math.max(maxGlass,T.G.stock.glass); maxWafer=Math.max(maxWafer,T.G.stock.wafer);
+  maxIngot=Math.max(maxIngot,T.G.stock.ingot); maxWafer=Math.max(maxWafer,T.G.stock.wafer);
+  maxDie=Math.max(maxDie,T.G.stock.die); maxPower=Math.max(maxPower,T.G.stock.power);
   maxCore=Math.max(maxCore,T.G.stock.core); maxC=Math.max(maxC,T.G.stock.compute,0);
   if(T.G.over) break; } }catch(e){ threw=e; }
 ok("5-minute sim runs without throwing",!threw,threw?String(threw.stack||threw):"");
-ok("gatherers harvested raw materials", (T.G.stock.silica+T.G.stock.ash+T.G.stock.water)>0 || maxGlass>0, "sil="+Math.floor(T.G.stock.silica)+" ash="+Math.floor(T.G.stock.ash)+" wat="+Math.floor(T.G.stock.water));
-ok("Furnace produced Cinderglass", maxGlass>0, "glass peak="+Math.floor(maxGlass));
-ok("Mill produced Sigil-Discs", maxWafer>0, "wafer peak="+Math.floor(maxWafer));
-ok("Assembly produced Reliquary Cores", maxCore>0, "core peak="+Math.floor(maxCore));
+ok("gatherers harvested the dead", T.G.stock.dead>0 || maxIngot>0, "dead="+Math.floor(T.G.stock.dead));
+ok("Furnace produced Silicon Ingots", maxIngot>0, "ingot peak="+Math.floor(maxIngot));
+ok("Mill produced Wafers", maxWafer>0, "wafer peak="+Math.floor(maxWafer));
+ok("Litho produced Etched Dies", maxDie>0, "die peak="+Math.floor(maxDie));
+ok("Substation produced Power", maxPower>0, "power peak="+Math.floor(maxPower));
+ok("Ossuary produced Reliquary Cores", maxCore>0, "core peak="+Math.floor(maxCore));
 ok("Datacenter produced COMPUTE (full chain end-to-end)", maxC>0, "compute peak="+Math.floor(maxC));
-ok("population survived (needs balance ok)", T.villagers.filter(v=>!v.dead).length>0, "alive="+T.villagers.filter(v=>!v.dead).length);
+ok("population survived", T.villagers.filter(v=>!v.dead).length>0, "alive="+T.villagers.filter(v=>!v.dead).length);
 ok("dread stayed bounded 0..100", T.G.dread>=0&&T.G.dread<=100, "dread="+T.G.dread.toFixed(0));
 
-// starvation test: cut food AND wood (no warmth); resolve must fall
-try{ T.G.over=null; T.G.dread=0; T.nodes.length=0; T.G.stock.pith=0; T.G.stock.wood=0; T.G.grow=999; // remove all food/wood sources + freeze growth
+// upkeep test: with no soul-ash to patch them, husk resolve must fall
+try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assignHusk(v,null);
+  T.buildings.length=0; T.nodes.length=0; T.G.stock.soulash=0; T.G.stock.dead=0; T.G.time=999;
+  for(const v of T.villagers) if(!v.dead) v.resolve=0.9;
   const avg=()=>{const a=T.villagers.filter(v=>!v.dead);return a.reduce((s,v)=>s+v.resolve,0)/Math.max(1,a.length);};
   const before=avg();
-  for(let s=0;s<30*30;s++){ T.stepEconomy(1/30); T.stepHusks(1/30); }
-  ok("starvation/cold erodes resolve", avg()<before-0.2, "avg resolve "+before.toFixed(2)+" -> "+avg().toFixed(2));
-}catch(e){ ok("starvation test",false,String(e)); }
+  for(let s=0;s<30*60;s++){ T.G.stock.soulash=0; T.stepEconomy(1/30); T.stepHusks(1/30); }
+  ok("no soul-ash upkeep erodes resolve", avg()<before-0.2, "avg resolve "+before.toFixed(2)+" -> "+avg().toFixed(2));
+}catch(e){ ok("upkeep test",false,String(e.stack||e)); }
 
 // placement coverage: after the gentler-terrain fix, most open land must be buildable across seeds
 { let total=0,okp=0; T.buildings.length=0; T.nodes.length=0;
@@ -106,38 +110,49 @@ try{ T.G.over=null; T.G.dread=0; T.nodes.length=0; T.G.stock.pith=0; T.G.stock.w
     for(let i=0;i<240;i++){ const a=Math.random()*6.283, r=Math.random()*68; const x=Math.cos(a)*r, z=Math.sin(a)*r; total++; if(T.buildingFits(x,z,1.8)) okp++; } }
   ok("most open land is buildable (placement)", okp/total>0.9, (100*okp/total).toFixed(0)+"% of valley buildable across 6 seeds"); }
 
-// --- material repositories / stockpiles (#1 sauce) ---
-{ T.buildings.length=0; T.nodes.length=0; T.G.over=null; T.G.stock.wood=0;
-  const baseCap=T.storageCap("wood");
+// --- population is bound, not born ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null;
+  T.placeBuildingFree("den",6,6); T.placeBuildingFree("den",-6,6);
+  T.G.stock.dead=5; T.G.stock.compute=10;
+  const p0=T.villagers.filter(v=>!v.dead).length;
+  T.bindHusk();
+  ok("bindHusk binds a husk for a corpse + Compute", T.villagers.filter(v=>!v.dead).length===p0+1 && T.G.stock.dead===4 && T.G.stock.compute===8, "pop "+p0+"->"+T.villagers.filter(v=>!v.dead).length+" dead="+T.G.stock.dead+" compute="+T.G.stock.compute);
+  T.G.time=999; T.G.stock.soulash=80; const before=T.villagers.filter(v=>!v.dead).length;
+  for(let s=0;s<30*60;s++){ T.stepEconomy(1/30); }
+  ok("husks never spawn for free", T.villagers.filter(v=>!v.dead).length<=before, "pop "+before+"->"+T.villagers.filter(v=>!v.dead).length); }
+
+// --- material repositories / stockpiles (the hub) ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.stock.dead=0;
+  const baseCap=T.storageCap("dead");
   ok("storageCap returns a positive floor", baseCap>0, "base="+baseCap);
   const sp=T.placeBuildingFree("stockpile",8,8);
-  const raised=T.storageCap("wood");
+  const raised=T.storageCap("dead");
   ok("a stockpile raises storage capacity", raised>baseCap, baseCap+" -> "+raised);
-  for(let i=0;i<5000;i++) T.addStock("wood",1);
-  ok("addStock can exceed the base cap once a stockpile stands", T.G.stock.wood>baseCap, "wood="+Math.floor(T.G.stock.wood)+" (base "+baseCap+")");
-  ok("addStock still clamps to the raised cap", T.G.stock.wood<=raised+0.001, "wood="+Math.floor(T.G.stock.wood)+" <= "+raised);
-  T.G.stock.ash=0; ok("pileFill is 0 when empty", T.pileFill("ash")===0, "fill="+T.pileFill("ash"));
-  T.G.stock.wood=raised; ok("pileFill is ~1 when full", Math.abs(T.pileFill("wood")-1)<0.001, "fill="+T.pileFill("wood").toFixed(2));
+  for(let i=0;i<5000;i++) T.addStock("dead",1);
+  ok("addStock can exceed the base cap once a stockpile stands", T.G.stock.dead>baseCap, "dead="+Math.floor(T.G.stock.dead)+" (base "+baseCap+")");
+  ok("addStock still clamps to the raised cap", T.G.stock.dead<=raised+0.001, "dead="+Math.floor(T.G.stock.dead)+" <= "+raised);
+  T.G.stock.ichor=0; ok("pileFill is 0 when empty", T.pileFill("ichor")===0, "fill="+T.pileFill("ichor"));
+  T.G.stock.dead=raised; ok("pileFill is ~1 when full", Math.abs(T.pileFill("dead")-1)<0.001, "fill="+T.pileFill("dead").toFixed(2));
   ok("stockpile yard builds 8 material bins", sp.mesh.userData.piles&&sp.mesh.userData.piles.length===8, "bins="+(sp.mesh.userData.piles||[]).length);
-  T.G.stock.wood=raised*0.5; T.updateStockpiles();
-  const woodPile=sp.mesh.userData.piles.find(p=>p.res==="wood");
-  ok("updateStockpiles scales a pile to its fill", woodPile&&Math.abs(woodPile.node.scale.y-0.5)<0.02&&woodPile.node.visible, "scaleY="+(woodPile?woodPile.node.scale.y.toFixed(2):"?"));
+  T.G.stock.dead=raised*0.5; T.updateStockpiles();
+  const deadPile=sp.mesh.userData.piles.find(p=>p.res==="dead");
+  ok("updateStockpiles scales a pile to its fill", deadPile&&Math.abs(deadPile.node.scale.y-0.5)<0.02&&deadPile.node.visible, "scaleY="+(deadPile?deadPile.node.scale.y.toFixed(2):"?"));
 }
 
 // --- save/load round-trips the whole foundry ---
 { T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null;
   T.seedSettlement();
-  T.placeNode("grove",-10,0); T.placeBuildingFree("furnace",-3,-3);
+  T.placeNode("grave",-10,0); T.placeBuildingFree("furnace",-3,-3);
   T.spawnVillager(2,2,"reaper");
-  T.G.stock.silica=42; T.G.writ=77; T.G.dread=33; T.G.quota.level=4;
+  T.G.stock.bonesil=42; T.G.writ=77; T.G.dread=33; T.G.quota.level=4;
   const snap=T.serializeState();
   const nb=T.buildings.length, nv=T.villagers.filter(v=>!v.dead).length, nn=T.nodes.length;
-  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.writ=0; T.G.dread=0; T.G.stock.silica=0; T.G.quota.level=1;
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.writ=0; T.G.dread=0; T.G.stock.bonesil=0; T.G.quota.level=1;
   T.applySave(snap);
   ok("save/load restores buildings", T.buildings.length===nb, T.buildings.length+"/"+nb);
   ok("save/load restores villagers", T.villagers.filter(v=>!v.dead).length===nv, T.villagers.length+"/"+nv);
   ok("save/load restores nodes", T.nodes.length===nn, T.nodes.length+"/"+nn);
-  ok("save/load restores resources & writ", T.G.stock.silica===42&&T.G.writ===77, "sil="+T.G.stock.silica+" writ="+T.G.writ);
+  ok("save/load restores resources & Bones", T.G.stock.bonesil===42&&T.G.writ===77, "bonesil="+T.G.stock.bonesil+" bones="+T.G.writ);
   ok("save/load restores quota progress", T.G.quota.level===4, "lvl="+T.G.quota.level);
 }
 
