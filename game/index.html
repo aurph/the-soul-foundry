@@ -130,7 +130,7 @@
   .optrow input[type=range]{flex:1;max-width:230px;accent-color:var(--ember)}
   .optrow input[type=checkbox]{width:16px;height:16px;accent-color:var(--ember)}
   .obj-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
-  #goals{position:fixed;right:8px;bottom:150px;z-index:26;width:300px;max-width:46vw;padding:11px 14px;border-radius:8px;display:none;border-left:3px solid var(--ember)}
+  #goals{position:fixed;right:8px;top:404px;z-index:26;width:300px;max-width:42vw;max-height:calc(100vh - 580px);overflow:auto;padding:11px 14px;border-radius:8px;display:none;border-left:3px solid var(--ember)}
   #goals .gh{font-size:10px;letter-spacing:1.5px;color:var(--ember);text-transform:uppercase}
   #goals .gt{font-size:13.5px;color:var(--ink-bright);line-height:1.45;margin-top:5px}
   #goals .gw{font-size:11px;color:var(--ink-dim);line-height:1.4;margin-top:6px;font-style:italic}
@@ -142,6 +142,9 @@
   #hint{position:fixed;left:50%;top:128px;transform:translateX(-50%);z-index:45;padding:5px 13px;border-radius:5px;
     font-size:12px;color:var(--ember-soft);background:#0d0e12cc;border:1px solid var(--line);pointer-events:none;display:none;white-space:nowrap}
   #dev{position:fixed;left:6px;bottom:116px;color:#6c8;font:11px monospace;z-index:60;display:none}
+  #pausebar{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:46;padding:10px 20px;border-radius:6px;cursor:pointer;
+    font-size:14px;letter-spacing:.5px;color:var(--ink-bright);background:#0d0e12ee;border:1px solid var(--ember);box-shadow:0 8px 34px #000b;display:none}
+  #pausebar .k{font:11px monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--ink-bright)}
   /* Haunted Mound: VHS grain + scanlines + heavy vignette */
   #grain{position:fixed;inset:0;z-index:15;pointer-events:none;width:100%;height:100%;
     image-rendering:pixelated;opacity:.035;mix-blend-mode:overlay}
@@ -164,6 +167,7 @@
 <div id="goals" class="frame"></div>
 <div id="toasts"></div>
 <div id="hint"></div>
+<div id="pausebar" onclick="beginPlay()">❚❚ &nbsp;Paused &middot; press <span class="k">Space</span> or click here to begin</div>
 <div id="dev"></div>
 <div id="dock">
   <div id="docktabs"></div>
@@ -517,10 +521,11 @@ addEventListener('resize',resize); addEventListener('orientationchange',resize);
 let _last=performance.now(), _acc=0, paused=false, simSpeed=1;
 const STEP=1/30;
 let mixers=[];   // animation mixers (villagers)
-let _grainCv=null,_grainCtx=null,_grainT=0;
+let _grainCv=null,_grainCtx=null,_grainT=0,_pauseEl=null;
 function drawGrain(){ if(!_grainCv){ _grainCv=document.getElementById('grain'); if(!_grainCv)return; _grainCtx=_grainCv.getContext('2d'); _grainCv.width=160; _grainCv.height=100; }
   const id=_grainCtx.createImageData(160,100), d=id.data; for(let i=0;i<d.length;i+=4){ const v=(Math.random()*255)|0; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } _grainCtx.putImageData(id,0,0); }
-function tickRender(dt){ stepAsh(dt); for(const m of mixers) m.update(dt); if(typeof updateStockpiles==="function") updateStockpiles(); _grainT+=dt; if(_grainT>0.055){ _grainT=0; drawGrain(); } }
+function tickRender(dt){ stepAsh(dt); for(const m of mixers) m.update(dt); if(typeof updateStockpiles==="function") updateStockpiles(); _grainT+=dt; if(_grainT>0.055){ _grainT=0; drawGrain(); }
+  if(!_pauseEl)_pauseEl=document.getElementById('pausebar'); if(_pauseEl)_pauseEl.style.display=(paused&&!(typeof G!=="undefined"&&G.over))?'block':'none'; }
 function loop(now){
   requestAnimationFrame(loop);
   let real=(now-_last)/1000; _last=now; if(real>0.2) real=0.2;
@@ -1093,8 +1098,10 @@ function start(){
   loadVillager(ok=>{
     bootWorld(save?save.seed:null);
     if(!(save&&loadGame())){ seedSettlement(); setTimeout(()=>{ try{ showHelp(); }catch(e){} }, 700); }
+    paused=true; if(typeof buildRail==="function") buildRail();   // start paused — let the player read in and look around first
   });
 }
+function beginPlay(){ paused=false; if(typeof buildRail==="function")buildRail(); }
 addEventListener('beforeunload',()=>{ try{ if(!G.over) saveGame(); }catch(e){} });
 function toast(msg,type){ const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg;
   $('toasts').appendChild(t); setTimeout(()=>{t.style.transition='opacity .5s';t.style.opacity=0;setTimeout(()=>t.remove(),500);},3200); }
@@ -1678,7 +1685,7 @@ function stepEconomy(dt){
 function crumble(v){ v.dead=true; SND.sfx('crumble'); scene.remove(v.obj); if(v.assigned){ const a=v.assigned.workers,k=a.indexOf(v); if(k>=0)a.splice(k,1);}
   const idx=villagers.indexOf(v); if(idx>=0)villagers.splice(idx,1); if(selected===v)clearInspect();
   toast("A husk crumbles back to ash.","bad"); }
-function endGame(win,why){ if(G.over)return; G.over=win?"win":"lose"; paused=true; SND.sfx(win?'win':'lose');
+function endGame(win,why){ if(G.over)return; G.over=win?"win":"lose"; paused=true; SND.sfx(win?'win':'lose'); try{ localStorage.removeItem('sf_save'); }catch(e){}   // clear the autosave so Again/reload starts a fresh valley, not the moment before defeat
   if(typeof showEnd==="function") showEnd(win,why); }
 
 /* === SECTION:CORE_END === */
