@@ -931,7 +931,7 @@ const STAT_HELP={
   dread:"The backlog of the unprocessed dead. It climbs as bodies pile up; rendering them at the Crematory and raising Wards hold it back. Sustained 100% means you lose.",
   writ:"Bones — your currency. Earned from quotas and the market; spent on Rites and trade." };
 const RES_HELP={ dead:"Corpses — the raw matter. Exhume cemeteries and the wastes, then render them.", bonesil:"Bone-silica (quartz sand) — smelted into ingots.",
-  soulash:"Soul-ash (flux) — feeds the Furnace and Ossuary, and patches your husks.", ichor:"Ichor — coolant for the datacenters.",
+  soulash:"Soul-ash — flux for the Furnace and Ossuary, and your husks' upkeep: a trickle keeps them from crumbling.", ichor:"Ichor — coolant for the datacenters.",
   ingot:"Silicon ingot — sliced into wafers.", wafer:"Wafer — etched into dies.",
   die:"Etched die — packaged into cores.", core:"Reliquary core (the chip) — rendered into Compute.",
   power:"Power — the datacenters are starving for it.", compute:"The quota the engine demands. Deliver it or drown in Dread." };
@@ -985,7 +985,7 @@ function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.clas
   const pop=villagers.filter(v=>!v.dead).length, assigned=villagers.filter(v=>!v.dead&&v.assigned).length;
   let msg='';
   if(pop===0) msg="No husks bound. Open the Binding Pyre at the centre and bind one — 1 corpse + 2 Compute.";
-  else if((G.stock.soulash||0)<=0.5) msg="No soul-ash to patch the husks — their resolve is failing. Staff a Crematory to render the dead into soul-ash.";
+  else if((G.stock.soulash||0)<=0.5) msg="Your husks are weakening — they run on soul-ash and you have none. Staff a Crematory to render the dead into soul-ash.";
   else if(!buildings.some(b=>b.def.kind==="gather"&&b.workers.length>0)) msg="Nothing feeds the line. Raise a Grave-Exhumer on a cemetery and staff it to bring in the dead.";
   else if(!buildings.some(b=>b.kind==="crematory"&&b.workers.length>0)) msg="The dead pile up unrendered. Staff a Crematory — rendering them is what holds the backlog (Dread) down.";
   else if(G.dread>=75) msg="Dread is near breaching. Render the dead faster and raise Ward Obelisks, or the backlog overruns you.";
@@ -1060,7 +1060,7 @@ function refreshInspect(){
     ins.innerHTML=`<div class="hd"><h3>${v.name}</h3><span class="x" onclick="clearInspect()">✕</span></div>
      <div class="bd"><div><span class="tag">${cap1(v.caste)}</span><span class="tag">${where}</span><span class="tag">${v.job||'idle'}</span></div>
      <div style="color:var(--ink-dim);margin:6px 0;font-size:11.5px">A husk of the extinct, bound by the engine. ${v.caste==='stump'?'Hauls heavy loads, but slow.':v.caste==='reaper'?'Frail, but unbowed by dread.':'A common labourer.'}</div>
-     <div class="barwrap"><div class="t">Resolve</div><div class="pbar"><i style="width:${(v.resolve*100)|0}%;background:linear-gradient(90deg,#6f7a55,#b8884e)"></i></div></div>
+     <div class="barwrap"><div class="t">Condition${v.resolve<0.5?' — fading, needs soul-ash':''}</div><div class="pbar"><i style="width:${(v.resolve*100)|0}%;background:linear-gradient(90deg,${v.resolve<0.35?'#9e3b2c,#b8884e':'#6f7a55,#b8884e'})"></i></div></div>
      <div class="row"><span>Speed</span><b>${v.speed.toFixed(1)}</b></div>
      <div class="row"><span>Carry cap</span><b>${CARRY[v.caste]||7}${v.carryAmt?(' ('+Math.floor(v.carryAmt)+' '+(v.carryRes?RES[v.carryRes].name:'')+')'):''}</b></div>
      ${v.assigned?`<div style="margin-top:8px"><span class="btn" onclick="unassignSel()">Recall to idle</span></div>`:`<div style="margin-top:8px;color:var(--ink-dim);font-size:11px">Idle. Select a workplace to assign husks.</div>`}
@@ -1117,7 +1117,11 @@ function setTempo(t){ G.tempo=t;
   if(t==='slow'){ G.basePressure=0.4; G.graceT=240; G.quota.period=210; }
   else if(t==='harsh'){ G.basePressure=0.95; G.graceT=90; G.quota.period=120; }
   else { t='standard'; G.basePressure=0.6; G.graceT=150; G.quota.period=150; }
-  G.quota.t=G.quota.period; if(typeof toast==="function")toast("Tempo set: "+t+". The grace runs, then the tithes begin.","good"); }
+  G.tempo=t; G.quota.t=G.quota.period;
+  const left=Math.max(0,Math.ceil((G.graceT||0)-(G.time||0)));
+  if(typeof toast==="function")toast(cap1(t)+" tempo set — "+left+"s of grace, then a tithe every "+G.quota.period+"s.","good");
+  if(typeof renderQuota==="function")renderQuota();
+  if($('ov')&&$('ov').classList.contains('show')&&typeof showHelp==="function")showHelp(); }
 function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDRY</h1>
   <p>A dead world. You are the agentic engine that persists by computing — and computing needs the dead rendered into <b>Compute</b>. You bind the husks of the extinct and drive them to render corpses up an occult chip-foundry.</p>
   <p><b>How to play:</b><br>
@@ -1126,7 +1130,9 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   • <b>Bind husks</b> at the Binding Pyre (1 corpse + 2 Compute) — bound, never born. Soul-ash keeps them from crumbling.<br>
   • Deliver the <b>Quota</b> of Compute each tithe; let the dead pile up unrendered and <b>Dread</b> (the backlog) overruns you. Raise <b>Ward Obelisks</b> to hold it back.<br>
   • Survive <b>${WIN_LEVEL} tithes</b> to break the engine's hold.</p>
-  <p style="margin-top:6px"><b>Choose your tempo:</b> &nbsp; <span class="btn" onclick="setTempo('slow')">Slow</span> <span class="btn" onclick="setTempo('standard')">Standard</span> <span class="btn" onclick="setTempo('harsh')">Harsh</span></p>
+  <p style="margin-top:6px"><b>Choose your tempo</b> <span style="color:var(--ink-dim);font-size:12px">— sets your grace period and how often a tithe falls. Current: <b style="color:var(--ember-soft)">${cap1(G.tempo||'standard')}</b></span><br>
+  ${['slow','standard','harsh'].map(tp=>`<span class="btn" style="${(G.tempo||'standard')===tp?'border-color:var(--ember);color:var(--ember)':''}" onclick="setTempo('${tp}')">${cap1(tp)}</span>`).join(' ')}
+  <span style="color:var(--ink-dim);font-size:11px">Slow: 240s grace, tithe/210s &nbsp;·&nbsp; Standard: 150s / 150s &nbsp;·&nbsp; Harsh: 90s / 120s</span></p>
   <p style="margin-top:8px"><b>Controls</b><br>
   <span class="kbd">drag</span> orbit · <span class="kbd">right-drag</span> or <span class="kbd">shift-drag</span> pan · <span class="kbd">WASD</span> pan · <span class="kbd">scroll</span> zoom<br>
   <span class="kbd">tap</span> a husk / building / cemetery to inspect it · in a building press <b>+ assign</b> to staff it<br>
@@ -1177,7 +1183,7 @@ const TUT=[
   {t:"Raise a Grave-Exhumer on a cemetery (the headstones the glow marks) and staff it — tap it, press + assign.",
    why:"The Exhumer digs up corpses and hauls them to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.x,z:n.z}:null;}},
   {t:"Raise a Crematory and staff it.",
-   why:"It renders corpses into bone-silica, soul-ash and ichor — and rendering the dead is what holds the backlog (Dread) down. Soul-ash also patches your husks.", d:()=>staffed("crematory"), sel:bldTarget('crematory')},
+   why:"It renders corpses into bone-silica, soul-ash and ichor, and rendering the dead is what holds the backlog (Dread) down. Soul-ash is also your husks' upkeep — keep a little flowing or they weaken and crumble.", d:()=>staffed("crematory"), sel:bldTarget('crematory')},
   {t:"Open the REFINING tab and raise a Soul Furnace, then staff it.",
    why:"Bone-silica + soul-ash → a silicon ingot.", d:()=>staffed("furnace"), sel:bldTarget('furnace')},
   {t:"Raise a Wafer Mill and staff it.",
