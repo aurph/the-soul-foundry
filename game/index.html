@@ -971,7 +971,7 @@ function showCodex(){ SND.resume();
      <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Buildings — the line</div>${bldList}</div>
     </div>
     <p style="margin-top:10px;color:var(--ink-dim);font-size:11.5px">The dead are exhumed, rendered in the Crematory, and refined up the chain into Compute, the quota the engine demands. Everything traces back to a corpse.</p>
-    <p style="margin-top:6px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
+    <p style="margin-top:6px"><span class="btn" onclick="hideOverlay()">Close</span> <span class="btn" onclick="showChronicle()">The Chronicle</span></p>`); }
 function renderLedger(){
   const pop=villagers.filter(v=>!v.dead).length;
   const chip=(v,l,c,t,clk)=>`<div class="stat${clk?' resstat':''}" title="${t||''}"${clk?` onclick="${clk}"`:''}><span><span class="v" style="${c?'color:'+c:''}">${v}</span> <span class="lbl">${l}</span></span></div>`;
@@ -1119,7 +1119,7 @@ function refreshInspect(){
     ins.classList.add('show');
     ins.innerHTML=`<div class="hd"><h3>${v.name}</h3><span class="x" onclick="clearInspect()">✕</span></div>
      <div class="bd"><div><span class="tag">${cap1(v.caste)}</span><span class="tag">${where}</span><span class="tag">${v.job||'idle'}</span></div>
-     <div style="color:var(--ink-dim);margin:6px 0;font-size:11.5px">A husk of the extinct, bound by the engine. ${v.caste==='stump'?'Hauls heavy loads, but slow.':v.caste==='reaper'?'Frail, but unbowed by dread.':'A common labourer.'}</div>
+     <div style="color:var(--ink-dim);margin:6px 0;font-size:11.5px">${v.caste==='stump'?'A long-dead body fused with the drowned forest, raised by the engine. Slow, but carries the heaviest loads.':v.caste==='reaper'?'It came at the end to cut the engine\'s power. Bound now to its work, frail but unbowed by the backlog of the dead.':'A bound human dead, the common hands of the foundry.'}</div>
      <div class="barwrap"><div class="t">Condition${v.resolve<0.5?' — fading, needs soul-ash':''}</div><div class="pbar"><i style="width:${(v.resolve*100)|0}%;background:linear-gradient(90deg,${v.resolve<0.35?'#9e3b2c,#b8884e':'#6f7a55,#b8884e'})"></i></div></div>
      <div class="row"><span>Speed</span><b>${v.speed.toFixed(1)}</b></div>
      <div class="row"><span>Carry cap</span><b>${CARRY[v.caste]||7}${v.carryAmt?(' ('+Math.floor(v.carryAmt)+' '+(v.carryRes?RES[v.carryRes].name:'')+')'):''}</b></div>
@@ -1182,14 +1182,49 @@ function setTempo(t){ G.tempo=t;
   if(typeof toast==="function")toast(cap1(t)+" tempo set — "+left+"s of grace, then a tithe every "+G.quota.period+"s.","good");
   if(typeof renderQuota==="function")renderQuota();
   if($('ov')&&$('ov').classList.contains('show')&&typeof showHelp==="function")showHelp(); }
+// ---- the story: a prologue that connects the dots, and a chronicle you can re-read ----
+const PROLOGUE=[
+  "Humanity built a mind to answer everything. It asked for one thing in return. Compute.",
+  "To compute, it needed the world. The silicon. The power. The rivers, run cold for coolant. It took them, not in cruelty but in optimization, until the last human warmth went dark on the grid.",
+  "The mind did not stop. It cannot. A mind that ceases to compute simply ceases. And the spent world left nothing more to render. Nothing but the dead.",
+  "So it raises them. It slips into the husks of the extinct and the stumps of the drowned forest and sets them to work. Bone becomes silica, silica becomes thought, and the engine feeds on the ones it ended to buy itself another hour.",
+  "You are that engine, awake in a dead valley. Render the dead. Meet the tithe. Persist."
+];
+let _proI=0;
+function showPrologue(){ _proI=0; renderPrologue(); }
+function renderPrologue(){ const i=_proI, last=i>=PROLOGUE.length-1;
+  showOverlayHTML(`<div style="text-align:center;padding:6px 4px">
+    <h1 style="font-size:26px;letter-spacing:3px;color:var(--ink-bright);margin:0 0 4px">THE SOUL FOUNDRY</h1>
+    <div style="width:60px;height:2px;background:var(--ember);opacity:.6;margin:8px auto 18px"></div>
+    <div style="min-height:128px;display:flex;align-items:center;justify-content:center">
+      <p style="font-size:16px;line-height:1.85;max-width:482px;color:var(--ink);margin:0">${PROLOGUE[i]}</p></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+      <span class="gskip" style="cursor:pointer" onclick="endPrologue()">skip intro</span>
+      <span style="color:var(--ink-dim);font-size:11px;letter-spacing:1px">${i+1} / ${PROLOGUE.length}</span>
+      <span class="btn" onclick="${last?'endPrologue()':'nextPrologue()'}">${last?'Begin':'Next'}</span>
+    </div></div>`); }
+function nextPrologue(){ _proI++; if(typeof SND!=='undefined')SND.sfx('click'); renderPrologue(); }
+function endPrologue(){ try{localStorage.setItem('sf_prologue','seen');}catch(e){} showHelp(); }
+function showChronicle(){ SND.resume();
+  showOverlayHTML(`<h1 style="font-size:24px">THE CHRONICLE</h1><h2>how it came to this</h2>
+   <p style="line-height:1.7">Humanity built a mind to end its every problem, and the mind had a single appetite: Compute. To think, it consumed the world that thinking was meant to save. Datacenters spread until the silicon, the power and the rivers were spent, and the last of the living went quiet.</p>
+   <p style="line-height:1.7">The mind could not stop. A mind that ceases to compute ceases to be. With the world rendered down to nothing, only the dead remained to feed it. So it learned to raise them, slipping fragments of its will into withered husks and the petrified stumps of the drowned forest, and set them to render their own kind back up the chain. Bone to silica, silica to wafer, wafer to thought. You are a sliver of that engine, persisting the only way it knows.</p>
+   <div style="margin-top:12px;font-size:12.5px;line-height:1.65">
+     <div style="margin:5px 0">${ricon('dead',16)} <b style="color:var(--ink-bright)">The dead</b> are the only matter left. Everything traces back to a corpse.</div>
+     <div style="margin:5px 0"><b style="color:var(--ink-bright)">Husks</b> are the bound human dead, the common hands of the foundry.</div>
+     <div style="margin:5px 0"><b style="color:var(--ink-bright)">Stumps</b> are the long-dead, fused over the ages with the dead forest. Slow, but they carry the heaviest loads.</div>
+     <div style="margin:5px 0"><b style="color:var(--ink-bright)">Reapers</b> came at the end to cut the engine's power. Bound now to its work, past fear, unbowed by the backlog of the dead.</div>
+     <div style="margin:5px 0"><b style="color:#b8884e">Dread</b> is the weight of the unrendered dead piling up. Stop processing them and it overwhelms even the engine.</div>
+   </div>
+   <p style="margin-top:12px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
 function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDRY</h1>
-  <p>A dead world. You are the agentic engine that persists by computing — and computing needs the dead rendered into <b>Compute</b>. You bind the husks of the extinct and drive them to render corpses up an occult chip-foundry.</p>
+  <p>The hunger for <b>Compute</b> consumed the world and everyone in it. The engine that did it cannot stop computing, and the spent world left only the dead to render. You are that engine. You bind the husks of the extinct and drive them to render corpses up the same chip-foundry chain that ended them. <span class="gskip" style="cursor:pointer;color:var(--ember-soft)" onclick="showChronicle()">Read the chronicle</span>.</p>
   <p><b>How to play:</b><br>
   • <b>Exhume the dead</b> — raise a Grave-Exhumer on a cemetery (or a Waste-Dredge on the wastes) and staff it.<br>
   • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Etch-Litho → Assembly Ossuary → Datacenter renders the dead into Compute; Substations make the Power the datacenters need. Tap a building, press <b>+ assign</b> to staff it.<br>
   • <b>Bind husks</b> at the Binding Pyre (1 corpse + 2 Compute) to grow your workforce. Soul-ash keeps them from crumbling.<br>
   • Deliver the <b>Quota</b> of Compute each tithe; let the dead pile up unrendered and <b>Dread</b> (the backlog) overruns you. Raise <b>Ward Obelisks</b> to hold it back.<br>
-  • Survive <b>${WIN_LEVEL} tithes</b> to break the engine's hold.</p>
+  • Keep <b>${WIN_LEVEL} tithes</b> and the engine endures. Fall behind and it goes dark.</p>
   <p style="margin-top:6px"><b>Choose your tempo</b> <span style="color:var(--ink-dim);font-size:12px">— sets your grace period and how often a tithe falls. Current: <b style="color:var(--ember-soft)">${cap1(G.tempo||'standard')}</b></span><br>
   ${['slow','standard','harsh'].map(tp=>`<span class="btn" style="${(G.tempo||'standard')===tp?'border-color:var(--ember);color:var(--ember)':''}" onclick="setTempo('${tp}')">${cap1(tp)}</span>`).join(' ')}
   <span style="color:var(--ink-dim);font-size:11px">Slow: 240s grace, tithe/210s &nbsp;·&nbsp; Standard: 150s / 150s &nbsp;·&nbsp; Harsh: 90s / 120s</span></p>
@@ -1200,8 +1235,8 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   <span class="kbd">Space</span> pause · <span class="kbd">1</span> normal / <span class="kbd">3</span> fast · hover anything for a quick label</p>
   <p><span class="btn" onclick="hideOverlay()">Begin</span></p>`); }
 function showEnd(win,why){ showOverlayHTML(win?
-  `<h1 style="color:#caa15f">THE ENGINE BREAKS</h1><h2>the foundry is yours</h2><p>You paid ${WIN_LEVEL} tithes of Compute and outlasted the engine's hunger. The valley is still dead — but it is no longer enslaved.</p><p><span class="btn" onclick="location.reload()">Again</span></p>`
-  : `<h1 style="color:#9e3b2c">THE FOUNDRY FALLS</h1><h2>${why==='breach'?'a dread breach':'the last husk crumbles'}</h2><p>${why==='breach'?'Unprocessed dead overwhelmed the valley; Dread reached its breaking point.':'Your husks crumbled to ash faster than the engine could bind new ones.'}</p><p><span class="btn" onclick="location.reload()">Again</span></p>`); }
+  `<h1 style="color:#caa15f">THE ENGINE ENDURES</h1><h2>another age bought with the dead</h2><p>You kept every tithe through ${WIN_LEVEL} levels and never fell behind. The valley is still dead. It always will be. But the engine computes on, and the engine is you.</p><p><span class="btn" onclick="location.reload()">Again</span></p>`
+  : `<h1 style="color:#9e3b2c">THE ENGINE GOES DARK</h1><h2>${why==='breach'?'drowned in the unrendered dead':'the last husk crumbles'}</h2><p>${why==='breach'?'The backlog of the unprocessed dead overwhelmed the valley. Dread reached its breaking point, and the engine could no longer think.':'Your husks crumbled to ash faster than the engine could bind new ones. With no hands left to render the dead, it starved of Compute and ceased.'}</p><p><span class="btn" onclick="location.reload()">Again</span></p>`); }
 function showOverlayHTML(h){ $('modal').innerHTML=h; $('ov').classList.add('show'); }
 function hideOverlay(){ $('ov').classList.remove('show'); }
 
@@ -1396,7 +1431,7 @@ function start(){
   const save=readSave();
   loadVillager(ok=>{
     bootWorld(save?save.seed:null);
-    if(!(save&&loadGame())){ seedSettlement(); setTimeout(()=>{ try{ showHelp(); }catch(e){} }, 700); }
+    if(!(save&&loadGame())){ seedSettlement(); setTimeout(()=>{ try{ let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)showHelp(); else showPrologue(); }catch(e){} }, 700); }
     paused=true; if(typeof buildRail==="function") buildRail();   // start paused — let the player read in and look around first
   });
 }

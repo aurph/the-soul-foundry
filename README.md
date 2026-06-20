@@ -1,9 +1,11 @@
 # THE SOUL FOUNDRY
 
-A true-3D, browser-based, desolate colony-automation game. A dead world, an
-agentic AI that persists by computing, and the husks of the dead bound to a
-foundry that renders their remains into Compute. Think Against the Storm meets
-Frostpunk by way of a grimy PS1 horror dream.
+A true-3D, browser-based, desolate colony-automation game. Humanity built a mind
+to end its problems, and the mind's one appetite, Compute, consumed the world and
+everyone in it. It cannot stop computing, and the spent world left only the dead to
+render. You are that engine: you bind the husks of the extinct and drive them to
+render corpses up the same chip-foundry chain that ended them, back into Compute.
+Think Against the Storm meets Frostpunk by way of a grimy PS1 horror dream.
 
 The whole game is one self-contained file: `game/index.html`.
 
