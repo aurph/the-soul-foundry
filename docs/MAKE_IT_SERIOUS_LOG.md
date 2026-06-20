@@ -52,3 +52,38 @@ last spawn boulders (folding into the husk/world polish pass).
 shows positionSpotlight/showCodex/hoverPick present and 0 target emoji remaining.
 
 **Next:** Phase 4 controls overlay + placement readout; Phase 5 onboarding/feel.
+
+## 2026-06-20 — Feedback batch (4 chunks, all shipped + live)
+Owner gave 11 points; grouped into 4 deployable chunks, each boottest+sim green.
+
+**Chunk 1 — models & spawn:**
+- Reaper: shroud now drapes OVER the skeleton (robe + shoulders + hood, skull peeking,
+  scythe-staff) instead of a cone with a spine sticking out.
+- Reliquary Yard: redesigned as a server-reliquary (dark metal racks, glowing teal core
+  + blade-lines, bone uprights with skulls), piles preserved.
+- Building debris: 0-2 bits scaled 0.35-0.6x (never bigger than the building).
+- Graves: spawn 22->13, field 60->34, + a 6.5-8u clearance so deposits never clip.
+
+**Chunk 2 — payloads & building animation:**
+- Husks carry the actual material (corpse bundle, powder heaps, coolant vial, wafer
+  discs, ingot bar, dies, glowing cores/compute, power spark), geometry+material swap.
+- Crematory/Furnace/Ossuary emit rising fading smoke while active (render-only,
+  Math.random, cleaned on demolish/load). (Husk work-animation already existed.)
+
+**Chunk 3 — clarity:**
+- Soul-ash reframed as husk UPKEEP everywhere (bar renamed Condition, turns red when
+  low; alert/codex/tutorial unified, "patch/resolve" jargon gone).
+- Tempo buttons: active one ember-highlighted, help shows current tempo + each option's
+  timing, picking one toasts exact grace seconds + refreshes the panel.
+
+**Chunk 4 — supply-chain blueprint:**
+- New rail button (custom blueprint glyph) -> The Line: visual corpse-to-Compute
+  blueprint, 8 steps with input->output icons and live red/amber/green status dots,
+  tap a step to jump to that building.
+
+**Verify:** boottest `all world-build steps ran`; sim `37 passed, 0 failed`; live shows
+showSupplyChain/payloadSpec/animateSmoke present, blueprint.png 200, 0 emoji.
+Higgsfield: ~533 credits (used ~1 for the blueprint glyph).
+
+**Deferred (noted, not yet done):** none outstanding from this batch. Future polish:
+more building model variety/textures, deeper husk work anims per job, methodology page.
