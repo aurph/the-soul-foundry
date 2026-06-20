@@ -1106,7 +1106,11 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   • Deliver the <b>Quota</b> of Compute each tithe; let the dead pile up unrendered and <b>Dread</b> (the backlog) overruns you. Raise <b>Ward Obelisks</b> to hold it back.<br>
   • Survive <b>${WIN_LEVEL} tithes</b> to break the engine's hold.</p>
   <p style="margin-top:6px"><b>Choose your tempo:</b> &nbsp; <span class="btn" onclick="setTempo('slow')">Slow</span> <span class="btn" onclick="setTempo('standard')">Standard</span> <span class="btn" onclick="setTempo('harsh')">Harsh</span></p>
-  <p><span class="kbd">drag</span> orbit · <span class="kbd">scroll</span> zoom · <span class="kbd">WASD</span> pan · <span class="kbd">Space</span> begin / pause</p>
+  <p style="margin-top:8px"><b>Controls</b><br>
+  <span class="kbd">drag</span> orbit · <span class="kbd">right-drag</span> or <span class="kbd">shift-drag</span> pan · <span class="kbd">WASD</span> pan · <span class="kbd">scroll</span> zoom<br>
+  <span class="kbd">tap</span> a husk / building / cemetery to inspect it · in a building press <b>+ assign</b> to staff it<br>
+  while placing: <span class="kbd">R</span> rotate · <span class="kbd">Esc</span> or <span class="kbd">right-click</span> cancel<br>
+  <span class="kbd">Space</span> pause · <span class="kbd">1</span> normal / <span class="kbd">3</span> fast · hover anything for a quick label</p>
   <p><span class="btn" onclick="hideOverlay()">Begin</span></p>`); }
 function showEnd(win,why){ showOverlayHTML(win?
   `<h1 style="color:#caa15f">THE ENGINE BREAKS</h1><h2>the foundry is yours</h2><p>You paid ${WIN_LEVEL} tithes of Compute and outlasted the engine's hunger. The valley is still dead — but it is no longer enslaved.</p><p><span class="btn" onclick="location.reload()">Again</span></p>`

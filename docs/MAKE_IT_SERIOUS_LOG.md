@@ -32,3 +32,23 @@
 Then Phase 2 (clickable everything + hover tooltips + 3D selection outline + a Codex
 overlay), Phase 3 (tutorial spotlight). Also still owe: stump frowning mouth + the
 last spawn boulders (folding into the husk/world polish pass).
+
+## 2026-06-20 — Phases 2 & 3 (shipped, live)
+**Phase 2 — clickable + explainable:**
+- Resource codex card (showResInfo) from any resource chip; icons added to the economy
+  panel, market, and building inspector (recipe/throughput/harvests).
+- Hover layer: a tooltip names any husk/building/deposit you point at and says what it
+  does/gives; ember selection ring + softer hover ring in 3D (driven in the loop).
+- In-game Codex overlay (rail) listing every material (click-through) and building with
+  its role/recipe. Husks/Dread ledger chips are clickable to their explanation.
+
+**Phase 3 — tutorial spotlight:**
+- Each step drives a pulsing GREEN spotlight onto its exact target: the gather tab, the
+  specific building card (data-bld; falls back to the right tab when off-screen), the
+  ledger, the quota banner; plus a green world-marker over the nearest cemetery for the
+  place-the-Exhumer step. Per-frame positioning; panel rebuilds only on step change.
+
+**Verify:** boottest `all world-build steps ran`; sim `37 passed, 0 failed`; live check
+shows positionSpotlight/showCodex/hoverPick present and 0 target emoji remaining.
+
+**Next:** Phase 4 controls overlay + placement readout; Phase 5 onboarding/feel.
