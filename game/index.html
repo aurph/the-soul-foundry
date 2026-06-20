@@ -910,7 +910,7 @@ function pickAt(sx,sy){
   if(placeKind){ const p=groundPoint(sx,sy); if(!p) return;
     if(BLD[placeKind].kind==='path'){ addPath(p.x,p.z); renderLedger(); return; }
     const b=placeBuilding(placeKind,snapG(p.x),snapG(p.z));   // snap buildings to the grid
-    if(b){ b.mesh.rotation.y=placeRot; SND.sfx('place'); renderLedger(); buildDock(); toast(BLD[placeKind].name+" raised."); if(!canAfford(BLD[placeKind].cost)){ placeKind=null; setHint(''); buildDock(); showGrid(false); } }
+    if(b){ b.mesh.rotation.y=placeRot; SND.sfx('place'); renderLedger(); buildDock(); toast("Raising the "+BLD[placeKind].name+"…"); if(!canAfford(BLD[placeKind].cost)){ placeKind=null; setHint(''); buildDock(); showGrid(false); } }
     else { SND.sfx('deny'); toast("Can't build there — too close to something, or off the valley.","bad"); }
     return; }
   const vh=ray.intersectObjects(villagers.filter(v=>!v.dead).map(v=>v.obj),true);
@@ -1167,6 +1167,11 @@ function refreshInspect(){
   } else if(selBld){ const b=selBld, d=b.def;
     ins.classList.add('show');
     let body=`<div style="color:var(--ink-dim);margin:4px 0 8px;font-size:11.5px">${d.desc}</div>`;
+    if(b.built===false){ const p=Math.round(clamp(1-b.buildT/b.buildTotal,0,1)*100);
+      body+=`<div class="barwrap"><div class="t">Raising… ${Math.ceil(b.buildT)}s</div><div class="pbar"><i style="width:${p}%;background:linear-gradient(90deg,#6f7a55,#b8884e)"></i></div></div>
+        <div style="color:var(--ink-dim);font-size:11px;margin-bottom:4px">Husks can be assigned now; it works once raised.</div>
+        <div style="margin-top:8px"><span class="btn bad" onclick="demolishSel()">Cancel (reclaims half)</span></div>`;
+      ins.innerHTML=`<div class="hd"><h3>${d.name}</h3><span class="x" onclick="clearInspect()">✕</span></div><div class="bd">${body}</div>`; return; }
     if(d.workers>0){ body+=`<div class="row"><span>Workers</span><b>${b.workers.length} / ${d.workers}</b></div>
       <div style="margin:6px 0"><span class="btn" onclick="addWorker()">+ assign</span> <span class="btn" onclick="remWorker()">− recall</span> <span style="color:var(--ink-dim);font-size:11px">${idleHusks().length} idle</span></div>`;
       if(b.workers.length){ body+=`<div class="obj-list">`+b.workers.map(w=>`<span class="tag" title="${cap1(w.caste)} husk">${w.name} · <span style="color:var(--ember-soft)">${huskStateLabel(w)}</span></span>`).join('')+`</div>`; }
@@ -1200,7 +1205,7 @@ function addWorker(){ if(!selBld)return; const idle=idleHusks(); if(!idle.length
   if(selBld.workers.length<selBld.def.workers){ assignHusk(idle[0],selBld); refreshInspect(); } }
 function remWorker(){ if(!selBld||!selBld.workers.length)return; assignHusk(selBld.workers[selBld.workers.length-1],null); refreshInspect(); }
 function demolishSel(){ if(!selBld)return; const b=selBld; b.workers.slice().forEach(w=>assignHusk(w,null));
-  for(const r in b.def.cost) addStock(r,Math.floor(b.def.cost[r]*0.5)); if(typeof removeSmoke==="function")removeSmoke(b); scene.remove(b.mesh); const i=buildings.indexOf(b); if(i>=0)buildings.splice(i,1); clearInspect(); renderLedger(); buildDock(); toast("Structure dismantled (half materials reclaimed)."); }
+  for(const r in b.def.cost) addStock(r,Math.floor(b.def.cost[r]*0.5)); if(typeof removeSmoke==="function")removeSmoke(b); if(b._scaffold){ scene.remove(b._scaffold); b._scaffold=null; } scene.remove(b.mesh); const i=buildings.indexOf(b); if(i>=0)buildings.splice(i,1); clearInspect(); renderLedger(); buildDock(); toast("Structure dismantled (half materials reclaimed)."); }
 function sellRes(r){ if((G.stock[r]||0)>=1){ G.stock[r]-=1; G.writ+=2; SND.sfx('click'); renderLedger(); if($('ov').classList.contains('show'))showShop(); } else SND.sfx('deny'); }
 function buyRes(r){ if((G.writ||0)>=4){ G.writ-=4; addStock(r,1); SND.sfx('click'); renderLedger(); showShop(); } else { SND.sfx('deny'); toast("Not enough Bones.","bad"); } }
 const SHOP_GOODS=["dead","bonesil","soulash","ichor","ingot","wafer","die"];
@@ -1406,6 +1411,14 @@ function simStep(dt){
   const heavy=af>0.62; if(heavy&&!G._ashOn){ G._ashOn=true; if(typeof toast==="function")toast("Ashfall sweeps down over the valley.","bad"); } else if(!heavy){ G._ashOn=false; }
   if(selected&&!selected.dead&&selected.obj){ Cam.target.lerp(new THREE.Vector3(selected.obj.position.x,selected.obj.position.y+0.6,selected.obj.position.z),0.05); }
   for(const b of buildings){ const ud=b.mesh.userData;
+    if(b.built===false){ b.buildT-=dt; const p=clamp(1-b.buildT/b.buildTotal,0,1);
+      b.mesh.scale.y=0.08+p*0.92;
+      if(b._scaffold){ for(const c of b._scaffold.children){ if(c.material) c.material.opacity=0.72*(0.5+0.5*Math.sin(performance.now()/180+b.x)); } }
+      if(b.buildT<=0){ b.built=true; b.mesh.scale.y=1;
+        if(b._scaffold){ scene.remove(b._scaffold); b._scaffold=null; }
+        if(typeof SND!=="undefined")SND.sfx('place'); if(typeof toast==="function")toast(b.def.name+" stands.","good"); }
+      continue;   // no animation/production while under construction
+    }
     if(b.kind==="pyre"&&ud.light){ const t=performance.now();
       ud.light.intensity=(b.active?2.8:0.5)+Math.sin(t/110)*0.5+Math.sin(t/53)*0.3;
       if(ud.flame){ ud.flame.scale.set(1+Math.sin(t/120)*0.08,1+Math.sin(t/80)*0.18,1+Math.cos(t/100)*0.08); ud.flame.rotation.y=Math.sin(t/200)*0.25; }
@@ -1450,7 +1463,7 @@ function restorePath(rx,rz){ const k=pathKey(rx,rz); if(PATHS.has(k))return; PAT
   if(!pathGroup){ pathGroup=new THREE.Group(); scene.add(pathGroup); }
   const q=new THREE.Mesh(new THREE.BoxGeometry(1.15,0.14,1.15),MAT(0x3a342a)); q.position.set(rx,terrainHeight(rx,rz)+0.07,rz); pathGroup.add(q); }
 function clearDynamic(){
-  for(const b of buildings){ if(typeof removeSmoke==="function")removeSmoke(b); scene.remove(b.mesh); } buildings.length=0;
+  for(const b of buildings){ if(typeof removeSmoke==="function")removeSmoke(b); if(b._scaffold){ scene.remove(b._scaffold); b._scaffold=null; } scene.remove(b.mesh); } buildings.length=0;
   for(const v of villagers) scene.remove(v.obj); villagers.length=0;
   for(const n of nodes) scene.remove(n.mesh); nodes.length=0;
   PATHS.clear(); if(pathGroup){ scene.remove(pathGroup); pathGroup=null; }
@@ -1967,12 +1980,26 @@ function buildingFits(x,z,foot){
   for(const n of nodes){ if(Math.hypot(n.x-x,n.z-z) < 2.0+foot*0.4) return false; }
   return true;
 }
+// how long a building takes to raise (a few seconds, scaled by footprint + cost)
+function buildTime(def){ const c=Object.values(def.cost||{}).reduce((a,n)=>a+n,0); return Math.min(11, 3.5+(def.foot||1.4)*1.4+c*0.05); }
+// a timber + bone scaffold cage that stands around a building while it is raised
+function makeScaffold(def){ const g=new THREE.Group(); const r=(def.foot||1.6)*0.6+0.35, h=2.1;
+  const m=new THREE.MeshStandardMaterial({color:0x9c9079,flatShading:true,roughness:1,transparent:true,opacity:0.72});
+  for(const sx of [-1,1])for(const sz of [-1,1]){ const p=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,h,5),m); p.position.set(sx*r,h/2,sz*r); g.add(p); }
+  for(const yy of [0.55,1.45]){ for(const sz of [-1,1]){ const bar=new THREE.Mesh(new THREE.BoxGeometry(2*r,0.05,0.05),m); bar.position.set(0,yy,sz*r); g.add(bar); }
+    for(const sx of [-1,1]){ const bar=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,2*r),m); bar.position.set(sx*r,yy,0); g.add(bar); } }
+  for(let i=0;i<2;i++){ const pk=new THREE.Mesh(new THREE.BoxGeometry(0.06,h*1.15,0.06),m); pk.position.set((i?r:-r)*0.55,h*0.5,(i?-r:r)*0.55); pk.rotation.z=i?0.28:-0.28; g.add(pk); }
+  return g; }
 function placeBuilding(kind,x,z){
   const def=BLD[kind]; if(!buildingFits(x,z,def.foot)) return null; if(!canAfford(def.cost)) return null;
   payCost(def.cost); ensureBuildingGLB(kind);
   const mesh=makeBuildingMesh(kind,def); mesh.position.set(x,terrainHeight(x,z),z); scene.add(mesh);
   const b={kind,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0};
-  buildings.push(b); groundBuilding(b); return b;
+  buildings.push(b); groundBuilding(b);
+  // raise it over time: the mesh rises out of the ground inside a scaffold cage
+  b.built=false; b.buildTotal=b.buildT=buildTime(def); mesh.scale.y=0.08;
+  b._scaffold=makeScaffold(def); b._scaffold.position.set(x,terrainHeight(x,z),z); scene.add(b._scaffold);
+  return b;
 }
 function buildingWorkSpot(b,i){ const ang=(i/Math.max(1,b.def.workers))*6.28; const r=b.def.foot*0.8+0.6;
   return {x:b.x+Math.cos(ang)*r, z:b.z+Math.sin(ang)*r}; }
@@ -2047,6 +2074,7 @@ function stepHusks(dt){
         if(moveHusk(v,nn.node.x,nn.node.z,dt,2.0)) v.job="harvest";
       } else if(v.job==="harvest"){
         const n=v.tnode;
+        if(b.built===false){ workAnim(v,dt); continue; }   // wait while the post is still being raised
         if(!n||n.amount<=0){ v.job="toNode"; continue; }
         const cap=(CARRY[v.caste]||7)*techMul('carry'), rate=(GRATE[v.caste]||5)*techMul('gather');
         const take=Math.min(rate*dt, n.amount, cap-v.carryAmt);
@@ -2119,7 +2147,7 @@ function stepEconomy(dt){
     const present=b.workers.filter(w=>w.atWork&&!w.dead).length;
     const rec=b.def.recipe; const inOk=Object.keys(rec.in).every(r=>(G.stock[r]||0)>=rec.in[r]);
     const outOk=Object.keys(rec.out).every(r=>storeRoom(r));
-    if(present>0&&inOk&&outOk){ b.active=true; b.prog+=dt; if(b.def.render)renderers++;
+    if(b.built!==false&&present>0&&inOk&&outOk){ b.active=true; b.prog+=dt; if(b.def.render)renderers++;
       if(b.prog>=rec.time){ b.prog-=rec.time; for(const r in rec.in)G.stock[r]-=rec.in[r]; for(const r in rec.out)addStock(r,rec.out[r]); b.cyc++; } }
     else b.active=false;
   }
