@@ -366,10 +366,11 @@ function terrainHeight(x,z){
   const d=Math.hypot(x,z)/HALF;
   const hills=(fbm(x*0.028+10,z*0.028+20)-0.5)*13;
   const ridge=(fbm(x*0.075-5,z*0.075+5)-0.5)*5;
-  const basin=-2.5*Math.exp(-Math.pow(d*2.3,2));
-  let h=hills+ridge+basin;
+  let h=hills+ridge+4.2;                 // lift the whole valley above the ash line so it is DRY LAND, not a sunken sea
   const rv=Math.abs(fbm(x*0.018-7,z*0.018+3)-0.5);
-  if(rv<0.045) h-=5*(1-rv/0.045);
+  if(rv<0.06) h-=8*(1-rv/0.06);          // ash rivers carve back below the waterline (the only standing water now)
+  const shelf=Math.exp(-Math.pow(d*1.5,2));
+  h=h*(1-shelf*0.8)+1.2*(shelf*0.8);     // settlement shelf: a level dry plateau the spawn sits on
   return h;
 }
 const BIOME_HSL={ forest:[0.26,0.24,0.27], silica:[0.10,0.07,0.5], ash:[0.03,0.12,0.15],
@@ -538,7 +539,7 @@ function buildMegacityHorizon(){
 /* =====================================================================
    === CAMERA RIG: constrained orbit (drag rotate / wheel zoom / pan) ===
    ===================================================================== */
-const Cam={ target:new THREE.Vector3(0,-1,0), az:Math.PI*0.25, el:0.72, dist:48, minD:18, maxD:200 };
+const Cam={ target:new THREE.Vector3(0,1,0), az:Math.PI*0.25, el:0.72, dist:48, minD:18, maxD:200 };
 function updateCamera(){
   const ce=clamp(Cam.el,0.5,1.4);
   const cx=Cam.target.x+Cam.dist*Math.cos(ce)*Math.sin(Cam.az);
