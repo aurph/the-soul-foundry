@@ -46,9 +46,9 @@
   #inspect .hd h3{font-size:18px;letter-spacing:1px}
   .twig,.modal{position:relative}
   #ledger{position:fixed}
-  #ledger::after{content:"";position:absolute;left:0;right:0;bottom:-14px;height:20px;
-    background:url('assets/ui/stick-bar.png') no-repeat center/100% 100%;opacity:.92;pointer-events:none;
-    filter:drop-shadow(0 2px 3px #000a)}
+  #ledger::after{content:"";position:absolute;left:0;right:0;bottom:-20px;height:30px;
+    background:url('assets/ui/stick-bar.png') no-repeat center/100% 100%;opacity:1;pointer-events:none;
+    filter:drop-shadow(0 2px 4px #000c)}
   #boot .wordmark{font-family:'Pirata One','Iowan Old Style',serif;font-weight:normal;
     font-size:clamp(36px,7vw,62px);letter-spacing:4px;line-height:1.05;margin:8px 0 2px;
     color:#c4b89e;opacity:.9;text-shadow:0 1px 1px #000a;text-transform:none}
@@ -1031,8 +1031,19 @@ function showSupplyChain(){ SND.resume();
     <p style="color:var(--ink-dim);font-size:12px;margin:2px 0 8px">Build and staff these in order. Each dot reads <span style="color:#9e3b2c">red</span> (not built), <span style="color:#c08a3a">amber</span> (built, needs husks), or <span style="color:#6f9a55">green</span> (running). Tap a step to jump to it.</p>
     <div class="chain">${CHAIN_STEPS.map(step).join('')}</div>
     <div style="margin-top:10px;padding:9px 11px;border:1px dashed var(--line);border-radius:6px;font-size:11.5px;color:var(--ink-dim);line-height:1.6">
-      ${ricon('compute',15)} <b style="color:var(--ink-bright)">Compute</b> is the quota the engine demands each tithe. &nbsp;${ricon('dead',15)}+${ricon('compute',15)} also bind new husks at the Binding Pyre — bound, never born.</div>
+      ${ricon('compute',15)} <b style="color:var(--ink-bright)">Compute</b> is the quota the engine demands each tithe. &nbsp;${ricon('dead',15)}+${ricon('compute',15)} also bind new husks at the Binding Pyre.</div>
     <p style="margin-top:10px"><span class="btn" onclick="hideOverlay()">Close</span> <span class="btn" onclick="showEconomy()">Live rates &amp; deficits</span></p>`); }
+// a little SVG line chart of total resources held over the last few minutes
+function resChartSVG(){ const h=G.resHist||[]; const W=520,H=86,pad=7;
+  if(h.length<2) return `<div style="color:var(--ink-dim);font-size:11px;padding:14px 6px;text-align:center">The line will chart here as the foundry runs…</div>`;
+  const mx=Math.max(1,...h);
+  const xy=h.map((v,i)=>{ const x=pad+(i/(h.length-1))*(W-2*pad); const y=H-pad-(v/mx)*(H-2*pad); return x.toFixed(1)+","+y.toFixed(1); });
+  const line=xy.join(' '), area=`${pad},${H-pad} ${line} ${(W-pad).toFixed(1)},${H-pad}`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none" style="display:block">
+    <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="#2b2d35" stroke-width="1"/>
+    <polygon points="${area}" fill="#e8a23a1e"/>
+    <polyline points="${line}" fill="none" stroke="#e8a23a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`; }
 function showEconomy(){ SND.resume();
   const rate={}; RES_ORDER.forEach(r=>rate[r]=0); let gatherWorkers=0;
   for(const b of buildings){
@@ -1053,7 +1064,14 @@ function showEconomy(){ SND.resume();
      <div style="flex:1;min-width:236px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">The line</div>${Object.keys(kinds).length?Object.keys(kinds).map(bldRow).join(''):'<div style="color:var(--ink-dim);font-size:12px">No gather/refine buildings staffed yet.</div>'}</div>
     </div>
     <div style="color:var(--ink-dim);font-size:11px;margin-top:10px">Green is surplus, red is a deficit. A red line upstream starves everything below it — add gatherers or another refiner there.</div>
-    <p style="margin-top:8px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
+    <div style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase">Total resources held</div>
+        <div style="font-size:13px;color:var(--ink-bright);font-variant-numeric:tabular-nums">${Math.round(RES_ORDER.reduce((a,r)=>a+(G.stock[r]||0),0))}</div>
+      </div>
+      <div style="border:1px solid var(--line);border-radius:6px;background:#0c0d11;padding:4px;margin-top:5px">${resChartSVG()}</div>
+    </div>
+    <p style="margin-top:10px"><span class="btn" onclick="hideOverlay()">Close</span> <span class="btn" onclick="showSupplyChain()">The Line (blueprint)</span></p>`); }
 function buildRail(){
   $('rail').innerHTML='';
   const mk=(gly,on,fn,tt)=>{ const b=document.createElement('div'); b.className='rbtn'+(on?' on':''); b.title=tt||''; b.onclick=fn;
@@ -1125,7 +1143,7 @@ function refreshInspect(){
     if(d.kind==="bind"){ const pop=villagers.filter(v=>!v.dead).length;
       body+=`<div class="row"><span>Husks bound</span><b>${pop} / ${G.popCap||6}</b></div>
       <div style="margin:7px 0"><span class="btn" onclick="bindHusk()">Bind a husk &middot; 1 corpse + 2 Compute</span></div>
-      <div style="color:var(--ink-dim);font-size:11px">Husks are bound here from the dead. They decay without soul-ash upkeep, and never breed on their own.</div>`; }
+      <div style="color:var(--ink-dim);font-size:11px">Husks are bound here from the dead. They decay without soul-ash upkeep.</div>`; }
     if(d.kind==="market") body+=`<div style="margin-top:6px"><span class="btn" onclick="showShop()">Open the market</span></div><div style="color:var(--ink-dim);font-size:11px;margin-top:4px">Buy and sell goods for Bones.</div>`;
     body+=`<div style="margin-top:10px"><span class="btn bad" onclick="demolishSel()">Demolish (reclaims half)</span></div>`;
     ins.innerHTML=`<div class="hd"><h3>${d.name}</h3><span class="x" onclick="clearInspect()">✕</span></div><div class="bd">${body}</div>`;
@@ -1169,7 +1187,7 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   <p><b>How to play:</b><br>
   • <b>Exhume the dead</b> — raise a Grave-Exhumer on a cemetery (or a Waste-Dredge on the wastes) and staff it.<br>
   • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Etch-Litho → Assembly Ossuary → Datacenter renders the dead into Compute; Substations make the Power the datacenters need. Tap a building, press <b>+ assign</b> to staff it.<br>
-  • <b>Bind husks</b> at the Binding Pyre (1 corpse + 2 Compute) — bound, never born. Soul-ash keeps them from crumbling.<br>
+  • <b>Bind husks</b> at the Binding Pyre (1 corpse + 2 Compute) to grow your workforce. Soul-ash keeps them from crumbling.<br>
   • Deliver the <b>Quota</b> of Compute each tithe; let the dead pile up unrendered and <b>Dread</b> (the backlog) overruns you. Raise <b>Ward Obelisks</b> to hold it back.<br>
   • Survive <b>${WIN_LEVEL} tithes</b> to break the engine's hold.</p>
   <p style="margin-top:6px"><b>Choose your tempo</b> <span style="color:var(--ink-dim);font-size:12px">— sets your grace period and how often a tithe falls. Current: <b style="color:var(--ember-soft)">${cap1(G.tempo||'standard')}</b></span><br>
@@ -1221,7 +1239,7 @@ function staffed(k){ return buildings.some(b=>b.kind===k && b.workers.length>0);
 function bldTarget(k){ return ()=> document.querySelector('[data-bld="'+k+'"]') ? '[data-bld="'+k+'"]' : '[data-tab="'+bldTab(k)+'"]'; }
 const TUT=[
   {t:"The dead are your raw matter. Open the GATHERING tab below.",
-   why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre): 1 corpse + 2 Compute — they never breed on their own.", d:()=>curTab==="gather", sel:()=>'[data-tab="gather"]'},
+   why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre) for 1 corpse + 2 Compute.", d:()=>curTab==="gather", sel:()=>'[data-tab="gather"]'},
   {t:"Raise a Grave-Exhumer on a cemetery (the headstones the glow marks) and staff it — tap it, press + assign.",
    why:"The Exhumer digs up corpses and hauls them to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.x,z:n.z}:null;}},
   {t:"Raise a Crematory and staff it.",
@@ -1705,27 +1723,32 @@ function pileGeo(res){ switch(res){
   default:        return {g:new THREE.IcosahedronGeometry(0.4,0), h:0.8};       // reliquary cores
 }}
 function makeStockpile(def){
-  // the Reliquary Yard: a server-reliquary — dark metal racks + a glowing teal core, lashed to bone uprights.
+  // the Reliquary Yard: a haunted foundry yard — dark timber + bone uprights, an ossuary backboard
+  // with hung relics and a faint ember soul-lantern. (Just one subtle dark panel nods to the machine.)
   const g=new THREE.Group();
-  const metal=MAT(0x23262c,{metalness:0.55,roughness:0.5}), dark=MAT(0x15171b,{metalness:0.4,roughness:0.6});
-  const bone=MAT(0xb3a98f); const teal=emis(0x4fb0c0);
+  const timber=MAT(0x2b251c), dark=MAT(0x1b1712), plank=MAT(0x352d22);
+  const bone=MAT(0xb3a98f); const ember=emis(0xc9772a);
   const W=3.8, D=2.2;
-  const plat=new THREE.Mesh(new THREE.BoxGeometry(W,0.2,D),dark); plat.position.y=0.1; g.add(plat);
-  const trim=new THREE.Mesh(new THREE.BoxGeometry(W+0.06,0.04,D+0.06),teal); trim.material.emissiveIntensity=0.5; trim.position.y=0.05; g.add(trim);  // glowing base seam
+  const plat=new THREE.Mesh(new THREE.BoxGeometry(W,0.2,D),timber); plat.position.y=0.1; g.add(plat);
   // bone corner uprights, each capped with a tiny skull
   for(const sx of [-1,1]) for(const sz of [-1,1]){ const post=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,1.55,6),bone);
     post.position.set(sx*(W/2-0.14),0.88,sz*(D/2-0.14)); g.add(post);
     const sk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.12,0),bone); sk.position.set(sx*(W/2-0.14),1.7,sz*(D/2-0.14)); g.add(sk); }
-  // a server-blade rack across the back, with glowing teal slot-lines
-  const rack=new THREE.Mesh(new THREE.BoxGeometry(W*0.92,1.2,0.34),metal); rack.position.set(0,0.94,-(D/2-0.28)); g.add(rack);
-  for(let i=0;i<6;i++){ const blade=new THREE.Mesh(new THREE.BoxGeometry(W*0.86,0.045,0.02),teal); blade.material.emissiveIntensity=0.6; blade.position.set(0,0.5+i*0.16,-(D/2-0.45)); g.add(blade); }
-  // a central reliquary core: a glowing teal pillar in a bone cage
-  const core=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.8,6),teal); core.material.emissiveIntensity=0.85; core.position.set(0,1.0,-(D/2-0.3)); g.add(core);
-  g.userData.coreGlow=core;
+  // an ossuary backboard of dark planks, with hung bone relics
+  const back=new THREE.Mesh(new THREE.BoxGeometry(W*0.92,1.15,0.16),plank); back.position.set(0,0.92,-(D/2-0.18)); g.add(back);
+  for(let i=0;i<3;i++){ const rx=-(W*0.3)+i*(W*0.3); const rib=new THREE.Mesh(new THREE.TorusGeometry(0.16,0.03,5,10,3.4),bone); rib.position.set(rx,0.95,-(D/2-0.26)); rib.rotation.z=0.2; g.add(rib);
+    const hang=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.34,4),bone); hang.position.set(rx,1.28,-(D/2-0.26)); g.add(hang); }
+  // one subtle dark machine panel with a single faint ember line (the only nod to the foundry/compute)
+  const panel=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.5,0.06),dark); panel.position.set(W*0.3,0.78,-(D/2-0.27)); g.add(panel);
+  const seam=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.03,0.02),ember); seam.material.emissiveIntensity=0.5; seam.position.set(W*0.3,0.78,-(D/2-0.31)); g.add(seam);
+  // a reliquary soul-lantern: a bone urn with a faint ember glow inside
+  const urn=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.2,0.42,7),bone); urn.position.set(-W*0.3,0.74,-(D/2-0.28)); g.add(urn);
+  const soul=new THREE.Mesh(new THREE.IcosahedronGeometry(0.1,0),ember); soul.material.emissiveIntensity=0.7; soul.position.set(-W*0.3,0.82,-(D/2-0.28)); g.add(soul);
+  g.userData.glow=soul;
   const piles=[]; const cols=4, cellX=W/cols, cellZ=D/2, top=0.22;
   PILE_RES.forEach((res,i)=>{ const cx=-(W/2)+cellX*((i%cols)+0.5), cz=-(D/2)+cellZ*(((i/cols)|0)+0.5)+0.18;
     const bin=new THREE.Mesh(new THREE.BoxGeometry(cellX*0.82,0.13,cellZ*0.74),dark); bin.position.set(cx,top,cz); g.add(bin);
-    const rim=new THREE.Mesh(new THREE.BoxGeometry(cellX*0.84,0.02,cellZ*0.76),teal); rim.material.emissiveIntensity=0.35; rim.position.set(cx,top+0.07,cz); g.add(rim);
+    const rim=new THREE.Mesh(new THREE.BoxGeometry(cellX*0.84,0.04,cellZ*0.76),bone); rim.position.set(cx,top+0.06,cz); g.add(rim);
     const pg=pileGeo(res); try{ pg.g.translate(0,pg.h/2,0); }catch(e){}   // anchor at base so it grows upward
     const opt=(res==="ichor")?{metalness:0.3,roughness:0.35}:null;
     const pile=new THREE.Mesh(pg.g, MAT(RES[res].col,opt)); pile.position.set(cx,top+0.08,cz); pile.scale.y=0.02; pile.visible=false;
@@ -2002,6 +2025,11 @@ function stepEconomy(dt){
   if(villagers.filter(v=>!v.dead).length===0 && G.time>20) endGame(false,"extinct");
   if(G.dread>=100){ G.breach=(G.breach||0)+dt; if(G.breach>=15) endGame(false,"breach"); } else G.breach=0;
   G.time=(G.time||0)+dt;
+  // sample total resources held over time for the economy line chart
+  G.histT=(G.histT==null?0:G.histT)-dt;
+  if(G.histT<=0){ G.histT=2.0; if(!G.resHist)G.resHist=[];
+    let tot=0; for(const r of RES_ORDER) tot+=(G.stock[r]||0);
+    G.resHist.push(tot); if(G.resHist.length>90)G.resHist.shift(); }
 }
 function crumble(v){ v.dead=true; SND.sfx('crumble'); scene.remove(v.obj); if(v.assigned){ const a=v.assigned.workers,k=a.indexOf(v); if(k>=0)a.splice(k,1);}
   const idx=villagers.indexOf(v); if(idx>=0)villagers.splice(idx,1); if(selected===v)clearInspect();
