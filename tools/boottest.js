@@ -7,7 +7,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__W={ buildTerrain, buildEnvironment, buildAsh, scatterWorld, scatterGroundDetail, seedSettlement, terrainHeight,
+code+=`\n;this.__W={ buildTerrain, buildEnvironment, buildAsh, scatterWorld, scatterGroundDetail, seedSettlement, buildShroud, updateShroud, terrainHeight,
   __seed:(s)=>{ WORLD_SEED=s; RNG=mulberry32(s); genRegions(s); } };`;
 
 const noop=()=>{};
@@ -45,7 +45,7 @@ vm.runInContext(code,sandbox,{filename:"game"});
 const W=sandbox.__W;
 
 W.__seed(1234);
-const steps=[['buildTerrain',()=>W.buildTerrain()],['scatterWorld',()=>W.scatterWorld()],['seedSettlement',()=>W.seedSettlement()]];
+const steps=[['buildTerrain',()=>W.buildTerrain()],['scatterWorld',()=>W.scatterWorld()],['seedSettlement',()=>W.seedSettlement()],['buildShroud',()=>W.buildShroud()],['updateShroud',()=>W.updateShroud()]];
 let failed=false;
 for(const [name,fn] of steps){
   try { fn(); console.log('OK   '+name); }
