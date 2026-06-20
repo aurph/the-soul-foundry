@@ -598,7 +598,9 @@ const VILLAGER_GLB="assets/glb/villager.glb", VILLAGER_GLB_CDN=GCDN+"fe782d76-8f
 let REAPER_GLB="assets/glb/reaper.glb", REAPER_GLB_CDN=GCDN+"1e40cd84-913b-4cb4-8f55-5c8e2dc49d74.glb";   // skeletal Reaper husk leaning on a staff (non-rigged, swayed in code)
 let vProto=null, vClips=null, vReady=false, vFailed=false;
 let rProto=null, rClips=null, rReady=false;                   // rigged Reaper husk
-function loadVillager(cb){ bootmsg("binding the husks…"); cb&&cb(true); }   // husks are hand-built low-poly now — no GLB load
+// husks are hand-built low-poly now — no GLB load. Defer the callback one tick so bootWorld runs
+// AFTER the rest of the script finishes evaluating (const MAT/NODE/BLD etc. are declared below start()).
+function loadVillager(cb){ bootmsg("binding the husks…"); setTimeout(()=>cb&&cb(true),0); }
 const WOOD=[0x2b2620,0x33291f,0x222a22,0x39301f], CLOTH=[0x1b1c1f,0x232019,0x191a17];
 function makeProcVillager(caste){
   // hand-built LOW-POLY husk — cute but pathetic, desolate. No GLBs; a few flat-shaded primitives each.
