@@ -1,5 +1,5 @@
-node_modules/
 .DS_Store
 *.log
-tools/preview.png
+node_modules/
 tools/_*.png
+tools/preview.png

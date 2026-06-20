@@ -181,6 +181,18 @@
   .modal{--wood:44px; background:#0b0c10f8; box-shadow:0 18px 80px #000e}
   #dock{--wood:26px; border-top:none}
   #inspect.frame::before,#goals.frame::before{display:none}
+  /* ===== custom icon system (replaces all emoji) ===== */
+  .ic{object-fit:contain;vertical-align:middle;flex:0 0 auto}
+  .stat .ic{margin-right:5px}
+  .resstat{cursor:pointer;border-radius:4px} .resstat:hover{background:#1c1f27}
+  .gbtn{cursor:pointer}
+  .rbtn{overflow:hidden;padding:0}
+  .rbtn img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.85) brightness(.9)}
+  .rbtn:hover img{filter:saturate(1) brightness(1.06)}
+  .rbtn.on{border-color:var(--ember)} .rbtn.on img{filter:brightness(1.14) saturate(1.1)}
+  .tab .tic{width:15px;height:15px;object-fit:contain;vertical-align:middle;margin-right:6px;opacity:.7}
+  .tab.on .tic{opacity:1}
+  .alert-ic{width:15px;height:15px;object-fit:contain;vertical-align:-2px;margin-right:5px}
 </style>
 </head>
 <body>
@@ -196,7 +208,7 @@
 <div id="goals" class="frame twig"></div>
 <div id="toasts"></div>
 <div id="hint"></div>
-<div id="pausebar" onclick="beginPlay()">❚❚ &nbsp;Paused &middot; press <span class="k">Space</span> or click here to begin</div>
+<div id="pausebar" onclick="beginPlay()"><img src="assets/ui/glyph/pause.png" style="width:15px;height:15px;vertical-align:-3px;opacity:.8;margin-right:5px">Paused &middot; press <span class="k">Space</span> or click here to begin</div>
 <div id="dev"></div>
 <div id="dock">
   <div id="docktabs"></div>
@@ -851,16 +863,29 @@ const RES_HELP={ dead:"Corpses — the raw matter. Exhume cemeteries and the was
   ingot:"Silicon ingot — sliced into wafers.", wafer:"Wafer — etched into dies.",
   die:"Etched die — packaged into cores.", core:"Reliquary core (the chip) — rendered into Compute.",
   power:"Power — the datacenters are starving for it.", compute:"The quota the engine demands. Deliver it or drown in Dread." };
+// ---- custom icon helpers + resource codex (no emoji, everything explainable) ----
+function ricon(r,s){ s=s||18; return `<img class="ic" src="assets/ui/res/${r}.png" style="width:${s}px;height:${s}px">`; }
+function gicon(n,s){ s=s||24; return `<img src="assets/ui/glyph/${n}.png" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle">`; }
+function resMadeBy(r){ const m=[]; for(const k of BLD_ORDER){ const d=BLD[k]; if(d.recipe&&d.recipe.out&&d.recipe.out[r])m.push(d.name); if(d.kind==='gather'&&d.res===r)m.push(d.name); } return m; }
+function resUsedBy(r){ const u=[]; for(const k of BLD_ORDER){ const d=BLD[k]; if(d.recipe&&d.recipe.in&&d.recipe.in[r])u.push(d.name); if(d.kind==='bind'&&r==='dead')u.push(d.name); } return u; }
+function showResInfo(r){ SND.resume(); const made=resMadeBy(r), used=resUsedBy(r);
+  showOverlayHTML(`<div style="display:flex;align-items:center;gap:12px;margin-bottom:2px">${ricon(r,42)}<h1 style="font-size:22px;margin:0">${RES[r].name}</h1></div>
+   <p style="margin:6px 0 12px">${RES_HELP[r]||''}</p>
+   <div class="optrow"><span>In stock</span><b>${Math.floor(G.stock[r]||0)}</b></div>
+   <div class="optrow"><span>Made by</span><b>${made.length?made.join(', '):'— raw / extracted'}</b></div>
+   <div class="optrow"><span>Used by</span><b>${used.length?used.join(', '):'— end product'}</b></div>
+   <p style="margin-top:10px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
 function renderLedger(){
   const pop=villagers.filter(v=>!v.dead).length;
   const chip=(v,l,c,t)=>`<div class="stat" title="${t||''}"><span><span class="v" style="${c?'color:'+c:''}">${v}</span> <span class="lbl">${l}</span></span></div>`;
-  let h=`<div class="stat shopbtn" title="Market — buy &amp; sell for Bones" onclick="showShop()"><span class="v" style="font-size:17px">🏪</span></div><div class="sep"></div>`
+  let h=`<div class="stat shopbtn gbtn" title="Market — buy & sell for Bones" onclick="showShop()">${gicon('market',22)}</div><div class="sep"></div>`
     +chip(pop+"/"+G.popCap,"Husks",pop<2?'#9e3b2c':'',STAT_HELP.husks)
     +chip(Math.round(G.dread)+"%","Dread",G.dread>55?'#9e3b2c':'#7d8a5a',STAT_HELP.dread)
-    +chip(Math.floor(G.writ),"Bones",'#e8c24a',STAT_HELP.writ)
+    +`<div class="stat resstat" title="Bones — your currency. Click to trade." onclick="showShop()">${ricon('bones',17)}<span class="v" style="color:#e8c24a">${Math.floor(G.writ)}</span></div>`
     +`<div class="sep"></div>`;
-  for(const r of RES_ORDER){ const n=Math.floor(G.stock[r]||0); if(n<=0 && ["glass","wafer","core"].indexOf(r)>=0) continue;
-    h+=`<div class="stat" title="${RES[r].name} — ${RES_HELP[r]||''}"><span><span class="v" style="color:#${RES[r].col.toString(16).padStart(6,'0')}">${n}</span> <span class="lbl">${RES[r].name}</span></span></div>`; }
+  const hideWhenEmpty=["bonesil","ingot","wafer","die","core"];
+  for(const r of RES_ORDER){ const n=Math.floor(G.stock[r]||0); if(n<=0 && hideWhenEmpty.indexOf(r)>=0) continue;
+    h+=`<div class="stat resstat" title="${RES[r].name} — click for details" onclick="showResInfo('${r}')">${ricon(r,17)}<span class="v">${n}</span></div>`; }
   $('ledger').innerHTML=h;
 }
 function renderQuota(){
@@ -880,7 +905,7 @@ function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.clas
   else if(G.dread>=75) msg="Dread is near breaching. Render the dead faster and raise Ward Obelisks, or the backlog overruns you.";
   else if(pop>0 && assigned===0) msg="Your husks stand idle. Tap a building and press + assign to put them to work.";
   else if(G.quota.t<35 && (G.stock.compute||0)<G.quota.need && (G.time||0)>=(G.graceT==null?150:G.graceT)) msg="Quota due soon and Compute is short. Staff the Datacenter and the chain feeding it.";
-  if(msg){ el.textContent="⚠ "+msg; el.classList.add('show'); } else el.classList.remove('show'); }
+  if(msg){ el.textContent=msg; el.classList.add('show'); } else el.classList.remove('show'); }
 function showEconomy(){ SND.resume();
   const rate={}; RES_ORDER.forEach(r=>rate[r]=0); let gatherWorkers=0;
   for(const b of buildings){
@@ -904,21 +929,23 @@ function showEconomy(){ SND.resume();
     <p style="margin-top:8px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
 function buildRail(){
   $('rail').innerHTML='';
-  const mk=(t,on,fn,tt)=>{ const b=document.createElement('div'); b.className='rbtn'+(on?' on':''); b.textContent=t; b.title=tt||''; b.onclick=fn; return b; };
-  $('rail').appendChild(mk('❚❚',paused,()=>{paused=!paused;buildRail();},'Pause (Space)'));
-  $('rail').appendChild(mk('▶',!paused&&simSpeed===1,()=>{paused=false;simSpeed=1;buildRail();},'1×'));
-  $('rail').appendChild(mk('»',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'3×'));
-  $('rail').appendChild(mk('?',false,()=>showHelp(),'How to play'));
-  $('rail').appendChild(mk('✦',false,()=>showRites(),'Rites — spend Bones on upgrades'));
-  $('rail').appendChild(mk('📊',false,()=>showEconomy(),'Economy — flows & the line'));
-  $('rail').appendChild(mk('♪',!SND.muted,()=>{ SND.resume(); SND.toggleMute(); buildRail(); }, SND.muted?'Sound is off — click for sound':'Mute sound'));
-  $('rail').appendChild(mk('⚙',false,()=>showOptions(),'Options'));
+  const mk=(gly,on,fn,tt)=>{ const b=document.createElement('div'); b.className='rbtn'+(on?' on':''); b.title=tt||''; b.onclick=fn;
+    const im=document.createElement('img'); im.src='assets/ui/glyph/'+gly+'.png'; im.alt=tt||''; b.appendChild(im); return b; };
+  $('rail').appendChild(mk('pause',paused,()=>{paused=!paused;buildRail();},'Pause (Space)'));
+  $('rail').appendChild(mk('play',!paused&&simSpeed===1,()=>{paused=false;simSpeed=1;buildRail();},'Normal speed (1)'));
+  $('rail').appendChild(mk('fast',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'Fast (3)'));
+  $('rail').appendChild(mk('economy',false,()=>showEconomy(),'Economy — flows & the line'));
+  $('rail').appendChild(mk('rites',false,()=>showRites(),'Rites — spend Bones on upgrades'));
+  $('rail').appendChild(mk('info',false,()=>showHelp(),'How to play'));
+  $('rail').appendChild(mk(SND.muted?'soundoff':'sound',!SND.muted,()=>{ SND.resume(); SND.toggleMute(); buildRail(); }, SND.muted?'Sound is off — click for sound':'Mute sound'));
+  $('rail').appendChild(mk('options',false,()=>showOptions(),'Options'));
 }
 
 /* build menu */
 function buildDock(){
   const tabs=$('docktabs'); tabs.innerHTML='';
-  for(const [k,label] of TABS){ const d=document.createElement('div'); d.className='tab'+(curTab===k?' on':''); d.textContent=label; d.onclick=()=>{curTab=k;buildDock();}; tabs.appendChild(d); }
+  const TAB_GLY={dwell:'dwelling',gather:'gathering',refine:'refining',civic:'civic'};
+  for(const [k,label] of TABS){ const d=document.createElement('div'); d.className='tab'+(curTab===k?' on':''); d.innerHTML=`<img class="tic" src="assets/ui/glyph/${TAB_GLY[k]||'dwelling'}.png">`+label; d.onclick=()=>{curTab=k;buildDock();}; tabs.appendChild(d); }
   const row=$('dockrow'); row.innerHTML='';
   for(const k of BLD_ORDER){ const def=BLD[k]; if(bldTab(k)!==curTab) continue;
     const card=document.createElement('div'); card.className='card'+(placeKind===k?' sel':'')+(canAfford(def.cost)?'':' locked');
