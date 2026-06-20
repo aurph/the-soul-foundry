@@ -1339,19 +1339,19 @@ function scatterWorld(){
   }
   // SPAWN GRAVEYARD — a dense ring of harvestable deposits (real models) right around the
   // settlement, close and reachable, so the dead are at hand from the first minute
-  for(let k=0;k<22;k++){ const a=rr(0,6.28), rad=rr(8,30); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+  for(let k=0;k<22;k++){ const a=rr(0,6.28), rad=rr(13,31); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-2.8) continue; placeNode(k%5===4?'waste':'grave', x, z); }
   // MATERIAL FIELD — clickable, harvestable deposits scattered across the whole dry valley:
   // the world is filled with resources you can actually work, not decoration you can't
   for(let k=0;k<60;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
-    if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<7||regionAt(x,z)) continue; placeNode(rnd()<0.68?'grave':'waste', x, z); }
+    if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<13||regionAt(x,z)) continue; placeNode(rnd()<0.68?'grave':'waste', x, z); }
   // dense trees, rocks and bone heaps hugging the spawn so the start never reads barren
   for(let k=0;k<35;k++){ const a=rr(0,6.28), rad=rr(7,32); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    if(terrainHeight(x,z)<-3.0||Math.hypot(x,z)<6) continue; const r=rnd();
+    if(terrainHeight(x,z)<-3.0||Math.hypot(x,z)<13) continue; const r=rnd();
     dropProp(r<0.5?makeDeadTree2(rr(0.7,1.5)):r<0.74?makeRock():r<0.9?makeBonePile():makeShard(), x,z, r<0.5); }
   // ambient props across the open land (denser, closer to centre — leave only a small build clearing)
   for(let i=0;i<90;i++){ const x=rr(-HALF+3,HALF-3), z=rr(-HALF+3,HALF-3);
-    if(Math.hypot(x,z)<6) continue; if(terrainHeight(x,z)<-3.2) continue; if(regionAt(x,z)) continue;
+    if(Math.hypot(x,z)<13) continue; if(terrainHeight(x,z)<-3.2) continue; if(regionAt(x,z)) continue;
     const r=rnd(); dropProp(r<0.45?makeDeadTree2(rr(0.6,1.2)):r<0.7?makeRock():r<0.86?makeBonePile():makeAshMound(), x,z, r<0.45);
   }
   // stark white grave-markers staked across the dark land
@@ -1379,20 +1379,20 @@ function scatterWorld(){
 function scatterGroundDetail(){
   const M=new THREE.Matrix4();
   const mk=(geo,mat,count,yfn,sfn,minH,clear)=>{ const im=new THREE.InstancedMesh(geo,mat,count); let n=0;
-    for(let i=0;i<count;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF); const h=terrainHeight(x,z); if(h<(minH||-3.4))continue; if(clear&&Math.hypot(x,z)<clear)continue;
+    for(let i=0;i<count;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF); const h=terrainHeight(x,z); if(h<(minH||-3.4))continue; if(Math.hypot(x,z)<13)continue;
       const s=sfn(); M.makeScale(s.x,s.y,s.z); M.setPosition(x,h+yfn(s),z); im.setMatrixAt(n++,M); }
     im.count=n; im.instanceMatrix.needsUpdate=true; im.frustumCulled=false; scene.add(im); return im; };
-  mk(new THREE.DodecahedronGeometry(0.6,0), MAT(0x53565d), 420, s=>0.12, ()=>{const a=rr(0.4,1.9);return{x:a,y:a*rr(0.5,1),z:a};});       // pale rubble & stones
+  mk(new THREE.DodecahedronGeometry(0.6,0), MAT(0x53565d), 280, s=>0.12, ()=>{const a=rr(0.4,1.9);return{x:a,y:a*rr(0.5,1),z:a};});       // pale rubble & stones
   mk(new THREE.DodecahedronGeometry(0.95,0), MAT(0x6b6760), 90, s=>0.18, ()=>{const a=rr(0.7,2.7);return{x:a,y:a*rr(0.5,0.9),z:a};});     // bigger boulders (read from afar)
-  mk(new THREE.ConeGeometry(0.13,1.2,4), MAT(0x444a33), 650, s=>s.y*0.45, ()=>{const a=rr(0.6,2.5);return{x:1,y:a,z:1};});               // dead grass tufts
-  mk(new THREE.IcosahedronGeometry(0.24,0), MAT(0x655f50), 320, s=>0.1, ()=>{const a=rr(0.4,1.5);return{x:a,y:a*0.6,z:a};});             // bone-grey debris
+  mk(new THREE.ConeGeometry(0.13,1.2,4), MAT(0x444a33), 440, s=>s.y*0.45, ()=>{const a=rr(0.6,2.5);return{x:1,y:a,z:1};});               // dead grass tufts
+  mk(new THREE.IcosahedronGeometry(0.24,0), MAT(0x655f50), 210, s=>0.1, ()=>{const a=rr(0.4,1.5);return{x:a,y:a*0.6,z:a};});             // bone-grey debris
   mk(new THREE.BoxGeometry(0.5,0.18,0.5), MAT(0x564c3e), 160, s=>0.06, ()=>{const a=rr(0.6,2.2);return{x:a,y:1,z:a*rr(0.6,1)};});       // broken slabs / dirt
   mk(new THREE.IcosahedronGeometry(0.17,0), MAT(0xbab296), 220, s=>0.08, ()=>{const a=rr(0.35,1.15);return{x:a,y:a*0.5,z:a};}, -3.0, 7);  // pale scattered BONES (high contrast)
   // DEAD FOREST — a blanket of leaning bare snags, the main readable texture from above
   const snagGeo=new THREE.CylinderGeometry(0.03,0.33,4.8,5);
-  const snags=new THREE.InstancedMesh(snagGeo, MAT(0x171309), 110); let tn=0;
+  const snags=new THREE.InstancedMesh(snagGeo, MAT(0x171309), 75); let tn=0;
   const TM=new THREE.Matrix4(),TQ=new THREE.Quaternion(),TE=new THREE.Euler(),TP=new THREE.Vector3(),TS=new THREE.Vector3();
-  for(let i=0;i<110;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF), h=terrainHeight(x,z); if(h<-3.0||Math.hypot(x,z)<5) continue;
+  for(let i=0;i<75;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF), h=terrainHeight(x,z); if(h<-3.0||Math.hypot(x,z)<13) continue;
     const sc=rr(0.5,1.4); TE.set(rr(-0.18,0.18),rr(0,6),rr(-0.18,0.18)); TQ.setFromEuler(TE); TP.set(x,h+2.4*sc,z); TS.set(sc,sc,sc);
     TM.compose(TP,TQ,TS); snags.setMatrixAt(tn++,TM); }
   snags.count=tn; snags.instanceMatrix.needsUpdate=true; snags.frustumCulled=false; scene.add(snags);
