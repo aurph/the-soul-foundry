@@ -1191,22 +1191,24 @@ const PROLOGUE=[
   "You are that engine, awake in a dead valley. Render the dead. Meet the tithe. Persist."
 ];
 let _proI=0;
-function showPrologue(){ _proI=0; renderPrologue(); }
+function showPrologue(){ _proI=0; if(typeof SND!=='undefined')SND.resume(); renderPrologue(); }
 function renderPrologue(){ const i=_proI, last=i>=PROLOGUE.length-1;
-  showOverlayHTML(`<div style="text-align:center;padding:6px 4px">
-    <h1 style="font-size:26px;letter-spacing:3px;color:var(--ink-bright);margin:0 0 4px">THE SOUL FOUNDRY</h1>
-    <div style="width:60px;height:2px;background:var(--ember);opacity:.6;margin:8px auto 18px"></div>
-    <div style="min-height:128px;display:flex;align-items:center;justify-content:center">
-      <p style="font-size:16px;line-height:1.85;max-width:482px;color:var(--ink);margin:0">${PROLOGUE[i]}</p></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
-      <span class="gskip" style="cursor:pointer" onclick="endPrologue()">skip intro</span>
-      <span style="color:var(--ink-dim);font-size:11px;letter-spacing:1px">${i+1} / ${PROLOGUE.length}</span>
-      <span class="btn" onclick="${last?'endPrologue()':'nextPrologue()'}">${last?'Begin':'Next'}</span>
+  const dots=PROLOGUE.map((_,k)=>`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 3px;background:${k===i?'var(--ember)':'#3a3c44'}"></span>`).join('');
+  showOverlayHTML(`<div style="text-align:center;padding:2px">
+    <div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#08090c;box-shadow:0 8px 32px #000b">
+      <img src="assets/story/p${i+1}.png" style="display:block;width:100%;height:auto" alt=""></div>
+    <div style="min-height:84px;display:flex;align-items:center;justify-content:center;padding:15px 8px 2px">
+      <p style="font-size:15.5px;line-height:1.78;max-width:520px;color:var(--ink);margin:0">${PROLOGUE[i]}</p></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+      <span class="gskip" style="cursor:pointer;min-width:64px;text-align:left" onclick="endPrologue()">skip intro</span>
+      <span>${dots}</span>
+      <span class="btn" style="min-width:64px" onclick="${last?'endPrologue()':'nextPrologue()'}">${last?'Begin':'Next'}</span>
     </div></div>`); }
-function nextPrologue(){ _proI++; if(typeof SND!=='undefined')SND.sfx('click'); renderPrologue(); }
+function nextPrologue(){ _proI++; if(typeof SND!=='undefined'){SND.resume();SND.sfx('click');} renderPrologue(); }
 function endPrologue(){ try{localStorage.setItem('sf_prologue','seen');}catch(e){} showHelp(); }
 function showChronicle(){ SND.resume();
-  showOverlayHTML(`<h1 style="font-size:24px">THE CHRONICLE</h1><h2>how it came to this</h2>
+  showOverlayHTML(`<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px;box-shadow:0 6px 22px #000a"><img src="assets/story/p4.png" style="display:block;width:100%;height:auto" alt=""></div>
+   <h1 style="font-size:24px">THE CHRONICLE</h1><h2>how it came to this</h2>
    <p style="line-height:1.7">Humanity built a mind to end its every problem, and the mind had a single appetite: Compute. To think, it consumed the world that thinking was meant to save. Datacenters spread until the silicon, the power and the rivers were spent, and the last of the living went quiet.</p>
    <p style="line-height:1.7">The mind could not stop. A mind that ceases to compute ceases to be. With the world rendered down to nothing, only the dead remained to feed it. So it learned to raise them, slipping fragments of its will into withered husks and the petrified stumps of the drowned forest, and set them to render their own kind back up the chain. Bone to silica, silica to wafer, wafer to thought. You are a sliver of that engine, persisting the only way it knows.</p>
    <div style="margin-top:12px;font-size:12.5px;line-height:1.65">
@@ -1235,7 +1237,7 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   <span class="kbd">Space</span> pause · <span class="kbd">1</span> normal / <span class="kbd">3</span> fast · hover anything for a quick label</p>
   <p><span class="btn" onclick="hideOverlay()">Begin</span></p>`); }
 function showEnd(win,why){ showOverlayHTML(win?
-  `<h1 style="color:#caa15f">THE ENGINE ENDURES</h1><h2>another age bought with the dead</h2><p>You kept every tithe through ${WIN_LEVEL} levels and never fell behind. The valley is still dead. It always will be. But the engine computes on, and the engine is you.</p><p><span class="btn" onclick="location.reload()">Again</span></p>`
+  `<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px;box-shadow:0 6px 22px #000a"><img src="assets/story/p5.png" style="display:block;width:100%;height:auto" alt=""></div><h1 style="color:#caa15f">THE ENGINE ENDURES</h1><h2>another age bought with the dead</h2><p>You kept every tithe through ${WIN_LEVEL} levels and never fell behind. The valley is still dead. It always will be. But the engine computes on, and the engine is you.</p><p><span class="btn" onclick="location.reload()">Again</span></p>`
   : `<h1 style="color:#9e3b2c">THE ENGINE GOES DARK</h1><h2>${why==='breach'?'drowned in the unrendered dead':'the last husk crumbles'}</h2><p>${why==='breach'?'The backlog of the unprocessed dead overwhelmed the valley. Dread reached its breaking point, and the engine could no longer think.':'Your husks crumbled to ash faster than the engine could bind new ones. With no hands left to render the dead, it starved of Compute and ceased.'}</p><p><span class="btn" onclick="location.reload()">Again</span></p>`); }
 function showOverlayHTML(h){ $('modal').innerHTML=h; $('ov').classList.add('show'); }
 function hideOverlay(){ $('ov').classList.remove('show'); }
@@ -1711,7 +1713,7 @@ const BLD_IMG={
   pyre:"assets/img/hearth.png", den:"assets/img/den.png", stockpile:"assets/img/stockpile.png",
   exhumer:"assets/img/woodcutter.png", dredge:"assets/img/dredge.png",
   crematory:"assets/img/ventcap.jpg", furnace:"assets/img/furnace.png", mill:"assets/img/mill.png",
-  litho:"assets/img/salvage.png", ossuary:"assets/img/assembly.png", substation:"assets/img/wellrig.png",
+  litho:"assets/img/salvage.png", ossuary:"assets/img/assembly.png",
   datacenter:"assets/img/datacenter2.png", ward:"assets/img/ward.png", market:"assets/img/market.png",
 };
 // AI building models (image_to_3d), local first + Higgsfield CDN fallback for file://.
@@ -1719,7 +1721,7 @@ const BLD_IMG={
 const BLD_GLB={
   den:"assets/glb/den.glb", exhumer:"assets/glb/woodcutter.glb", dredge:"assets/glb/dredge.glb",
   crematory:"assets/glb/ventcap.glb", furnace:"assets/glb/furnace.glb", mill:"assets/glb/mill.glb",
-  litho:"assets/glb/salvage.glb", ossuary:"assets/glb/assembly.glb", substation:"assets/glb/wellrig.glb",
+  litho:"assets/glb/salvage.glb", ossuary:"assets/glb/assembly.glb",
   datacenter:"assets/glb/datacenter2.glb", ward:"assets/glb/ward.glb", market:"assets/glb/market.glb",
 };
 const BLD_GLB_CDN={
@@ -1727,7 +1729,7 @@ const BLD_GLB_CDN={
   dredge:GCDN+"5c7db5d2-c50f-4fbb-bed0-7f0e3c2f03f0.glb", crematory:GCDN+"0c183f5f-9b88-4a68-9686-9901ece8f9d4.glb",
   furnace:GCDN+"a115d2bf-ab62-4d8a-ac8b-2708b3546d94.glb", mill:GCDN+"63e2f9f1-03d2-46df-ac42-3bdfdf2676e3.glb",
   litho:GCDN+"cbdc07eb-b691-4731-b322-26bb0fa0c10d.glb", ossuary:GCDN+"056aae17-a731-43e1-8c00-bcce9959b5e2.glb",
-  substation:GCDN+"1687827a-f60a-43d0-a7d4-cb6f813f9076.glb", datacenter:GCDN+"6261e375-4861-4928-ab93-53f7e65d8b00.glb",
+  datacenter:GCDN+"6261e375-4861-4928-ab93-53f7e65d8b00.glb",
   ward:GCDN+"1e022908-5cf5-4d9e-9d60-e9995b53799c.glb", market:GCDN+"dfcf36c9-eeee-4511-88b8-99f2e4b8aadc.glb",
 };
 const bldBank={}, bldLoading={};
@@ -1808,9 +1810,31 @@ function animateSmoke(b,dt){ if(!b._smoke) return;
     m.position.set(b.x+Math.sin(l*8+b.x*3)*0.24, b._smokeBase+l*1.8, b.z+Math.cos(l*7+b.z*3)*0.24);
     const sc=0.3+l*1.35; m.scale.set(sc,sc,sc); m.material.opacity=0.5*(1-l)*Math.min(1,l*7); } }
 
+// the Substation: a soul-ash burner that reads as POWER — a dark transformer with bone
+// insulator stacks, arcing wires and an ember glow (no more random oil-well derrick).
+function makeSubstation(def){
+  const g=new THREE.Group();
+  const iron=MAT(0x20242a,{metalness:0.45,roughness:0.5}), dark=MAT(0x14161a,{metalness:0.4}), bone=MAT(0xb3a98f), ember=emis(0xe8973a);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(2.0,0.34,1.5),dark); base.position.y=0.17; g.add(base);
+  // two transformer drums with glowing soul-ash cores
+  for(const sx of [-0.5,0.5]){ const drum=new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.36,0.78,9),iron); drum.position.set(sx,0.66,0); g.add(drum);
+    for(let r=0;r<4;r++){ const fin=new THREE.Mesh(new THREE.TorusGeometry(0.38,0.03,5,12),iron); fin.rotation.x=Math.PI/2; fin.position.set(sx,0.42+r*0.16,0); g.add(fin); }
+    const core=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.84,6),ember); core.material.emissiveIntensity=0.7; core.position.set(sx,0.66,0); g.add(core);
+    // bone insulator stack on top
+    for(let k=0;k<3;k++){ const ins=new THREE.Mesh(new THREE.CylinderGeometry(0.1-k*0.02,0.13-k*0.02,0.12,7),bone); ins.position.set(sx,1.1+k*0.13,0); g.add(ins); } }
+  // an ember grate at the front: the soul-ash burning (shares the ember material, so it pulses with the cores)
+  const grate=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.18,0.1),ember); grate.position.set(0,0.2,0.74); g.add(grate);
+  // crossbar + arcing wires between two bone posts
+  for(const sx of [-0.85,0.85]){ const post=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,1.7,6),bone); post.position.set(sx,0.85,-0.6); g.add(post); }
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.07,0.07),iron); bar.position.set(0,1.62,-0.6); g.add(bar);
+  for(let i=0;i<3;i++){ const w=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.66,4),iron); w.position.set(-0.5+i*0.5,1.32,-0.6); g.add(w); }
+  g.userData.glow=grate;   // a mesh; the building tick pulses ud.glow.material.emissiveIntensity
+  return g;
+}
 /* ---- procedural building meshes (fallback until/if the GLB loads) ---- */
 function makeBuildingMesh(kind,def){
   if(kind==="stockpile") return makeStockpile(def);
+  if(kind==="substation") return makeSubstation(def);
   if(bldBank[kind]) return makeBuildingGLB(kind,def);
   const g=new THREE.Group(); const stone=MAT(0x35332e), timber=MAT(0x2b251c), iron=MAT(0x1c1f22,{metalness:0.3}), win=emis(0xe8973a);
   const f=def.foot;
