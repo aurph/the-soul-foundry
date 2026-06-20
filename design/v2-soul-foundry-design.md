@@ -6,11 +6,11 @@ souls into Compute. Player = the intelligence / overseer.
 
 ## Resources
 Raw (from land nodes): Deadwood, Rot-Pith, Silica, Soul-Ash, Grave-Water, Salvage.
-Refined: Cinderglass, Sigil-Disc, Reliquary Core, Compute. Currency: Writ.
+Refined: Cinderglass, Etched-Disc, Reliquary Core, Compute. Currency: Writ.
 
 ## Chain
-Silica + Soul-Ash -> Cinderglass (Furnace); Cinderglass + Water -> Sigil-Disc (Mill);
-Sigil-Disc + Soul-Ash -> Reliquary Core (Assembly); Core + Water -> Compute (Datacenter).
+Silica + Soul-Ash -> Cinderglass (Furnace); Cinderglass + Water -> Etched-Disc (Mill);
+Etched-Disc + Soul-Ash -> Reliquary Core (Assembly); Core + Water -> Compute (Datacenter).
 
 ## Buildings
 The Pyre (warmth), Bone Den (housing), Bone Path (+35% move), gathering posts

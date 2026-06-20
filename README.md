@@ -3,7 +3,7 @@
 A true-3D, browser-based, desolate colony-automation game. A dead world, an
 agentic AI that persists by computing, and the husks of the dead bound to a
 foundry that renders their remains into Compute. Think Against the Storm meets
-Frostpunk by way of a Haunted Mound music video.
+Frostpunk by way of a grimy PS1 horror dream.
 
 The whole game is one self-contained file: `game/index.html`.
 

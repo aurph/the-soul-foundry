@@ -160,7 +160,7 @@
   #pausebar{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:46;padding:10px 20px;border-radius:6px;cursor:pointer;
     font-size:14px;letter-spacing:.5px;color:var(--ink-bright);background:#0d0e12ee;border:1px solid var(--ember);box-shadow:0 8px 34px #000b;display:none}
   #pausebar .k{font:11px monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--ink-bright)}
-  /* Haunted Mound: VHS grain + scanlines + heavy vignette */
+  /* Desolation: VHS grain + scanlines + heavy vignette */
   #grain{position:fixed;inset:0;z-index:15;pointer-events:none;width:100%;height:100%;
     image-rendering:pixelated;opacity:.035;mix-blend-mode:overlay}
   #vhs{position:fixed;inset:0;z-index:16;pointer-events:none;
@@ -625,8 +625,8 @@ function makeProcVillager(caste){
     socket(-0.16); socket(0.16);
     const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.05,0.06),dk); mouth.position.set(0,0.52,1.0); g.add(mouth);
     const mcL=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.05,0.06),dk); mcL.position.set(-0.13,0.48,1.0); g.add(mcL); const mcR=mcL.clone(); mcR.position.x=0.13; g.add(mcR);
-    const cv=new THREE.Mesh(new THREE.BoxGeometry(0.045,0.2,0.04),sigilMat()); cv.position.set(0,1.0,1.0); g.add(cv);
-    const ch=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.045,0.04),sigilMat()); ch.position.set(0,1.04,1.0); g.add(ch);
+    const cv=new THREE.Mesh(new THREE.BoxGeometry(0.045,0.2,0.04),markerMat()); cv.position.set(0,1.0,1.0); g.add(cv);
+    const ch=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.045,0.04),markerMat()); ch.position.set(0,1.04,1.0); g.add(ch);
     // two long arms reaching forward to claw and drag
     const aL=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.08,1.35,5),wood); aL.position.set(-0.78,0.32,0.62); aL.rotation.x=-0.8; g.add(aL);
     const aR=aL.clone(); aR.position.x=0.78; g.add(aR);
@@ -993,7 +993,7 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   <p>A dead world. You are the agentic engine that persists by computing — and computing needs the dead rendered into <b>Compute</b>. You bind the husks of the extinct and drive them to render corpses up an occult chip-foundry.</p>
   <p><b>How to play:</b><br>
   • <b>Exhume the dead</b> — raise a Grave-Exhumer on a cemetery (or a Waste-Dredge on the wastes) and staff it.<br>
-  • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Sigil-Litho → Assembly Ossuary → Datacenter renders the dead into Compute; Substations make the Power the datacenters need. Tap a building, press <b>+ assign</b> to staff it.<br>
+  • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Etch-Litho → Assembly Ossuary → Datacenter renders the dead into Compute; Substations make the Power the datacenters need. Tap a building, press <b>+ assign</b> to staff it.<br>
   • <b>Bind husks</b> at the Binding Pyre (1 corpse + 2 Compute) — bound, never born. Soul-ash keeps them from crumbling.<br>
   • Deliver the <b>Quota</b> of Compute each tithe; let the dead pile up unrendered and <b>Dread</b> (the backlog) overruns you. Raise <b>Ward Obelisks</b> to hold it back.<br>
   • Survive <b>${WIN_LEVEL} tithes</b> to break the engine's hold.</p>
@@ -1048,7 +1048,7 @@ const TUT=[
    why:"Bone-silica + soul-ash → a silicon ingot.", d:()=>staffed("furnace")},
   {t:"Raise a Wafer Mill and staff it.",
    why:"The ingot is sliced into wafers.", d:()=>staffed("mill")},
-  {t:"Raise a Sigil-Litho and staff it.",
+  {t:"Raise an Etch-Litho and staff it.",
    why:"Wafers are etched into dies — the circuits.", d:()=>staffed("litho")},
   {t:"Raise an Assembly Ossuary and staff it.",
    why:"Dies + soul-ash are packaged into reliquary cores — the chips.", d:()=>staffed("ossuary")},
@@ -1083,7 +1083,7 @@ const UPGRADES=[
   {id:'callous',name:'Calloused Husks', desc:'+30% carry capacity for all husks.', cost:80},
   {id:'roads',  name:'Bone Roads',      desc:'+18% extra speed on Bone Paths.',    cost:50},
   {id:'embers', name:'Banked Embers',   desc:'+40% warmth from the Pyre.',         cost:70},
-  {id:'sigils', name:'Warding Sigils',  desc:'+30% Dread suppression from Wards.',  cost:90},
+  {id:'warding', name:'Ward Stones',  desc:'+30% Dread suppression from Wards.',  cost:90},
 ];
 function buyRite(id){ const u=UPGRADES.find(x=>x.id===id); if(!u||G.tech[id]) return;
   if((G.writ||0)<u.cost){ SND.sfx('deny'); toast("Not enough Bones for "+u.name,"bad"); return; }
@@ -1223,8 +1223,8 @@ const BLD={
     recipe:{in:{bonesil:2,soulash:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica and soul-ash into a silicon ingot."},
   mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6},foot:2.0,workers:3,dread:0.5,
     recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers."},
-  litho:{name:"Sigil-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
-    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches sigil-circuits into the wafer — photolithography by another name."},
+  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
+    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into the wafer. Photolithography by another name."},
   ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10},foot:2.2,workers:4,dread:0.8,
     recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores — the processors."},
   substation:{name:"Substation",kind:"refine",cost:{dead:16,soulash:4},foot:1.8,workers:2,dread:0.5,
@@ -1275,14 +1275,18 @@ function makeAshMound(){ const m=MAT(0x2a2722); const s=rr(0.8,2.0);
 function makeNode(type){
   const def=NODE[type]; const g=new THREE.Group(); g.userData.depleted=false;
   if(type==="grave"){
-    // a cute little cemetery: leaning headstones, white crosses, fresh dirt mounds
-    const dirt=MAT(0x37302a), stone=MAT(0x70696090>>4||0x6b6660), white=MAT(0xece6d4);
-    const plot=new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.7,0.22,10),dirt); plot.position.y=0.11; g.add(plot);
-    for(let i=0;i<6+rint(3);i++){ const a=rr(0,6.28), d=rr(0.4,2.1), x=Math.cos(a)*d, z=Math.sin(a)*d, ry=rr(0,6);
-      if(rnd()<0.5){ const hs=new THREE.Mesh(new THREE.BoxGeometry(rr(0.32,0.5),rr(0.5,0.8),0.13),stone); hs.position.set(x,0.4,z); hs.rotation.set(rr(-0.12,0.12),ry,rr(-0.16,0.16)); g.add(hs); }
-      else { const post=new THREE.Mesh(new THREE.BoxGeometry(0.1,rr(0.6,0.9),0.1),white); post.position.set(x,0.42,z); post.rotation.y=ry; g.add(post);
-        const bar=new THREE.Mesh(new THREE.BoxGeometry(rr(0.3,0.46),0.1,0.1),white); bar.position.set(x,0.62,z); bar.rotation.y=ry; g.add(bar); }
-      const mound=new THREE.Mesh(new THREE.SphereGeometry(rr(0.3,0.5),6,4,0,6.283,0,1.3),dirt); mound.scale.y=0.4; mound.position.set(x*0.55,0.14,z*0.55); g.add(mound); }
+    // a small cemetery you harvest: a tall central marker + headstones so it reads as a 3D landmark, not a flat patch
+    const dirt=MAT(0x37302a), stone=MAT(0x6b6660), white=MAT(0xd8d2c0);
+    const plot=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.7,0.26,10),dirt); plot.position.y=0.13; g.add(plot);
+    if(rnd()<0.5){ const obh=rr(1.9,2.7); const ob=new THREE.Mesh(new THREE.BoxGeometry(0.5,obh,0.5),stone); ob.position.y=obh/2; ob.rotation.y=rr(0,6); g.add(ob);
+      const cap=new THREE.Mesh(new THREE.ConeGeometry(0.44,0.55,4),stone); cap.position.y=obh+0.2; cap.rotation.y=0.78; g.add(cap); }
+    else { const ph=rr(1.8,2.5); const post=new THREE.Mesh(new THREE.BoxGeometry(0.17,ph,0.17),white); post.position.y=ph/2; g.add(post);
+      const bar=new THREE.Mesh(new THREE.BoxGeometry(0.72,0.17,0.17),white); bar.position.y=ph*0.72; g.add(bar); }
+    for(let i=0;i<7+rint(4);i++){ const a=rr(0,6.28), d=rr(0.6,2.05), x=Math.cos(a)*d, z=Math.sin(a)*d, ry=rr(0,6);
+      if(rnd()<0.55){ const hh=rr(0.8,1.4); const hs=new THREE.Mesh(new THREE.BoxGeometry(rr(0.42,0.62),hh,0.16),stone); hs.position.set(x,hh/2,z); hs.rotation.set(rr(-0.12,0.12),ry,rr(-0.16,0.16)); g.add(hs); }
+      else { const ph=rr(0.9,1.45); const post=new THREE.Mesh(new THREE.BoxGeometry(0.12,ph,0.12),white); post.position.set(x,ph/2,z); post.rotation.y=ry; g.add(post);
+        const bar=new THREE.Mesh(new THREE.BoxGeometry(rr(0.34,0.5),0.12,0.12),white); bar.position.set(x,ph*0.72,z); bar.rotation.y=ry; g.add(bar); }
+      const mound=new THREE.Mesh(new THREE.SphereGeometry(rr(0.3,0.5),6,4,0,6.283,0,1.3),dirt); mound.scale.y=0.4; mound.position.set(x*0.6,0.16,z*0.6); g.add(mound); }
   }
   else { // corpse-waste: a low heap of shrouded bodies dragged in from the desolation
     const dirt=MAT(0x2a2620);
@@ -1297,12 +1301,12 @@ function placeNode(type,x,z){ const n=makeNode(type); n.x=x; n.z=z; n.mesh.posit
 function makeShard(){ const g=new THREE.Group(); for(let i=0;i<2+rint(3);i++){ const s=new THREE.Mesh(new THREE.ConeGeometry(rr(0.2,0.5),rr(0.9,2.2),4),MAT(0xc8c2b4));
   s.position.set(rr(-0.6,0.6),rr(0.3,0.8),rr(-0.6,0.6)); s.rotation.set(rr(-0.4,0.4),rr(0,6),rr(-0.4,0.4)); g.add(s);} return g; }
 function dropProp(maker,x,z,rot){ const o=maker; o.position.set(x,terrainHeight(x,z),z); if(rot)o.rotation.y=rr(0,6); decoGroup.add(o); }
-function sigilMat(){ const m=emis(0xece6d4); m.emissiveIntensity=0.85; m.fog=true; return m; }
-function makeSigilCross(){ const g=new THREE.Group(), m=sigilMat(); const hpost=rr(1.5,2.6);
+function markerMat(){ const m=emis(0xece6d4); m.emissiveIntensity=0.85; m.fog=true; return m; }
+function makeGraveCross(){ const g=new THREE.Group(), m=markerMat(); const hpost=rr(1.5,2.6);
   const post=new THREE.Mesh(new THREE.BoxGeometry(0.13,hpost,0.13),m); post.position.y=hpost/2; g.add(post);
   const bar=new THREE.Mesh(new THREE.BoxGeometry(rr(0.7,1.15),0.13,0.13),m); bar.position.y=hpost*rr(0.62,0.8); g.add(bar);
   g.rotation.y=rr(-0.5,0.5); g.rotation.z=rr(-0.06,0.06); return g; }
-function makeSigilRing(){ const g=new THREE.Group(), m=sigilMat();
+function makeBoneRing(){ const g=new THREE.Group(), m=markerMat();
   const r=new THREE.Mesh(new THREE.TorusGeometry(rr(0.9,1.6),0.05,4,18),m); r.rotation.x=Math.PI/2; r.position.y=0.06; g.add(r);
   const a=new THREE.Mesh(new THREE.BoxGeometry(r.geometry.parameters.radius*2,0.04,0.07),m); a.position.y=0.06; g.add(a);
   const b=a.clone(); b.rotation.y=Math.PI/2; g.add(b); return g; }
@@ -1332,23 +1336,27 @@ function scatterWorld(){
     else if(g.type==='graves'){ addNodes('grave',3); addProps(()=>makeBonePile(),16); addProps(()=>makeRock(),4); }
     else { addNodes('grave',2); addProps(()=>makeAshMound(),9); addProps(()=>makeDeadTree2(rr(0.6,1.1)),9,true); }
   }
-  // a tight ring of resource deposits right around the settlement — close, visible objects you can reach at once
-  const closeRing=[['grave',0],['grave',1],['waste',2],['grave',3],['grave',4],['waste',5]];
-  for(const cr of closeRing){ const a=(cr[1]/6)*6.283+rr(-0.35,0.35), rad=rr(13,21), x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    if(terrainHeight(x,z)<-3.0) continue; placeNode(cr[0],x,z); }
+  // SPAWN GRAVEYARD — a dense ring of harvestable deposits (real models) right around the
+  // settlement, close and reachable, so the dead are at hand from the first minute
+  for(let k=0;k<20;k++){ const a=rr(0,6.28), rad=rr(8,30); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.8) continue; placeNode(k%5===4?'waste':'grave', x, z); }
+  // dense trees, rocks and bone heaps hugging the spawn so the start never reads barren
+  for(let k=0;k<150;k++){ const a=rr(0,6.28), rad=rr(7,32); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-3.0||Math.hypot(x,z)<6) continue; const r=rnd();
+    dropProp(r<0.5?makeDeadTree2(rr(0.7,1.5)):r<0.74?makeRock():r<0.9?makeBonePile():makeShard(), x,z, r<0.5); }
   // ambient props across the open land (denser, closer to centre — leave only a small build clearing)
   for(let i=0;i<480;i++){ const x=rr(-HALF+3,HALF-3), z=rr(-HALF+3,HALF-3);
     if(Math.hypot(x,z)<6) continue; if(terrainHeight(x,z)<-3.2) continue; if(regionAt(x,z)) continue;
     const r=rnd(); dropProp(r<0.45?makeDeadTree2(rr(0.6,1.2)):r<0.7?makeRock():r<0.86?makeBonePile():makeAshMound(), x,z, r<0.45);
   }
-  // Haunted Mound: stark white crosses + sigils staked across the dark land
+  // stark white grave-markers staked across the dark land
   for(let i=0;i<110;i++){ const x=rr(-HALF+4,HALF-4), z=rr(-HALF+4,HALF-4);
     if(Math.hypot(x,z)<8) continue; if(terrainHeight(x,z)<-3.2) continue;
-    dropProp(rnd()<0.74?makeSigilCross():makeSigilRing(), x,z, false);
+    dropProp(rnd()<0.74?makeGraveCross():makeBoneRing(), x,z, false);
   }
-  // a stand of stark white crosses + sigils staked right around the settlement (the signature, and highly readable)
+  // a stand of stark white grave-markers right around the settlement (highly readable)
   for(let i=0;i<80;i++){ const a=rr(0,6.28), rad=rr(10,42); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    if(terrainHeight(x,z)<-3.0) continue; dropProp(rnd()<0.72?makeSigilCross():makeSigilRing(), x,z, false); }
+    if(terrainHeight(x,z)<-3.0) continue; dropProp(rnd()<0.72?makeGraveCross():makeBoneRing(), x,z, false); }
   // dead server-towers carry the datacenter/machine motif across the desolation
   for(let i=0;i<46;i++){ const a=rr(0,6.28), r=rr(16,HALF-6); const x=Math.cos(a)*r, z=Math.sin(a)*r;
     if(terrainHeight(x,z)<-3.2||regionAt(x,z)) continue; dropProp(makeServerTower(),x,z,true); }
@@ -1359,7 +1367,7 @@ function scatterWorld(){
   // a denser desolate ring reaching from the buildable shelf out to the fields, so nothing sits on bare plain
   for(let i=0;i<230;i++){ const a=rr(0,6.28), rad=rr(11,52); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0) continue; const r=rnd();
-    dropProp(r<0.4?makeDeadTree2(rr(0.7,1.4)):r<0.62?makeBonePile():r<0.8?makeRock():r<0.92?makeAshMound():(rnd()<0.5?makeSigilCross():makeSigilRing()), x,z, r<0.4); }
+    dropProp(r<0.4?makeDeadTree2(rr(0.7,1.4)):r<0.62?makeBonePile():r<0.8?makeRock():r<0.92?makeAshMound():(rnd()<0.5?makeGraveCross():makeBoneRing()), x,z, r<0.4); }
   scatterGroundDetail();
 }
 // tens of thousands of instanced props (one draw call each) — a dense desolate floor that never reads blank
@@ -1436,7 +1444,7 @@ function techMul(kind){ const t=G.tech||{};
   if(kind==='carry')  return t.callous?1.3:1;
   if(kind==='path')   return t.roads?1.18:1;
   if(kind==='warmth') return t.embers?1.4:1;
-  if(kind==='ward')   return t.sigils?1.3:1;
+  if(kind==='ward')   return t.warding?1.3:1;
   return 1; }
 
 /* ---- AI building models: concept renders -> image_to_3d GLBs, loaded at runtime ---- */
@@ -1502,8 +1510,8 @@ function makeStockpile(def){
   const beam=new THREE.Mesh(new THREE.BoxGeometry(W,0.14,0.14),timber); beam.position.set(0,1.62,-(D/2-0.16)); g.add(beam);
   const beam2=beam.clone(); beam2.position.z=(D/2-0.16); g.add(beam2);
   const tarp=new THREE.Mesh(new THREE.BoxGeometry(W*0.95,0.05,D*0.52),MAT(0x221f19)); tarp.position.set(0,1.56,-(D*0.2)); tarp.rotation.x=-0.13; g.add(tarp);
-  const sig=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.52,0.05),sigilMat()); sig.position.set(-(W/2-0.16),1.05,(D/2-0.16)); g.add(sig);
-  const bar=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.05,0.05),sigilMat()); bar.position.set(-(W/2-0.16),1.16,(D/2-0.16)); g.add(bar);
+  const sig=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.52,0.05),markerMat()); sig.position.set(-(W/2-0.16),1.05,(D/2-0.16)); g.add(sig);
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.05,0.05),markerMat()); bar.position.set(-(W/2-0.16),1.16,(D/2-0.16)); g.add(bar);
   const piles=[]; const cols=4, cellX=W/cols, cellZ=D/2, top=0.2;
   PILE_RES.forEach((res,i)=>{ const cx=-(W/2)+cellX*((i%cols)+0.5), cz=-(D/2)+cellZ*(((i/cols)|0)+0.5);
     const bin=new THREE.Mesh(new THREE.BoxGeometry(cellX*0.82,0.12,cellZ*0.8),MAT(0x1e1b15)); bin.position.set(cx,top,cz); g.add(bin);
@@ -1573,7 +1581,7 @@ function scatterAround(b,fr){
     else if(def.kind==="refine"||def.kind==="datacenter") o=(r<0.45)?makeWreck():(r<0.75?makeServerTower():makeBonePile());
     else o=(r<0.5)?makeBonePile():makeRock();
     dropProp(o,x,z,true); }
-  if(rnd()<0.7){ const a=rr(0,6.28), d=R+0.3; dropProp(rnd()<0.6?makeSigilCross():makeSigilRing(), b.x+Math.cos(a)*d, b.z+Math.sin(a)*d, false); }
+  if(rnd()<0.7){ const a=rr(0,6.28), d=R+0.3; dropProp(rnd()<0.6?makeGraveCross():makeBoneRing(), b.x+Math.cos(a)*d, b.z+Math.sin(a)*d, false); }
 }
 function buildingFits(x,z,foot){
   if(Math.hypot(x,z)>HALF-foot) return false;

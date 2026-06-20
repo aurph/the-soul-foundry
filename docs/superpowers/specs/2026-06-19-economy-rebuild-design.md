@@ -26,7 +26,7 @@ framing the owner flagged as too derivative.
 | 2 | Crematory (Render) | Dead → **Bone-silica**, **Soul-ash**, **Ichor** | quartz sand + dopant/flux + coolant |
 | 3 | Soul Furnace | Bone-silica + Soul-ash → **Ingot** | polysilicon ingot |
 | 4 | Glass Mill | Ingot → **Wafers** | wafer slicing |
-| 5 | Sigil-Litho | Wafers → **Etched Dies** | photolithography (sigils = circuits) |
+| 5 | Etch-Litho | Wafers → **Etched Dies** | photolithography (etched circuits) |
 | 6 | Assembly Ossuary | Etched Dies → **Cores** | dicing + packaging (chips) |
 | 7 | Server-wright | Cores → **Server-Reliquaries** | board/server assembly |
 | 8 | Spectral Datacenter | Servers + **Power** + Ichor → **Compute** | datacenter (power + cooling) |
@@ -68,8 +68,8 @@ fraction of cost. Build grid + footprint ghost kept.
 
 ## UI / visual overhaul
 
-- **De-cozy:** drop the warm wood/parchment ATS tone; push Haunted Mound — colder,
-  grimier, lo-fi, starker white-on-black sigils.
+- **De-cozy:** drop the warm wood/parchment ATS tone; push the desolation, colder,
+  grimier, lo-fi, starker white-on-black markers.
 - **Low-poly dead-branch UI borders** + a **branch/bone wordmark** (generating now).
 - A **more distinctive display typeface** for headings (paired with the wordmark).
 - **Lower-poly husks** — the AI characters re-generated blockier/chunkier.

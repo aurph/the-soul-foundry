@@ -34,7 +34,7 @@ Took the working vertical slice to a complete, tested, vendored, deployable game
   cloaked thin-limbed mesh after several attempts; documented). Stump-folk got a
   bespoke heave-and-tilt log shuffle.
 - **Belonging.** Placed buildings now face the Pyre, sink a foundation skirt and
-  rim stones into the terrain, and scatter kind-matched debris and a white sigil.
+  rim stones into the terrain, and scatter kind-matched debris and a white grave-marker.
 - **Progression.** localStorage save/load with autosave and save-on-exit, an
   options menu (music, SFX, film-grain, mute), a staged tutorial, drifting
   weather (clear to ashfall, shifting fog and ash), and random world events.

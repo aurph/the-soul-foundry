@@ -14,7 +14,7 @@
 - Deterministic sim: fixed 1/30s timestep, seeded `mulberry32`; no `Math.random()` in sim — use `rnd()/rint()/rr()`.
 - `node tools/sim3dtest.js` must pass after every task (extend it; never let it go red).
 - Currency var stays `G.writ` internally (save-compat), displayed as "Bones".
-- Aesthetic: PS1 low-poly, desolate Haunted Mound, white-on-black sigils, no glow but faint ember; new UI = low-poly twigs, spooky, not cozy/parchment.
+- Aesthetic: PS1 low-poly, desolate wastes, white-on-black markers, no glow but faint ember; new UI = low-poly twigs, spooky, not cozy/parchment.
 - Keep: build grid+ghost, save/load+autosave, audio (SND), stockpile-hub haul loop, start-paused, lose-clears-save, inspector, alert line, world/biomes/megacity.
 
 ---
@@ -36,7 +36,7 @@
 | crematory | Crematory | refine | dead2 → bonesil1+soulash1+ichor1 | 3 |
 | furnace | Soul Furnace | refine | bonesil2+soulash1 → ingot1 | 3 |
 | mill | Wafer Mill | refine | ingot1 → wafer2 | 3 |
-| litho | Sigil-Litho | refine | wafer1 → die1 | 3 |
+| litho | Etch-Litho | refine | wafer1 → die1 | 3 |
 | ossuary | Assembly Ossuary | refine | die1+soulash1 → core1 | 4 |
 | substation | Substation | refine | soulash1 → power2 | 2 |
 | datacenter | Spectral Datacenter | datacenter | core1+power1+ichor1 → compute3 | 5 |
@@ -97,7 +97,7 @@
 
 **Files:** `game/index.html` (CSS + frame elements), `game/assets/ui/*`, regenerate husk GLBs (Higgsfield).
 
-- [ ] Step 1: vendor the branch art (`border-corner.png`, `border-bar.png`, `wordmark.png`, already in `game/assets/ui/`). Add CSS to frame HUD panels with the corner/bar art via `mix-blend-mode:screen` (drops the black). Replace parchment/iron panel fills with darker, colder tones; lean into white sigils.
+- [ ] Step 1: vendor the branch art (`border-corner.png`, `border-bar.png`, `wordmark.png`, already in `game/assets/ui/`). Add CSS to frame HUD panels with the corner/bar art via `mix-blend-mode:screen` (drops the black). Replace parchment/iron panel fills with darker, colder tones; lean into white markers.
 - [ ] Step 2: put the `wordmark.png` on the boot/title screen; pick a distinctive display font for headings (`@font-face` vendored, with a serif fallback).
 - [ ] Step 3: increase starting foliage density further (more close trees/twigs).
 - [ ] Step 4: regenerate Worker + Reaper husks at lower polycount / blockier (Higgsfield image_to_3d, lower `target_polycount`), re-vendor, re-wire.
