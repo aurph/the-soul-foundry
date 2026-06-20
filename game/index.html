@@ -711,9 +711,9 @@ function spawnVillager(x,z,caste){
     else staticGLB=true;   // non-rigged AI mesh (the cloaked Reaper) — glide & sway it procedurally
   } else { obj=makeProcVillager(caste); proc=true; }
   obj.position.set(x,terrainHeight(x,z),z);
-  // carried-load indicator: a small block shown while hauling, tinted to the resource — makes the supply chain legible
+  // carried-load indicator: the husk physically carries the material, shaped to what it is
   const onTop=!!(obj.userData&&obj.userData.carryTop);  // the stump carries loads on its flat top
-  const carry=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.34,0.34),MAT(0x6b5a40)); carry.visible=false; carry.position.set(0,onTop?1.22:1.0,onTop?0:0.34); obj.add(carry);
+  const carry=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.32,0.32),MAT(0x6b5a40)); carry.visible=false; carry.position.set(0,onTop?1.22:1.0,onTop?0:0.34); obj.add(carry);
   scene.add(obj);
   const v={obj,mixer,act,proc,staticGLB,caste,carryMesh:carry,
     name:villagerName(), job:"idle",
@@ -755,6 +755,26 @@ function stepVillagers(dt){
   }
 }
 function lerpAngle(a,b,t){ let d=((b-a+Math.PI)%(Math.PI*2))-Math.PI; if(d<-Math.PI)d+=Math.PI*2; return a+d*t; }
+// what a husk physically carries, shaped to the material (powder heaps, a coolant vial, wafer discs, glowing cores…)
+function payloadSpec(res){ const C=(RES[res]&&RES[res].col)||0x6b5a40;
+  switch(res){
+    case 'dead':    return {g:()=>new THREE.BoxGeometry(0.5,0.22,0.24), col:0x6b6256, rz:0.14};       // a wrapped corpse-bundle
+    case 'bonesil': case 'soulash': return {g:()=>new THREE.ConeGeometry(0.27,0.2,7), col:C};          // a heap of powder
+    case 'ichor':   return {g:()=>new THREE.CylinderGeometry(0.1,0.12,0.36,7), col:C, emis:true};       // a vial of coolant
+    case 'ingot':   return {g:()=>new THREE.BoxGeometry(0.44,0.16,0.18), col:C, metal:true};            // a silicon bar
+    case 'wafer':   return {g:()=>new THREE.CylinderGeometry(0.23,0.23,0.05,12), col:C, rx:0.18};       // a stack of wafer discs
+    case 'die':     return {g:()=>new THREE.BoxGeometry(0.3,0.07,0.3), col:C};                          // an etched die
+    case 'core':    return {g:()=>new THREE.BoxGeometry(0.2,0.2,0.2), col:C, emis:true};                // a glowing reliquary core
+    case 'power':   return {g:()=>new THREE.ConeGeometry(0.15,0.34,5), col:C, emis:true};               // a spark of power
+    case 'compute': return {g:()=>new THREE.BoxGeometry(0.2,0.2,0.2), col:C, emis:true};                // a node of compute
+    default:        return {g:()=>new THREE.BoxGeometry(0.3,0.3,0.3), col:C};
+  }
+}
+function applyPayload(v){ const m=v.carryMesh; if(!m||!v.carryRes) return; const sp=payloadSpec(v.carryRes);
+  try{ if(m.geometry&&m.geometry.dispose)m.geometry.dispose(); m.geometry=sp.g(); }catch(e){}
+  try{ if(m.material&&m.material.dispose)m.material.dispose(); m.material=sp.emis?emis(sp.col):MAT(sp.col,sp.metal?{metalness:0.45,roughness:0.5}:null); }catch(e){}
+  if(m.rotation&&m.rotation.set) m.rotation.set(sp.rx||0,0,sp.rz||0);
+  const onTop=!!(v.obj.userData&&v.obj.userData.carryTop); v._payBaseY=(onTop?1.2:0.98); }
 
 /* central hearth: fire light + ember points (a warm anchor in the dead valley) */
 let hearthLight=null;
@@ -1081,7 +1101,7 @@ function addWorker(){ if(!selBld)return; const idle=idleHusks(); if(!idle.length
   if(selBld.workers.length<selBld.def.workers){ assignHusk(idle[0],selBld); refreshInspect(); } }
 function remWorker(){ if(!selBld||!selBld.workers.length)return; assignHusk(selBld.workers[selBld.workers.length-1],null); refreshInspect(); }
 function demolishSel(){ if(!selBld)return; const b=selBld; b.workers.slice().forEach(w=>assignHusk(w,null));
-  for(const r in b.def.cost) addStock(r,Math.floor(b.def.cost[r]*0.5)); scene.remove(b.mesh); const i=buildings.indexOf(b); if(i>=0)buildings.splice(i,1); clearInspect(); renderLedger(); buildDock(); toast("Structure dismantled (half materials reclaimed)."); }
+  for(const r in b.def.cost) addStock(r,Math.floor(b.def.cost[r]*0.5)); if(typeof removeSmoke==="function")removeSmoke(b); scene.remove(b.mesh); const i=buildings.indexOf(b); if(i>=0)buildings.splice(i,1); clearInspect(); renderLedger(); buildDock(); toast("Structure dismantled (half materials reclaimed)."); }
 function sellRes(r){ if((G.stock[r]||0)>=1){ G.stock[r]-=1; G.writ+=2; SND.sfx('click'); renderLedger(); if($('ov').classList.contains('show'))showShop(); } else SND.sfx('deny'); }
 function buyRes(r){ if((G.writ||0)>=4){ G.writ-=4; addStock(r,1); SND.sfx('click'); renderLedger(); showShop(); } else { SND.sfx('deny'); toast("Not enough Bones.","bad"); } }
 const SHOP_GOODS=["dead","bonesil","soulash","ichor","ingot","wafer","die"];
@@ -1244,7 +1264,8 @@ function simStep(dt){
       ud.light.intensity=(b.active?2.8:0.5)+Math.sin(t/110)*0.5+Math.sin(t/53)*0.3;
       if(ud.flame){ ud.flame.scale.set(1+Math.sin(t/120)*0.08,1+Math.sin(t/80)*0.18,1+Math.cos(t/100)*0.08); ud.flame.rotation.y=Math.sin(t/200)*0.25; }
       if(ud.tongues){ ud.tongues[0].scale.y=1+Math.sin(t/70)*0.2; ud.tongues[2].scale.y=1+Math.sin(t/45)*0.35; } }
-    if(ud.glow){ ud.glow.material.emissiveIntensity=(b.active?0.9:0.35)+Math.sin(performance.now()/200+b.x)*0.2; } }
+    if(ud.glow){ ud.glow.material.emissiveIntensity=(b.active?0.9:0.35)+Math.sin(performance.now()/200+b.x)*0.2; }
+    if(SMOKERS[b.kind]){ ensureSmoke(b); animateSmoke(b,dt); } }
   _ledgerT-=dt; if(_ledgerT<=0){ _ledgerT=0.35; renderLedger(); renderQuota(); renderAlert(); SND.setTension(G.dread/100); if(typeof updateTutorial==="function")updateTutorial(); if((selected&&!selected.dead)||selBld||selNode) refreshInspect(); }
 }
 
@@ -1280,7 +1301,7 @@ function restorePath(rx,rz){ const k=pathKey(rx,rz); if(PATHS.has(k))return; PAT
   if(!pathGroup){ pathGroup=new THREE.Group(); scene.add(pathGroup); }
   const q=new THREE.Mesh(new THREE.BoxGeometry(1.15,0.14,1.15),MAT(0x3a342a)); q.position.set(rx,terrainHeight(rx,rz)+0.07,rz); pathGroup.add(q); }
 function clearDynamic(){
-  for(const b of buildings) scene.remove(b.mesh); buildings.length=0;
+  for(const b of buildings){ if(typeof removeSmoke==="function")removeSmoke(b); scene.remove(b.mesh); } buildings.length=0;
   for(const v of villagers) scene.remove(v.obj); villagers.length=0;
   for(const n of nodes) scene.remove(n.mesh); nodes.length=0;
   PATHS.clear(); if(pathGroup){ scene.remove(pathGroup); pathGroup=null; }
@@ -1667,6 +1688,19 @@ function makeStockpile(def){
 // scale each pile to its bin's fill every frame — the economy made physical
 function updateStockpiles(){ for(const b of buildings){ if(b.kind!=="stockpile"||!b.mesh||!b.mesh.userData.piles) continue;
   for(const p of b.mesh.userData.piles){ const f=pileFill(p.res); p.node.visible=f>0.012; p.node.scale.y=Math.max(0.02,f); } } }
+// ---- chimney smoke for the rendering buildings (render-only; uses Math.random so it never desyncs the sim) ----
+const SMOKERS={crematory:2.0, furnace:1.85, ossuary:1.7};
+function ensureSmoke(b){ if(b._smoke||!SMOKERS[b.kind]) return; const puffs=[];
+  for(let i=0;i<5;i++){ const m=new THREE.Mesh(new THREE.IcosahedronGeometry(0.26,0),
+    new THREE.MeshStandardMaterial({color:0x6b665d,transparent:true,opacity:0,flatShading:true,roughness:1,depthWrite:false}));
+    m.renderOrder=5; m._life=Math.random(); scene.add(m); puffs.push(m); }
+  b._smoke=puffs; b._smokeBase=terrainHeight(b.x,b.z)+SMOKERS[b.kind]; }
+function removeSmoke(b){ if(b._smoke){ for(const m of b._smoke) scene.remove(m); b._smoke=null; } }
+function animateSmoke(b,dt){ if(!b._smoke) return;
+  for(const m of b._smoke){ if(!b.active){ m.visible=false; continue; } m.visible=true;
+    m._life+=dt*0.42; if(m._life>1) m._life-=1; const l=m._life;
+    m.position.set(b.x+Math.sin(l*8+b.x*3)*0.24, b._smokeBase+l*1.8, b.z+Math.cos(l*7+b.z*3)*0.24);
+    const sc=0.3+l*1.35; m.scale.set(sc,sc,sc); m.material.opacity=0.5*(1-l)*Math.min(1,l*7); } }
 
 /* ---- procedural building meshes (fallback until/if the GLB loads) ---- */
 function makeBuildingMesh(kind,def){
@@ -1795,9 +1829,9 @@ function stepHusks(dt){
   for(const v of villagers){
     if(v.dead) continue;
     if(v.carryMesh){ const carrying=v.carryAmt>0.1; v.carryMesh.visible=carrying;
-      if(carrying){ const col=(v.carryRes&&RES[v.carryRes])?RES[v.carryRes].col:0x6b5a40;
-        if(v.carryMesh.material&&v.carryMesh.material.color&&v.carryMesh.material.color.setHex)v.carryMesh.material.color.setHex(col);
-        const s=0.5+Math.min(1,v.carryAmt/12)*0.85; v.carryMesh.scale.set(s,s,s); } }
+      if(carrying){ if(v.carryRes!==v._payRes){ v._payRes=v.carryRes; applyPayload(v); }
+        const s=0.62+Math.min(1,v.carryAmt/12)*0.55; v.carryMesh.scale.set(s,s,s);
+        if(v._payBaseY!=null) v.carryMesh.position.y=v._payBaseY; } }
     const b=v.assigned;
     if(!b){ // idle until assigned: stand still, only the rare slow shuffle near the Pyre
       v.restock-=dt;
