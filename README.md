@@ -11,23 +11,36 @@ This is a fun side project. Nothing serious, just a world I wanted to see exist.
 
 ## How to play
 
-Claw raw matter from the valley, refine it up an occult-industrial supply chain,
-feed the spectral datacenters, and meet a rising quota of Compute. Keep the Pyre
-fed with Deadwood for warmth and gather Rot-Pith for food, or the husks crumble.
-Miss a quota and the backlog of the unprocessed dead becomes Dread. Build Ward
-Obelisks to hold Dread back, Reliquary Yards to stockpile your matter, and Bone
-Paths to move husks faster. Survive eight tithes of Compute to break the engine.
+Exhume the dead from cemeteries and the wastes, then render them up an occult
+chip-foundry: Crematory to Soul Furnace to Wafer Mill to Etch-Litho to Assembly
+Ossuary to Spectral Datacenter turns corpses into Compute, the quota the engine
+demands. Substations burn soul-ash into the Power the datacenters need. Bind your
+workforce at the Binding Pyre (1 corpse + 2 Compute): husks are bound, never born,
+and crumble without soul-ash upkeep. Let the dead pile up unrendered and the
+backlog becomes Dread; raise Ward Obelisks to hold it back, Reliquary Yards to
+stockpile, and Bone Paths to move husks faster. Deliver the rising tithe of
+Compute through eight levels to break the engine's hold.
 
-The three husk castes: Workers (balanced, a rigged animated model), Stump-folk
-(haul far more, slow, a bespoke procedural log), and Reapers (frail, resist
-Dread, a hooded husk).
+The three husk castes are hand-built low-poly: Workers (balanced, hunched, dim
+ember eyes), Stump-folk (haul far more, slow, a scary face carved into the wood
+and loads carried on their flat top), and Reapers (frail, resist Dread, a little
+hooded skeleton on a crooked staff).
 
 ## Controls
 
-- Drag to orbit, scroll to zoom, WASD to pan, Q/E to rotate.
-- Click a husk or a building to inspect it and assign workers.
-- Build from the dock at the bottom, then click the ground to place.
-- Space pauses, 1 / 3 set game speed, Esc cancels placement.
+- Drag to orbit, right-drag or shift-drag (or WASD) to pan, scroll to zoom.
+- Click a husk, building, or cemetery to inspect it; in a building press + assign.
+- Hover anything for a quick label. Click any resource or the Codex for detail.
+- Build from the dock at the bottom, then click the ground to place; R rotates.
+- Space pauses, 1 / 3 set game speed, Esc or right-click cancels placement.
+
+## Interface
+
+The UI is custom, no stock kit: woodcut glyph buttons and a sliced occult-folk
+resource icon set (no emoji), a clickable Codex and per-resource cards explaining
+what each thing is and where it sits in the chain, hover tooltips and ember
+selection rings in the 3D world, and a tutorial that drives a green spotlight onto
+the exact button or cemetery each step is talking about.
 
 ## Architecture
 
@@ -43,10 +56,12 @@ Two rules keep it sane:
 
 ## Assets
 
-Buildings and characters are AI-generated: a concept image, then an image-to-3D
-GLB, loaded at runtime. Music and sound effects are AI-generated. Everything is
-vendored under `game/assets/` (`glb/`, `img/`, `audio/`) and `game/vendor/`
-(Three.js r128), so the build has no third-party runtime dependency.
+Buildings are AI-generated (a concept image, then an image-to-3D GLB) loaded at
+runtime; the husk characters are hand-built procedural low-poly (flat-shaded
+primitives, no GLB). The UI icons are a custom occult-woodcut set generated with
+Higgsfield and sliced into per-item PNGs by `tools/slicesheet.js`. Music and sound
+effects are AI-generated. Everything is vendored under `game/assets/` and
+`game/vendor/` (Three.js r128), so the build has no third-party runtime dependency.
 
 Audio degrades gracefully: a WebAudio synth drone and synth sound effects always
 play, with the AI clips layered on top when their files load. The game has full
