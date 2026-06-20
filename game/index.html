@@ -193,6 +193,9 @@
   .tab .tic{width:15px;height:15px;object-fit:contain;vertical-align:middle;margin-right:6px;opacity:.7}
   .tab.on .tic{opacity:1}
   .alert-ic{width:15px;height:15px;object-fit:contain;vertical-align:-2px;margin-right:5px}
+  #tip{position:fixed;z-index:48;max-width:252px;padding:5px 9px;border-radius:5px;font-size:12px;line-height:1.35;
+    color:var(--ink-bright);background:#0d0e12f2;border:1px solid var(--line);box-shadow:0 4px 16px #000b;pointer-events:none;display:none}
+  #tip b{color:var(--ember-soft);font-weight:normal}
 </style>
 </head>
 <body>
@@ -208,6 +211,7 @@
 <div id="goals" class="frame twig"></div>
 <div id="toasts"></div>
 <div id="hint"></div>
+<div id="tip"></div>
 <div id="pausebar" onclick="beginPlay()"><img src="assets/ui/glyph/pause.png" style="width:15px;height:15px;vertical-align:-3px;opacity:.8;margin-right:5px">Paused &middot; press <span class="k">Space</span> or click here to begin</div>
 <div id="dev"></div>
 <div id="dock">
@@ -582,6 +586,7 @@ function loop(now){
   if(!paused){ _acc+=real*simSpeed;
     while(_acc>=STEP){ if(typeof simStep==="function") simStep(STEP); _acc-=STEP; } }
   tickRender(real);
+  if(typeof updateRings==="function") updateRings(now/1000);
   updateCamera();
   renderer.render(scene,camera);
 }
@@ -779,7 +784,8 @@ canvas.addEventListener('pointermove',e=>{ if(ptrs.has(e.pointerId)) ptrs.set(e.
   if(placeKind&&BLD[placeKind]&&BLD[placeKind].kind!=='path') updateGhost(e.clientX,e.clientY);
   if(dragMode==='pinch'&&ptrs.size>=2){ const a=[...ptrs.values()]; const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
     if(distSt>0) Cam.dist=clamp(pinch0*(distSt/d),Cam.minD,Cam.maxD); return; }
-  if(!dStart) return; const dx=e.clientX-dStart.x, dy=e.clientY-dStart.y;
+  if(!dStart){ if(typeof updateHover==="function") updateHover(e.clientX,e.clientY); return; }
+  const dx=e.clientX-dStart.x, dy=e.clientY-dStart.y;
   if(Math.abs(dx)+Math.abs(dy)>5) dStart.moved=true;
   if(placeKind && BLD[placeKind] && BLD[placeKind].kind==='path'){ const p=groundPoint(e.clientX,e.clientY); if(p){ if(addPath(p.x,p.z)) renderLedger(); } return; }
   if(dragMode==='orbit'){ Cam.az=dStart.az - dx*0.005; Cam.el=clamp(dStart.el + dy*0.005,0.5,1.4); }
@@ -848,6 +854,39 @@ function pickAt(sx,sy){
     const n=nodes.find(x=>x.mesh===r); if(n){ selectNode(n); return; } }
   clearInspect();
 }
+// ===== HOVER + SELECTION feedback: anything on screen tells you what it is =====
+let hovered=null;
+function objLabel(kind,o){
+  if(kind==='husk') return `<b>${o.name}</b> · ${cap1(o.caste)} husk · ${o.assigned?('working '+o.assigned.def.name):'idle'}`;
+  if(kind==='bld'){ const d=o.def; const what=d.kind==='gather'?('gathers '+RES[d.res].name):d.recipe?('makes '+RES[Object.keys(d.recipe.out)[0]].name):(d.desc.split('.')[0]); return `<b>${d.name}</b> · ${what} · tap to inspect`; }
+  if(kind==='node') return `<b>${o.def.name}</b> · ${o.def.gives.map(r=>RES[r].name).join(', ')} · ${Math.ceil(o.amount)} left · tap for details`;
+  return '';
+}
+function hoverPick(sx,sy){ ndc.x=(sx/innerWidth)*2-1; ndc.y=-(sy/innerHeight)*2+1; ray.setFromCamera(ndc,camera);
+  const vh=ray.intersectObjects(villagers.filter(v=>!v.dead).map(v=>v.obj),true);
+  if(vh.length){ let r=vh[0].object; while(r.parent&&!villagers.find(v=>v.obj===r))r=r.parent; const v=villagers.find(x=>x.obj===r); if(v)return{kind:'husk',o:v}; }
+  const bh=ray.intersectObjects(buildings.map(b=>b.mesh),true);
+  if(bh.length){ let r=bh[0].object; while(r.parent&&!buildings.find(b=>b.mesh===r))r=r.parent; const b=buildings.find(x=>x.mesh===r); if(b)return{kind:'bld',o:b}; }
+  const nh=ray.intersectObjects(nodes.map(n=>n.mesh),true);
+  if(nh.length){ let r=nh[0].object; while(r.parent&&!nodes.find(n=>n.mesh===r))r=r.parent; const n=nodes.find(x=>x.mesh===r); if(n)return{kind:'node',o:n}; }
+  return null;
+}
+function updateHover(sx,sy){ const t=document.getElementById('tip'); if(!t)return;
+  if(placeKind||dragMode){ t.style.display='none'; hovered=null; canvas.style.cursor=''; return; }
+  const h=hoverPick(sx,sy);
+  if(h){ hovered=h; t.innerHTML=objLabel(h.kind,h.o); t.style.display='block'; t.style.left=Math.min(sx+15,innerWidth-262)+'px'; t.style.top=(sy+18)+'px'; canvas.style.cursor='pointer'; }
+  else { hovered=null; t.style.display='none'; canvas.style.cursor=''; }
+}
+let selRing=null,hovRing=null;
+function ensureRings(){ if(selRing)return;
+  const mk=(col)=>{ const m=new THREE.Mesh(new THREE.TorusGeometry(1.0,0.07,6,22),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,depthWrite:false})); m.rotation.x=Math.PI/2; m.visible=false; m.renderOrder=6; scene.add(m); return m; };
+  selRing=mk(0xe8a23a); hovRing=mk(0xb8b09a); }
+function ringUnder(ring,obj,R,t,op){ if(!obj){ring.visible=false;return;} const p=obj.position; ring.position.set(p.x,terrainHeight(p.x,p.z)+0.16,p.z); const s=R*(1+Math.sin(t*4)*0.04); ring.scale.set(s,s,1); ring.material.opacity=op; ring.visible=true; }
+function updateRings(t){ ensureRings();
+  let selObj=null,selR=1.5; if(selected&&!selected.dead){selObj=selected.obj;selR=1.0;} else if(selBld){selObj=selBld.mesh;selR=Math.max(1.5,(selBld.def.foot||1.4)*1.1);} else if(selNode){selObj=selNode.mesh;selR=2.6;}
+  if(selObj)ringUnder(selRing,selObj,selR,t,0.65); else selRing.visible=false;
+  let hovObj=null,hovR=1.4; if(hovered){ if(hovered.kind==='husk'){hovObj=hovered.o.obj;hovR=1.0;} else if(hovered.kind==='bld'){hovObj=hovered.o.mesh;hovR=Math.max(1.5,(hovered.o.def.foot||1.4)*1.1);} else {hovObj=hovered.o.mesh;hovR=2.6;} }
+  if(hovObj&&hovObj!==selObj)ringUnder(hovRing,hovObj,hovR,t,0.3); else hovRing.visible=false; }
 
 /* =====================================================================
    === UI (early): ledger, villager inspector, rail ===
