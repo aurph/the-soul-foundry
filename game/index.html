@@ -613,16 +613,21 @@ function loop(now){
 }
 
 // ---- FOG OF WAR: the shroud of the unrendered dark. Your buildings (the engine's reach) push it back. ----
-const SHROUD=[]; const FOG_TILE=20, FOG_REVEAL_BLD=27, FOG_REVEAL_HOME=42; let shroudGroup=null, _shroudGeo=null;
+const SHROUD=[]; const FOG_TILE=18, FOG_REVEAL_BLD=30, FOG_REVEAL_HOME=60, FOG_OP=0.6; let shroudGroup=null, _shroudGeo=null;
 function buildShroud(){
   if(shroudGroup) scene.remove(shroudGroup); SHROUD.length=0;
   shroudGroup=new THREE.Group(); scene.add(shroudGroup);
-  if(!_shroudGeo) _shroudGeo=new THREE.BoxGeometry(FOG_TILE*1.04,17,FOG_TILE*1.04);
+  // low, wide, overlapping slabs (not tall cubes) — jittered into ragged banks of murk. Visual-only Math.random.
+  if(!_shroudGeo) _shroudGeo=new THREE.BoxGeometry(FOG_TILE*1.5,6,FOG_TILE*1.5);
   for(let x=-HALF+FOG_TILE/2; x<HALF; x+=FOG_TILE) for(let z=-HALF+FOG_TILE/2; z<HALF; z+=FOG_TILE){
-    const mat=new THREE.MeshBasicMaterial({color:HORIZON,transparent:true,opacity:0.92,depthWrite:false,fog:true});
-    const m=new THREE.Mesh(_shroudGeo,mat); m.position.set(x,6,z); m.renderOrder=4;
+    const op=FOG_OP*(0.86+Math.random()*0.28);
+    const mat=new THREE.MeshBasicMaterial({color:0x15171c,transparent:true,opacity:op,depthWrite:false,fog:true});
+    const m=new THREE.Mesh(_shroudGeo,mat);
+    const jx=x+(Math.random()-0.5)*FOG_TILE*0.4, jz=z+(Math.random()-0.5)*FOG_TILE*0.4;
+    m.position.set(jx,1.6+Math.random()*1.6,jz); m.rotation.y=Math.random()*Math.PI;
+    m.scale.set(0.9+Math.random()*0.5,0.8+Math.random()*0.7,0.9+Math.random()*0.5); m.renderOrder=4;
     const home=Math.hypot(x,z)<FOG_REVEAL_HOME; if(home)m.visible=false;
-    shroudGroup.add(m); SHROUD.push({m,x,z,revealed:home,op:home?0:0.92});
+    shroudGroup.add(m); SHROUD.push({m,x:jx,z:jz,revealed:home,op:home?0:op,base:op});
   }
 }
 function updateShroud(){ if(!SHROUD.length) return;
