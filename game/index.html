@@ -659,24 +659,25 @@ function makeProcVillager(caste){
     for(let i=0;i<3;i++){ const a=rr(0,6.28); const rt=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.1,rr(0.22,0.38),5),bark); rt.position.set(Math.cos(a)*0.44,0.07,Math.sin(a)*0.44); rt.rotation.set(rr(0.9,1.3),a,0); g.add(rt); }
     g.userData.arms=[aL,aR]; g.userData.carryTop=true; g.scale.setScalar(1.0);
   } else if(caste==="reaper"){
-    // a little grim reaper — a bony SKULL + exposed ribcage, a tattered cape behind, a skeletal arm on a crooked staff
-    const cape=new THREE.Mesh(new THREE.ConeGeometry(0.4,1.05,8),cloth); cape.position.set(0,0.58,-0.13); cape.rotation.x=-0.13; g.add(cape);   // drapes the back, doesn't enclose
-    const spine=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.66,6),pale); spine.position.set(0,0.78,0.06); g.add(spine);
-    for(let i=0;i<4;i++){ const w=0.27-i*0.045; const rib=new THREE.Mesh(new THREE.BoxGeometry(w,0.03,0.03),pale); rib.position.set(0,0.99-i*0.12,0.12); g.add(rib); }   // ribcage
-    const pelvis=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.1,0.1),pale); pelvis.position.set(0,0.46,0.06); g.add(pelvis);
-    const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(0.17,0),pale); skull.position.set(0,1.28,0.08); g.add(skull);
-    const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.17,0.08,0.15),pale); jaw.position.set(0,1.16,0.1); g.add(jaw);
-    const soL=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.08,0.06),dk); soL.position.set(-0.06,1.31,0.21); g.add(soL);
-    const soR=soL.clone(); soR.position.x=0.06; g.add(soR);
-    eye(-0.06,1.31,0.24); eye(0.06,1.31,0.24);
-    const nose=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.05,0.04),dk); nose.position.set(0,1.24,0.23); g.add(nose);
-    const staff=new THREE.Mesh(new THREE.CylinderGeometry(0.024,0.034,1.5,6),bark); staff.position.set(0.32,0.74,0.14); staff.rotation.z=0.1; g.add(staff);
-    const upper=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.36,5),pale); upper.position.set(0.17,0.96,0.12); upper.rotation.z=-0.8; g.add(upper);
-    const fore=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.34,5),pale); fore.position.set(0.3,0.87,0.13); fore.rotation.z=-0.2; g.add(fore);
-    const hand=new THREE.Mesh(new THREE.IcosahedronGeometry(0.05,0),pale); hand.position.set(0.33,0.99,0.14); g.add(hand);
-    const lL=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.024,0.38,5),pale); lL.position.set(-0.08,0.19,0.02); g.add(lL);
+    // a little grim reaper: a hooded SHROUD draped OVER the body, skull peeking from the hood, bony hands on a scythe-staff
+    const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(0.16,0),pale); skull.position.set(0,1.14,0.04); g.add(skull);
+    const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.07,0.13),pale); jaw.position.set(0,1.04,0.06); g.add(jaw);
+    eye(-0.055,1.16,0.17); eye(0.055,1.16,0.17);
+    const nose=new THREE.Mesh(new THREE.BoxGeometry(0.025,0.045,0.035),dk); nose.position.set(0,1.1,0.18); g.add(nose);
+    // the shroud: a robe that drapes over the shoulders down to the ground (body-centered, covers the skeleton)
+    const robe=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.46,1.18,9),cloth); robe.position.y=0.59; g.add(robe);
+    const shoulders=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.18,0.26,9),cloth); shoulders.position.y=1.0; g.add(shoulders);
+    // hood OVER the skull, opening at the face
+    const hood=new THREE.Mesh(new THREE.ConeGeometry(0.26,0.46,9),cloth); hood.position.set(0,1.2,-0.02); g.add(hood);
+    const hoodBack=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.34,0.16),cloth); hoodBack.position.set(0,1.16,-0.12); g.add(hoodBack);
+    // a scythe-staff with bony hands gripping it
+    const staff=new THREE.Mesh(new THREE.CylinderGeometry(0.026,0.036,1.55,6),bark); staff.position.set(0.34,0.76,0.12); staff.rotation.z=0.12; g.add(staff);
+    const blade=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.34,0.1),pale); blade.position.set(0.45,1.46,0.12); blade.rotation.z=-0.9; g.add(blade);
+    const hand1=new THREE.Mesh(new THREE.IcosahedronGeometry(0.055,0),pale); hand1.position.set(0.31,0.98,0.13); g.add(hand1);
+    const hand2=new THREE.Mesh(new THREE.IcosahedronGeometry(0.05,0),pale); hand2.position.set(0.36,0.66,0.12); g.add(hand2);
+    const lL=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.024,0.26,5),pale); lL.position.set(-0.08,0.13,0.02); g.add(lL);
     const lR=lL.clone(); lR.position.x=0.08; g.add(lR);
-    g.userData.legs=[lL,lR]; g.scale.setScalar(0.95);
+    g.userData.legs=[lL,lR]; g.userData.robe=robe; g.scale.setScalar(0.98);
   } else {
     // worker: a small hunched husk, too-big droopy head, dim sad eyes (cute-pathetic) with a hint of exposed bone
     const body=new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.3,0.8,8),bark); body.position.y=0.76; body.rotation.x=0.24; g.add(body);  // hunched forward
@@ -1425,6 +1426,9 @@ function makeNode(type){
   return {type,def,mesh:g,amount:amt,max:amt};
 }
 function placeNode(type,x,z){ const n=makeNode(type); n.x=x; n.z=z; n.mesh.position.set(x,terrainHeight(x,z),z); n.mesh.rotation.y=rr(0,6); scene.add(n.mesh); nodes.push(n); return n; }
+// deposits are ~2.5u wide; keep them a clear distance apart so they never clip into each other
+function nodeClear(x,z,min){ min=min||6.5; for(const n of nodes){ if(Math.hypot(n.x-x,n.z-z)<min) return false; } return true; }
+function tryPlaceNode(type,x,z,min){ if(!nodeClear(x,z,min)) return null; return placeNode(type,x,z); }
 
 function makeShard(){ const g=new THREE.Group(); for(let i=0;i<2+rint(3);i++){ const s=new THREE.Mesh(new THREE.ConeGeometry(rr(0.2,0.5),rr(0.9,2.2),4),MAT(0xc8c2b4));
   s.position.set(rr(-0.6,0.6),rr(0.3,0.8),rr(-0.6,0.6)); s.rotation.set(rr(-0.4,0.4),rr(0,6),rr(-0.4,0.4)); g.add(s);} return g; }
@@ -1455,7 +1459,7 @@ function scatterWorld(){
     const inReg=(spread)=>{ const a=rg()*6.28, d=rg()*g.rad*(spread||0.92);
       return [clamp(g.x+Math.cos(a)*d,-HALF+3,HALF-3), clamp(g.z+Math.sin(a)*d,-HALF+3,HALF-3)]; };
     const nNodes=2+(rg()*2|0);
-    const addNodes=(type,n)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(0.7); if(terrainHeight(x,z)<-3.2)continue; placeNode(type,x,z); } };
+    const addNodes=(type,n)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(0.7); if(terrainHeight(x,z)<-3.2)continue; tryPlaceNode(type,x,z,7); } };
     const addProps=(maker,n,rot)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(1.0); if(terrainHeight(x,z)<-3.2||Math.hypot(x,z)<13)continue; dropProp(maker(),x,z,rot); } };  // keep region decoration out of the spawn pad
     if(g.type==='forest'){ addNodes('grave',nNodes+1); addProps(()=>makeDeadTree2(rr(0.7,1.5)),20,true); addProps(()=>makeBonePile(),3); }
     else if(g.type==='silica'){ addNodes('waste',3); addProps(()=>makeShard(),16,true); addProps(()=>makeRock(),5); }
@@ -1466,12 +1470,11 @@ function scatterWorld(){
   }
   // SPAWN GRAVEYARD — a dense ring of harvestable deposits (real models) right around the
   // settlement, close and reachable, so the dead are at hand from the first minute
-  for(let k=0;k<22;k++){ const a=rr(0,6.28), rad=rr(13,31); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    if(terrainHeight(x,z)<-2.8) continue; placeNode(k%5===4?'waste':'grave', x, z); }
-  // MATERIAL FIELD — clickable, harvestable deposits scattered across the whole dry valley:
-  // the world is filled with resources you can actually work, not decoration you can't
-  for(let k=0;k<60;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
-    if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<13||regionAt(x,z)) continue; placeNode(rnd()<0.68?'grave':'waste', x, z); }
+  for(let k=0;k<13;k++){ const a=rr(0,6.28), rad=rr(13,31); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode(k%5===4?'waste':'grave', x, z, 7); }
+  // MATERIAL FIELD — clickable, harvestable deposits spread across the dry valley, well spaced (no clumping/clipping)
+  for(let k=0;k<34;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
+    if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<13||regionAt(x,z)) continue; tryPlaceNode(rnd()<0.6?'grave':'waste', x, z, 8); }
   // dense trees, rocks and bone heaps hugging the spawn so the start never reads barren
   for(let k=0;k<35;k++){ const a=rr(0,6.28), rad=rr(7,32); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0||Math.hypot(x,z)<13) continue; const r=rnd();
@@ -1633,23 +1636,30 @@ function pileGeo(res){ switch(res){
   default:        return {g:new THREE.IcosahedronGeometry(0.4,0), h:0.8};       // reliquary cores
 }}
 function makeStockpile(def){
+  // the Reliquary Yard: a server-reliquary — dark metal racks + a glowing teal core, lashed to bone uprights.
   const g=new THREE.Group();
-  const timber=MAT(0x2b251c), plank=MAT(0x37322b);
+  const metal=MAT(0x23262c,{metalness:0.55,roughness:0.5}), dark=MAT(0x15171b,{metalness:0.4,roughness:0.6});
+  const bone=MAT(0xb3a98f); const teal=emis(0x4fb0c0);
   const W=3.8, D=2.2;
-  const plat=new THREE.Mesh(new THREE.BoxGeometry(W,0.18,D),plank); plat.position.y=0.1; g.add(plat);
-  for(const sx of [-1,1]) for(const sz of [-1,1]){ const post=new THREE.Mesh(new THREE.BoxGeometry(0.16,1.6,0.16),timber);
-    post.position.set(sx*(W/2-0.16),0.9,sz*(D/2-0.16)); g.add(post); }
-  const beam=new THREE.Mesh(new THREE.BoxGeometry(W,0.14,0.14),timber); beam.position.set(0,1.62,-(D/2-0.16)); g.add(beam);
-  const beam2=beam.clone(); beam2.position.z=(D/2-0.16); g.add(beam2);
-  const tarp=new THREE.Mesh(new THREE.BoxGeometry(W*0.95,0.05,D*0.52),MAT(0x221f19)); tarp.position.set(0,1.56,-(D*0.2)); tarp.rotation.x=-0.13; g.add(tarp);
-  const sig=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.52,0.05),markerMat()); sig.position.set(-(W/2-0.16),1.05,(D/2-0.16)); g.add(sig);
-  const bar=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.05,0.05),markerMat()); bar.position.set(-(W/2-0.16),1.16,(D/2-0.16)); g.add(bar);
-  const piles=[]; const cols=4, cellX=W/cols, cellZ=D/2, top=0.2;
-  PILE_RES.forEach((res,i)=>{ const cx=-(W/2)+cellX*((i%cols)+0.5), cz=-(D/2)+cellZ*(((i/cols)|0)+0.5);
-    const bin=new THREE.Mesh(new THREE.BoxGeometry(cellX*0.82,0.12,cellZ*0.8),MAT(0x1e1b15)); bin.position.set(cx,top,cz); g.add(bin);
+  const plat=new THREE.Mesh(new THREE.BoxGeometry(W,0.2,D),dark); plat.position.y=0.1; g.add(plat);
+  const trim=new THREE.Mesh(new THREE.BoxGeometry(W+0.06,0.04,D+0.06),teal); trim.material.emissiveIntensity=0.5; trim.position.y=0.05; g.add(trim);  // glowing base seam
+  // bone corner uprights, each capped with a tiny skull
+  for(const sx of [-1,1]) for(const sz of [-1,1]){ const post=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,1.55,6),bone);
+    post.position.set(sx*(W/2-0.14),0.88,sz*(D/2-0.14)); g.add(post);
+    const sk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.12,0),bone); sk.position.set(sx*(W/2-0.14),1.7,sz*(D/2-0.14)); g.add(sk); }
+  // a server-blade rack across the back, with glowing teal slot-lines
+  const rack=new THREE.Mesh(new THREE.BoxGeometry(W*0.92,1.2,0.34),metal); rack.position.set(0,0.94,-(D/2-0.28)); g.add(rack);
+  for(let i=0;i<6;i++){ const blade=new THREE.Mesh(new THREE.BoxGeometry(W*0.86,0.045,0.02),teal); blade.material.emissiveIntensity=0.6; blade.position.set(0,0.5+i*0.16,-(D/2-0.45)); g.add(blade); }
+  // a central reliquary core: a glowing teal pillar in a bone cage
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.8,6),teal); core.material.emissiveIntensity=0.85; core.position.set(0,1.0,-(D/2-0.3)); g.add(core);
+  g.userData.coreGlow=core;
+  const piles=[]; const cols=4, cellX=W/cols, cellZ=D/2, top=0.22;
+  PILE_RES.forEach((res,i)=>{ const cx=-(W/2)+cellX*((i%cols)+0.5), cz=-(D/2)+cellZ*(((i/cols)|0)+0.5)+0.18;
+    const bin=new THREE.Mesh(new THREE.BoxGeometry(cellX*0.82,0.13,cellZ*0.74),dark); bin.position.set(cx,top,cz); g.add(bin);
+    const rim=new THREE.Mesh(new THREE.BoxGeometry(cellX*0.84,0.02,cellZ*0.76),teal); rim.material.emissiveIntensity=0.35; rim.position.set(cx,top+0.07,cz); g.add(rim);
     const pg=pileGeo(res); try{ pg.g.translate(0,pg.h/2,0); }catch(e){}   // anchor at base so it grows upward
-    const opt=(res==="water")?{metalness:0.3,roughness:0.35}:null;
-    const pile=new THREE.Mesh(pg.g, MAT(RES[res].col,opt)); pile.position.set(cx,top+0.06,cz); pile.scale.y=0.02; pile.visible=false;
+    const opt=(res==="ichor")?{metalness:0.3,roughness:0.35}:null;
+    const pile=new THREE.Mesh(pg.g, MAT(RES[res].col,opt)); pile.position.set(cx,top+0.08,cz); pile.scale.y=0.02; pile.visible=false;
     g.add(pile); piles.push({res,node:pile}); });
   g.userData.piles=piles; g.userData.isStockpile=true;
   return g;
@@ -1706,14 +1716,16 @@ function groundBuilding(b){
   scatterAround(b,fr);
 }
 function scatterAround(b,fr){
-  const def=b.def; const R=fr+0.7, n=2+rint(3);
-  for(let i=0;i<n;i++){ const a=rr(0,6.28), d=R+rr(0,1.1), x=b.x+Math.cos(a)*d, z=b.z+Math.sin(a)*d; if(terrainHeight(x,z)<-3.2) continue;
+  // a FEW small bits of debris hugging a new building — kept small (never bigger than the building) and sparse
+  const def=b.def; const R=fr+1.0, n=rint(3);               // 0-2 props, often none
+  for(let i=0;i<n;i++){ const a=rr(0,6.28), d=R+rr(0.2,1.0), x=b.x+Math.cos(a)*d, z=b.z+Math.sin(a)*d; if(terrainHeight(x,z)<-3.2) continue;
     const r=rnd(); let o;
-    if(def.kind==="gather") o=(r<0.5)?makeBonePile():makeShard();
-    else if(def.kind==="refine"||def.kind==="datacenter") o=(r<0.45)?makeWreck():(r<0.75?makeServerTower():makeBonePile());
-    else o=(r<0.5)?makeBonePile():makeRock();
+    if(def.kind==="gather") o=(r<0.6)?makeBonePile():makeShard();
+    else if(def.kind==="refine"||def.kind==="datacenter") o=(r<0.6)?makeBonePile():makeServerTower();
+    else o=makeBonePile();
+    o.scale.multiplyScalar(rr(0.35,0.6));                   // small — debris, not boulders
     dropProp(o,x,z,true); }
-  if(rnd()<0.7){ const a=rr(0,6.28), d=R+0.3; dropProp(rnd()<0.6?makeGraveCross():makeBoneRing(), b.x+Math.cos(a)*d, b.z+Math.sin(a)*d, false); }
+  if(rnd()<0.4){ const a=rr(0,6.28), d=R+0.3; const cr=makeGraveCross(); cr.scale.multiplyScalar(0.7); dropProp(cr, b.x+Math.cos(a)*d, b.z+Math.sin(a)*d, false); }
 }
 function buildingFits(x,z,foot){
   if(Math.hypot(x,z)>HALF-foot) return false;
