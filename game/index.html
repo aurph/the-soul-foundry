@@ -196,6 +196,14 @@
   #tip{position:fixed;z-index:48;max-width:252px;padding:5px 9px;border-radius:5px;font-size:12px;line-height:1.35;
     color:var(--ink-bright);background:#0d0e12f2;border:1px solid var(--line);box-shadow:0 4px 16px #000b;pointer-events:none;display:none}
   #tip b{color:var(--ember-soft);font-weight:normal}
+  /* tutorial green spotlight */
+  #spot{position:fixed;z-index:44;border:2px solid #80df68;border-radius:8px;pointer-events:none;display:none;
+    animation:spotpulse 1.3s ease-in-out infinite}
+  @keyframes spotpulse{0%,100%{box-shadow:0 0 0 3px #80df6840,0 0 16px 4px #80df6844,inset 0 0 12px #80df6822}
+    50%{box-shadow:0 0 0 4px #80df6866,0 0 28px 8px #80df6877,inset 0 0 16px #80df6844}}
+  #wspot{position:fixed;z-index:44;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid #80df68;border-radius:50%;
+    box-shadow:0 0 14px 4px #80df6866;pointer-events:none;display:none;animation:spotpulse 1.3s ease-in-out infinite}
+  #wspot::after{content:'';position:absolute;inset:6px;border-radius:50%;background:#80df6833}
 </style>
 </head>
 <body>
@@ -212,6 +220,7 @@
 <div id="toasts"></div>
 <div id="hint"></div>
 <div id="tip"></div>
+<div id="spot"></div><div id="wspot"></div>
 <div id="pausebar" onclick="beginPlay()"><img src="assets/ui/glyph/pause.png" style="width:15px;height:15px;vertical-align:-3px;opacity:.8;margin-right:5px">Paused &middot; press <span class="k">Space</span> or click here to begin</div>
 <div id="dev"></div>
 <div id="dock">
@@ -587,6 +596,7 @@ function loop(now){
     while(_acc>=STEP){ if(typeof simStep==="function") simStep(STEP); _acc-=STEP; } }
   tickRender(real);
   if(typeof updateRings==="function") updateRings(now/1000);
+  if(typeof positionSpotlight==="function") positionSpotlight();
   updateCamera();
   renderer.render(scene,camera);
 }
@@ -1001,10 +1011,10 @@ function buildRail(){
 function buildDock(){
   const tabs=$('docktabs'); tabs.innerHTML='';
   const TAB_GLY={dwell:'dwelling',gather:'gathering',refine:'refining',civic:'civic'};
-  for(const [k,label] of TABS){ const d=document.createElement('div'); d.className='tab'+(curTab===k?' on':''); d.innerHTML=`<img class="tic" src="assets/ui/glyph/${TAB_GLY[k]||'dwelling'}.png">`+label; d.onclick=()=>{curTab=k;buildDock();}; tabs.appendChild(d); }
+  for(const [k,label] of TABS){ const d=document.createElement('div'); d.className='tab'+(curTab===k?' on':''); d.dataset.tab=k; d.innerHTML=`<img class="tic" src="assets/ui/glyph/${TAB_GLY[k]||'dwelling'}.png">`+label; d.onclick=()=>{curTab=k;buildDock();}; tabs.appendChild(d); }
   const row=$('dockrow'); row.innerHTML='';
   for(const k of BLD_ORDER){ const def=BLD[k]; if(bldTab(k)!==curTab) continue;
-    const card=document.createElement('div'); card.className='card'+(placeKind===k?' sel':'')+(canAfford(def.cost)?'':' locked');
+    const card=document.createElement('div'); card.className='card'+(placeKind===k?' sel':'')+(canAfford(def.cost)?'':' locked'); card.dataset.bld=k;
     const costStr=Object.keys(def.cost).length? Object.entries(def.cost).map(([r,n])=>n+" "+RES[r].name.split(' ')[0]).join(', ') : 'free';
     const thumb=BLD_IMG[k]?`background:#0c0d11 center/cover no-repeat url('${BLD_IMG[k]}')`
       :`background:#${def.kind==='refine'||def.kind==='datacenter'?'2a2d33':def.kind==='gather'?'2b2519':'33312c'}`;
@@ -1135,31 +1145,32 @@ function newValley(){ try{ localStorage.removeItem('sf_save'); }catch(e){} locat
 function hasB(k){ return buildings.some(b=>b.kind===k); }
 function staffed(k){ return buildings.some(b=>b.kind===k && b.workers.length>0); }
 // a full, ordered tutorial that walks the player all the way to their first Compute
+function bldTarget(k){ return ()=> document.querySelector('[data-bld="'+k+'"]') ? '[data-bld="'+k+'"]' : '[data-tab="'+bldTab(k)+'"]'; }
 const TUT=[
   {t:"The dead are your raw matter. Open the GATHERING tab below.",
-   why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre): 1 corpse + 2 Compute — they never breed on their own.", d:()=>curTab==="gather"},
-  {t:"Raise a Grave-Exhumer on a cemetery (the headstones near the settlement) and staff it — tap it, press + assign.",
-   why:"The Exhumer digs up corpses and hauls them to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer")},
+   why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre): 1 corpse + 2 Compute — they never breed on their own.", d:()=>curTab==="gather", sel:()=>'[data-tab="gather"]'},
+  {t:"Raise a Grave-Exhumer on a cemetery (the headstones the glow marks) and staff it — tap it, press + assign.",
+   why:"The Exhumer digs up corpses and hauls them to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.x,z:n.z}:null;}},
   {t:"Raise a Crematory and staff it.",
-   why:"It renders corpses into bone-silica, soul-ash and ichor — and rendering the dead is what holds the backlog (Dread) down. Soul-ash also patches your husks.", d:()=>staffed("crematory")},
+   why:"It renders corpses into bone-silica, soul-ash and ichor — and rendering the dead is what holds the backlog (Dread) down. Soul-ash also patches your husks.", d:()=>staffed("crematory"), sel:bldTarget('crematory')},
   {t:"Open the REFINING tab and raise a Soul Furnace, then staff it.",
-   why:"Bone-silica + soul-ash → a silicon ingot.", d:()=>staffed("furnace")},
+   why:"Bone-silica + soul-ash → a silicon ingot.", d:()=>staffed("furnace"), sel:bldTarget('furnace')},
   {t:"Raise a Wafer Mill and staff it.",
-   why:"The ingot is sliced into wafers.", d:()=>staffed("mill")},
+   why:"The ingot is sliced into wafers.", d:()=>staffed("mill"), sel:bldTarget('mill')},
   {t:"Raise an Etch-Litho and staff it.",
-   why:"Wafers are etched into dies — the circuits.", d:()=>staffed("litho")},
+   why:"Wafers are etched into dies — the circuits.", d:()=>staffed("litho"), sel:bldTarget('litho')},
   {t:"Raise an Assembly Ossuary and staff it.",
-   why:"Dies + soul-ash are packaged into reliquary cores — the chips.", d:()=>staffed("ossuary")},
+   why:"Dies + soul-ash are packaged into reliquary cores — the chips.", d:()=>staffed("ossuary"), sel:bldTarget('ossuary')},
   {t:"Raise a Substation and staff it — the datacenters need Power.",
-   why:"Soul-ash burns into Power. No power, no Compute.", d:()=>staffed("substation")},
+   why:"Soul-ash burns into Power. No power, no Compute.", d:()=>staffed("substation"), sel:bldTarget('substation')},
   {t:"Raise a Spectral Datacenter and staff it.",
-   why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>staffed("datacenter")},
+   why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>staffed("datacenter"), sel:bldTarget('datacenter')},
   {t:"Now wait — your first Compute appears in the ledger up top.",
-   why:"Short on a material? Add gatherers or another refiner. Short on husks? Bind more at the Pyre.", d:()=>(G.stock.compute||0)>0},
+   why:"Short on a material? Add gatherers or another refiner. Short on husks? Bind more at the Pyre.", d:()=>(G.stock.compute||0)>0, sel:()=>'#ledger'},
   {t:"The foundry breathes. Pay each tithe of Compute once the grace ends, and keep rendering the dead. You're on your own now.",
-   why:"", d:()=>G.quota.level>1},
+   why:"", d:()=>G.quota.level>1, sel:()=>'#quota'},
 ];
-let tutIdx=0, tutDone=false;
+let tutIdx=0, tutDone=false, _tutShown=-1;
 function loadTut(){ try{ tutDone=localStorage.getItem('sf_tut')==='done'; }catch(e){} }
 function skipTut(){ tutDone=true; try{localStorage.setItem('sf_tut','done');}catch(e){} const g=$('goals'); if(g)g.style.display='none'; }
 function updateTutorial(){ const g=$('goals'); if(!g) return;
@@ -1168,11 +1179,26 @@ function updateTutorial(){ const g=$('goals'); if(!g) return;
   if(tutIdx>=TUT.length){ skipTut(); if(typeof toast==="function")toast("Tutorial complete. The foundry stands on its own now.","good"); return; }
   const step=TUT[tutIdx];
   g.style.display='block';
-  g.innerHTML=`<div class="gh">Tutorial &middot; step ${tutIdx+1} of ${TUT.length}</div>
+  if(tutIdx!==_tutShown){ _tutShown=tutIdx;
+    g.innerHTML=`<div class="gh">Tutorial &middot; step ${tutIdx+1} of ${TUT.length}</div>
     <div class="gt">${step.t}</div>
     ${step.why?`<div class="gw">${step.why}</div>`:''}
     <div class="gbar"><i style="width:${Math.round(tutIdx/TUT.length*100)}%"></i></div>
-    <div class="gp"><span class="gskip" onclick="skipTut()">skip tutorial</span></div>`;
+    <div class="gp"><span class="gskip" onclick="skipTut()">skip tutorial</span></div>`; }
+}
+// green spotlight: highlight the UI element (or cemetery) the current tutorial step points at
+function positionSpotlight(){ const s=document.getElementById('spot'), w=document.getElementById('wspot'); if(!s||!w) return;
+  const step=(!tutDone && tutIdx<TUT.length)?TUT[tutIdx]:null;
+  if(!step){ s.style.display='none'; w.style.display='none'; return; }
+  let shown=false;
+  if(step.sel){ const q=step.sel(); const el=q&&document.querySelector(q);
+    if(el && el.getClientRects().length){ const r=el.getBoundingClientRect(); s.style.left=(r.left-5)+'px'; s.style.top=(r.top-5)+'px'; s.style.width=(r.width+10)+'px'; s.style.height=(r.height+10)+'px'; s.style.display='block'; shown=true; } }
+  if(!shown) s.style.display='none';
+  if(step.at){ const p=step.at();
+    if(p){ const v=new THREE.Vector3(p.x,terrainHeight(p.x,p.z)+1.4,p.z); v.project(camera);
+      if(v.z<1){ w.style.left=((v.x*0.5+0.5)*innerWidth)+'px'; w.style.top=((-v.y*0.5+0.5)*innerHeight)+'px'; w.style.display='block'; } else w.style.display='none'; }
+    else w.style.display='none'; }
+  else w.style.display='none';
 }
 
 /* research rites: spend Writ on permanent upgrades */
