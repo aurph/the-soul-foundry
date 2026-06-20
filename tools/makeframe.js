@@ -263,4 +263,10 @@ console.log('wrote', OUT_PREV);
 const SLICE = T;
 save(nineSlice(frame, SLICE, 30, 266, 392, [12, 13, 17, 255]), path.join(__dirname, '_panel-inspect.png'));
 save(nineSlice(frame, SLICE, 44, 600, 430, [12, 13, 17, 255]), path.join(__dirname, '_panel-modal.png'));
-console.log('wrote panel mocks (slice=' + SLICE + ', inspect 266 bw=30, modal 600 bw=44)');
+save(nineSlice(frame, SLICE, 24, 1000, 150, [12, 13, 17, 255]), path.join(__dirname, '_panel-dock.png'));
+console.log('wrote panel mocks (slice=' + SLICE + ', inspect bw=30, modal bw=44, dock bw=24)');
+
+// horizontal stick bar for thin rules (ledger underline) — graded+grimed strip on transparent
+const bar = resize(B, 1024, 84); grime(bar);
+const OUT_BAR = path.join(__dirname, '..', 'game', 'assets', 'ui', 'stick-bar.png');
+save(bar, OUT_BAR); console.log('wrote', OUT_BAR);

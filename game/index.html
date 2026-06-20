@@ -46,8 +46,9 @@
   #inspect .hd h3{font-size:18px;letter-spacing:1px}
   .twig,.modal{position:relative}
   #ledger{position:fixed}
-  #ledger::after{content:"";position:absolute;left:0;right:0;bottom:-13px;height:22px;
-    background:url('assets/ui/border-bar.png') repeat-x center/auto 150%;mix-blend-mode:screen;opacity:.6;pointer-events:none}
+  #ledger::after{content:"";position:absolute;left:0;right:0;bottom:-14px;height:20px;
+    background:url('assets/ui/stick-bar.png') no-repeat center/100% 100%;opacity:.92;pointer-events:none;
+    filter:drop-shadow(0 2px 3px #000a)}
   #boot .wordmark{width:min(470px,84vw);margin:4px 0;mix-blend-mode:screen;filter:drop-shadow(0 0 26px #d98a3a26)}
 
   /* top ledger */
@@ -169,13 +170,14 @@
      graded cold + grimy (built by tools/makeframe.js). border-image
      wraps the content panels in real wood instead of a faint corner.
      ============================================================ */
-  #inspect,#goals,.modal{
+  #inspect,#goals,.modal,#dock{
     border:var(--wood,30px) solid transparent;
     border-image:url('assets/ui/frame-branch.png') 160 stretch;
     border-radius:0; backdrop-filter:none;
   }
   #inspect,#goals{--wood:30px; background:#0a0b0ff5}
   .modal{--wood:44px; background:#0b0c10f8; box-shadow:0 18px 80px #000e}
+  #dock{--wood:26px; border-top:none}
   #inspect.frame::before,#goals.frame::before{display:none}
 </style>
 </head>
@@ -341,11 +343,18 @@ const fill=new THREE.DirectionalLight(0x4a4338,0.3); fill.position.set(80,40,-60
 let TERRAIN=null, HMAP=null, REGIONS=[], WORLD_SEED=1;
 const REGION_TYPES=['forest','silica','ash','ruins','graves','bog'];
 function genRegions(seed){
-  const r=mulberry32(seed*7+13); const regs=[]; const n=8+((r()*4)|0);
-  const forced=['forest','forest','silica','ash','graves','ruins','bog'];
-  for(let i=0;i<n;i++){ const ang=r()*6.28, dist=(i<5? 17+r()*16 : 36+r()*26);   // essentials hug the settlement; the rest sprawl out
+  const r=mulberry32(seed*7+13); const regs=[];
+  // dead-givers (forest/graves) land in the NEAR band; waste/ruin fields fill mid+far
+  const forced=['forest','silica','ash','graves','ruins','bog','forest','graves'];
+  const n=12+((r()*3)|0);                  // 12-14 fields — enough to fill the valley
+  const a0=r()*6.28;                        // random world rotation
+  for(let i=0;i<n;i++){
+    const ang=a0 + i*(6.283/n) + r()*0.45;  // EVEN angular slots -> no empty wedges in any direction
+    const band=i%3;                         // near / mid / far cycle -> every direction gets a near field too
+    const dist=(band===0? 15+r()*11 : band===1? 27+r()*13 : 41+r()*15);
     regs.push({type:i<forced.length?forced[i]:REGION_TYPES[(r()*REGION_TYPES.length)|0],
-      x:Math.cos(ang)*dist, z:Math.sin(ang)*dist, rad:10+r()*11, seed:(r()*1e6)|0}); }
+      x:Math.cos(ang)*dist, z:Math.sin(ang)*dist, rad:11+r()*9, seed:(r()*1e6)|0});
+  }
   REGIONS=regs; return regs;
 }
 function regionAt(x,z){ let best=null; for(const g of REGIONS){ const d=Math.hypot(x-g.x,z-g.z);
@@ -1339,10 +1348,14 @@ function scatterWorld(){
   for(let i=0;i<80;i++){ const a=rr(0,6.28), rad=rr(10,42); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0) continue; dropProp(rnd()<0.72?makeSigilCross():makeSigilRing(), x,z, false); }
   // dead server-towers carry the datacenter/machine motif across the desolation
-  for(let i=0;i<26;i++){ const a=rr(0,6.28), r=rr(13,HALF-5); const x=Math.cos(a)*r, z=Math.sin(a)*r;
+  for(let i=0;i<46;i++){ const a=rr(0,6.28), r=rr(16,HALF-6); const x=Math.cos(a)*r, z=Math.sin(a)*r;
     if(terrainHeight(x,z)<-3.2||regionAt(x,z)) continue; dropProp(makeServerTower(),x,z,true); }
-  // a denser desolate ring hugging the buildable shelf, so the settlement never sits on an empty grey plain
-  for(let i=0;i<150;i++){ const a=rr(0,6.28), rad=rr(11,38); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+  // landmark silhouettes seeded through the mid-band so the walk out is never an empty grey gap
+  for(let i=0;i<34;i++){ const a=rr(0,6.28), rad=rr(18,56); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-3.2||regionAt(x,z)) continue; const r=rnd();
+    dropProp(r<0.42?makeMonolith():r<0.74?makeWreck():makeServerTower(), x,z, r>=0.42&&r<0.74); }
+  // a denser desolate ring reaching from the buildable shelf out to the fields, so nothing sits on bare plain
+  for(let i=0;i<230;i++){ const a=rr(0,6.28), rad=rr(11,52); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0) continue; const r=rnd();
     dropProp(r<0.4?makeDeadTree2(rr(0.7,1.4)):r<0.62?makeBonePile():r<0.8?makeRock():r<0.92?makeAshMound():(rnd()<0.5?makeSigilCross():makeSigilRing()), x,z, r<0.4); }
   scatterGroundDetail();
