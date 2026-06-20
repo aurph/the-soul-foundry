@@ -196,6 +196,17 @@
   #tip{position:fixed;z-index:48;max-width:252px;padding:5px 9px;border-radius:5px;font-size:12px;line-height:1.35;
     color:var(--ink-bright);background:#0d0e12f2;border:1px solid var(--line);box-shadow:0 4px 16px #000b;pointer-events:none;display:none}
   #tip b{color:var(--ember-soft);font-weight:normal}
+  /* supply-chain blueprint */
+  .chain{display:flex;flex-direction:column;gap:0;margin:10px 0}
+  .cstep{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border:1px solid var(--line);border-radius:7px;background:#0e0f13;cursor:pointer}
+  .cstep:hover{border-color:var(--ember-soft);background:#13151a}
+  .cstep .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;margin-top:4px;box-shadow:0 0 7px currentColor}
+  .cstep .cgly{width:22px;height:22px;flex:0 0 auto;margin-top:1px;object-fit:contain}
+  .cstep .cn{font-family:'Grenze Gotisch','Iowan Old Style',serif;font-size:15px;color:var(--ink-bright)}
+  .cstep .cstat{font-size:10.5px;color:var(--ink-dim);margin-left:7px}
+  .cstep .cflow{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--ink-dim)}
+  .cstep .cflow img{width:18px;height:18px;vertical-align:middle}
+  .carrow{width:2px;height:13px;background:linear-gradient(var(--line),var(--ember-soft));margin-left:17px}
   /* tutorial green spotlight */
   #spot{position:fixed;z-index:44;border:2px solid #80df68;border-radius:8px;pointer-events:none;display:none;
     animation:spotpulse 1.3s ease-in-out infinite}
@@ -992,6 +1003,36 @@ function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.clas
   else if(pop>0 && assigned===0) msg="Your husks stand idle. Tap a building and press + assign to put them to work.";
   else if(G.quota.t<35 && (G.stock.compute||0)<G.quota.need && (G.time||0)>=(G.graceT==null?150:G.graceT)) msg="Quota due soon and Compute is short. Staff the Datacenter and the chain feeding it.";
   if(msg){ el.textContent=msg; el.classList.add('show'); } else el.classList.remove('show'); }
+// the supply-chain blueprint: the whole line from corpse to Compute, with live build/staff status
+const CHAIN_STEPS=[
+  {k:'exhumer', in:[], out:['dead'], gly:'gathering', extra:'or a Waste-Dredge on the wastes'},
+  {k:'crematory', in:['dead'], out:['bonesil','soulash','ichor'], gly:'refining'},
+  {k:'furnace', in:['bonesil','soulash'], out:['ingot'], gly:'refining'},
+  {k:'mill', in:['ingot'], out:['wafer'], gly:'refining'},
+  {k:'litho', in:['wafer'], out:['die'], gly:'refining'},
+  {k:'ossuary', in:['die','soulash'], out:['core'], gly:'refining'},
+  {k:'substation', in:['soulash'], out:['power'], gly:'refining'},
+  {k:'datacenter', in:['core','power','ichor'], out:['compute'], gly:'refining'},
+];
+function chainStatus(k){ const built=buildings.filter(b=>b.kind===k); return {built:built.length, staffed:built.filter(b=>b.workers&&b.workers.length>0).length}; }
+function selectFirstOfKind(k){ const b=buildings.find(x=>x.kind===k); if(b){ hideOverlay(); selectBuilding(b); } else if(typeof toast==="function"){ toast(BLD[k].name+" — not built yet. Raise it from the dock below."); } }
+function showSupplyChain(){ SND.resume();
+  const step=(s,i)=>{ const st=chainStatus(s.k), d=BLD[s.k];
+    const dot=st.staffed>0?'#6f9a55':st.built>0?'#c08a3a':'#9e3b2c';
+    const stat=st.staffed>0?(st.staffed+" staffed · running"):st.built>0?(st.built+" built · needs husks"):"not built yet";
+    const ins=s.in.length?s.in.map(r=>ricon(r,18)).join(''):'<span style="color:var(--ink-dim);font-size:11px">exhume the dead</span>';
+    const outs=s.out.map(r=>ricon(r,18)).join('');
+    return `${i>0?'<div class="carrow"></div>':''}<div class="cstep" onclick="selectFirstOfKind('${s.k}')">
+       <div class="dot" style="color:${dot};background:${dot}"></div>
+       <img class="cgly" src="assets/ui/glyph/${s.gly}.png">
+       <div style="flex:1"><div class="cn">${d.name}<span class="cstat">${stat}</span></div>
+       <div class="cflow">${ins} <span style="color:var(--ember-soft);font-size:14px">→</span> ${outs}${s.extra?` <span style="color:var(--ink-dim)">· ${s.extra}</span>`:''}</div></div></div>`; };
+  showOverlayHTML(`<h1 style="font-size:24px">THE LINE</h1><h2>supply-chain blueprint — corpse to Compute</h2>
+    <p style="color:var(--ink-dim);font-size:12px;margin:2px 0 8px">Build and staff these in order. Each dot reads <span style="color:#9e3b2c">red</span> (not built), <span style="color:#c08a3a">amber</span> (built, needs husks), or <span style="color:#6f9a55">green</span> (running). Tap a step to jump to it.</p>
+    <div class="chain">${CHAIN_STEPS.map(step).join('')}</div>
+    <div style="margin-top:10px;padding:9px 11px;border:1px dashed var(--line);border-radius:6px;font-size:11.5px;color:var(--ink-dim);line-height:1.6">
+      ${ricon('compute',15)} <b style="color:var(--ink-bright)">Compute</b> is the quota the engine demands each tithe. &nbsp;${ricon('dead',15)}+${ricon('compute',15)} also bind new husks at the Binding Pyre — bound, never born.</div>
+    <p style="margin-top:10px"><span class="btn" onclick="hideOverlay()">Close</span> <span class="btn" onclick="showEconomy()">Live rates &amp; deficits</span></p>`); }
 function showEconomy(){ SND.resume();
   const rate={}; RES_ORDER.forEach(r=>rate[r]=0); let gatherWorkers=0;
   for(const b of buildings){
@@ -1020,7 +1061,8 @@ function buildRail(){
   $('rail').appendChild(mk('pause',paused,()=>{paused=!paused;buildRail();},'Pause (Space)'));
   $('rail').appendChild(mk('play',!paused&&simSpeed===1,()=>{paused=false;simSpeed=1;buildRail();},'Normal speed (1)'));
   $('rail').appendChild(mk('fast',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'Fast (3)'));
-  $('rail').appendChild(mk('economy',false,()=>showEconomy(),'Economy — flows & the line'));
+  $('rail').appendChild(mk('blueprint',false,()=>showSupplyChain(),'The Line — supply-chain blueprint'));
+  $('rail').appendChild(mk('economy',false,()=>showEconomy(),'Economy — live rates & deficits'));
   $('rail').appendChild(mk('rites',false,()=>showRites(),'Rites — spend Bones on upgrades'));
   $('rail').appendChild(mk('info',false,()=>showHelp(),'How to play'));
   $('rail').appendChild(mk('codex',false,()=>showCodex(),'Codex — what everything is'));
