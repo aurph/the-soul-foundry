@@ -1411,6 +1411,8 @@ function simStep(dt){
       if(ud.flame){ ud.flame.scale.set(1+Math.sin(t/120)*0.08,1+Math.sin(t/80)*0.18,1+Math.cos(t/100)*0.08); ud.flame.rotation.y=Math.sin(t/200)*0.25; }
       if(ud.tongues){ ud.tongues[0].scale.y=1+Math.sin(t/70)*0.2; ud.tongues[2].scale.y=1+Math.sin(t/45)*0.35; } }
     if(ud.glow){ ud.glow.material.emissiveIntensity=(b.active?0.9:0.35)+Math.sin(performance.now()/200+b.x)*0.2; }
+    if(ud.spin){ const m=b.active?1:0.12; for(const s of ud.spin) s.m.rotation[s.ax]+=s.sp*dt*m; }   // moving parts on procedural buildings
+    if(ud.bob){ const t=performance.now()/1000; for(const o of ud.bob) o.m.position.y=o.y0+Math.sin(t*o.sp+o.ph)*o.amp*(b.active?1:0.2); }
     if(SMOKERS[b.kind]){ ensureSmoke(b); animateSmoke(b,dt); } }
   if(typeof updateShroud==="function") updateShroud();
   _ledgerT-=dt; if(_ledgerT<=0){ _ledgerT=0.35; renderLedger(); renderQuota(); renderAlert(); SND.setTension(G.dread/100); if(typeof updateTutorial==="function")updateTutorial(); if((selected&&!selected.dead)||selBld||selNode) refreshInspect(); }
@@ -1764,14 +1766,14 @@ const BLD_IMG={
 // Pyre + stockpile stay procedural (animated flame / dynamic material piles).
 const BLD_GLB={
   den:"assets/glb/den.glb", exhumer:"assets/glb/woodcutter.glb", dredge:"assets/glb/dredge.glb",
-  crematory:"assets/glb/ventcap.glb", furnace:"assets/glb/furnace.glb", mill:"assets/glb/mill.glb",
+  crematory:"assets/glb/ventcap.glb", furnace:"assets/glb/furnace.glb",
   litho:"assets/glb/salvage.glb", ossuary:"assets/glb/assembly.glb",
   datacenter:"assets/glb/datacenter2.glb", ward:"assets/glb/ward.glb", market:"assets/glb/market.glb",
 };
 const BLD_GLB_CDN={
   den:GCDN+"313cdc68-2ae3-4f96-838a-2a64fdba6915.glb", exhumer:GCDN+"df17a501-c35b-452d-b4ed-82da088c4791.glb",
   dredge:GCDN+"5c7db5d2-c50f-4fbb-bed0-7f0e3c2f03f0.glb", crematory:GCDN+"0c183f5f-9b88-4a68-9686-9901ece8f9d4.glb",
-  furnace:GCDN+"a115d2bf-ab62-4d8a-ac8b-2708b3546d94.glb", mill:GCDN+"63e2f9f1-03d2-46df-ac42-3bdfdf2676e3.glb",
+  furnace:GCDN+"a115d2bf-ab62-4d8a-ac8b-2708b3546d94.glb",
   litho:GCDN+"cbdc07eb-b691-4731-b322-26bb0fa0c10d.glb", ossuary:GCDN+"056aae17-a731-43e1-8c00-bcce9959b5e2.glb",
   datacenter:GCDN+"6261e375-4861-4928-ab93-53f7e65d8b00.glb",
   ward:GCDN+"1e022908-5cf5-4d9e-9d60-e9995b53799c.glb", market:GCDN+"dfcf36c9-eeee-4511-88b8-99f2e4b8aadc.glb",
@@ -1875,10 +1877,33 @@ function makeSubstation(def){
   g.userData.glow=grate;   // a mesh; the building tick pulses ud.glow.material.emissiveIntensity
   return g;
 }
+// the Wafer Mill: an editable, ANIMATED, compute-themed building — spinning wafer discs on a
+// spindle, server-rack ribs, glowing circuit traces. Proof of the procedural approach.
+function makeMill(def){
+  const g=new THREE.Group();
+  const iron=MAT(0x23262c,{metalness:0.5,roughness:0.5}), bone=MAT(0xb3a98f), ember=emis(0xe8973a), teal=emis(0x6fae9b);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.92,1.6),iron); base.position.y=0.46; g.add(base);
+  // server-rack ribs on the front (the compute element)
+  for(let i=0;i<5;i++){ const slat=new THREE.Mesh(new THREE.BoxGeometry(1.78,0.05,0.03),teal); slat.material.emissiveIntensity=0.5; slat.position.set(0,0.2+i*0.15,0.81); g.add(slat); }
+  // a glowing circuit trace etched across the top
+  const tr1=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.02,0.05),ember); tr1.material.emissiveIntensity=0.5; tr1.position.set(0,0.93,-0.3); g.add(tr1);
+  const tr2=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.02,0.6),ember); tr2.material.emissiveIntensity=0.5; tr2.position.set(0.5,0.93,0); g.add(tr2);
+  // bone corner posts
+  for(const sx of [-1,1])for(const sz of [-1,1]){ const p=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,1.0,6),bone); p.position.set(sx*0.92,0.5,sz*0.78); g.add(p); }
+  // a spindle with a spinning stack of wafer discs (slicing the ingot into wafers)
+  const spindle=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.5,6),bone); spindle.position.set(0,1.18,0.1); g.add(spindle);
+  const disc=new THREE.Mesh(new THREE.CylinderGeometry(0.56,0.56,0.05,18),MAT(0x6fae9b,{metalness:0.35,roughness:0.4})); disc.position.set(0,1.34,0.1); g.add(disc);
+  const disc2=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.05,18),MAT(0x8fc6b0,{metalness:0.35,roughness:0.4})); disc2.position.set(0,1.44,0.1); g.add(disc2);
+  // a fixed slicer arm reaching over the discs
+  const arm=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.07,0.07),iron); arm.position.set(0.28,1.4,0.1); g.add(arm);
+  g.userData.glow=tr1; g.userData.spin=[{m:disc,ax:'y',sp:2.4},{m:disc2,ax:'y',sp:-1.7}];
+  return g;
+}
 /* ---- procedural building meshes (fallback until/if the GLB loads) ---- */
 function makeBuildingMesh(kind,def){
   if(kind==="stockpile") return makeStockpile(def);
   if(kind==="substation") return makeSubstation(def);
+  if(kind==="mill") return makeMill(def);
   if(bldBank[kind]) return makeBuildingGLB(kind,def);
   const g=new THREE.Group(); const stone=MAT(0x35332e), timber=MAT(0x2b251c), iron=MAT(0x1c1f22,{metalness:0.3}), win=emis(0xe8973a);
   const f=def.foot;
