@@ -916,12 +916,26 @@ function showResInfo(r){ SND.resume(); const made=resMadeBy(r), used=resUsedBy(r
    <div class="optrow"><span>Made by</span><b>${made.length?made.join(', '):'— raw / extracted'}</b></div>
    <div class="optrow"><span>Used by</span><b>${used.length?used.join(', '):'— end product'}</b></div>
    <p style="margin-top:10px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
+function showStatInfo(k){ SND.resume(); const titles={husks:'Husks',dread:'Dread',writ:'Bones'};
+  showOverlayHTML(`<h1 style="font-size:22px">${titles[k]||k}</h1><p style="margin:8px 0 14px;line-height:1.6">${STAT_HELP[k]||''}</p><p><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
+function showCodex(){ SND.resume();
+  const resList=RES_ORDER.map(r=>`<div class="optrow resstat" style="cursor:pointer" onclick="showResInfo('${r}')"><span>${ricon(r,18)} <b style="font-weight:normal;color:var(--ink-bright)">${RES[r].name}</b></span><span style="color:var(--ink-dim);font-size:11px;max-width:230px;text-align:right">${(RES_HELP[r]||'').replace(/\s*—\s*/,' — ').slice(0,58)}</span></div>`).join('');
+  const bldList=BLD_ORDER.filter(k=>k!=='path').map(k=>{ const d=BLD[k];
+    const role=d.kind==='gather'?('gathers '+RES[d.res].name):d.recipe?(Object.entries(d.recipe.in).map(([r,n])=>n+'×'+RES[r].name.split(' ')[0]).join(' + ')+' → '+Object.entries(d.recipe.out).map(([r,n])=>n+'×'+RES[r].name.split(' ')[0]).join(' + ')):d.desc.split('.')[0];
+    return `<div class="optrow"><span><b style="font-weight:normal;color:var(--ink-bright)">${d.name}</b></span><span style="color:var(--ink-dim);font-size:11px;max-width:250px;text-align:right">${role}</span></div>`; }).join('');
+  showOverlayHTML(`<h1 style="font-size:24px">THE CODEX</h1><h2>what everything is, and how the line runs</h2>
+    <div style="display:flex;gap:22px;flex-wrap:wrap">
+     <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Materials — click for detail</div>${resList}</div>
+     <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Buildings — the line</div>${bldList}</div>
+    </div>
+    <p style="margin-top:10px;color:var(--ink-dim);font-size:11.5px">The dead are exhumed, rendered in the Crematory, and refined up the chain into Compute, the quota the engine demands. Everything traces back to a corpse.</p>
+    <p style="margin-top:6px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
 function renderLedger(){
   const pop=villagers.filter(v=>!v.dead).length;
-  const chip=(v,l,c,t)=>`<div class="stat" title="${t||''}"><span><span class="v" style="${c?'color:'+c:''}">${v}</span> <span class="lbl">${l}</span></span></div>`;
+  const chip=(v,l,c,t,clk)=>`<div class="stat${clk?' resstat':''}" title="${t||''}"${clk?` onclick="${clk}"`:''}><span><span class="v" style="${c?'color:'+c:''}">${v}</span> <span class="lbl">${l}</span></span></div>`;
   let h=`<div class="stat shopbtn gbtn" title="Market — buy & sell for Bones" onclick="showShop()">${gicon('market',22)}</div><div class="sep"></div>`
-    +chip(pop+"/"+G.popCap,"Husks",pop<2?'#9e3b2c':'',STAT_HELP.husks)
-    +chip(Math.round(G.dread)+"%","Dread",G.dread>55?'#9e3b2c':'#7d8a5a',STAT_HELP.dread)
+    +chip(pop+"/"+G.popCap,"Husks",pop<2?'#9e3b2c':'',STAT_HELP.husks,"showStatInfo('husks')")
+    +chip(Math.round(G.dread)+"%","Dread",G.dread>55?'#9e3b2c':'#7d8a5a',STAT_HELP.dread,"showStatInfo('dread')")
     +`<div class="stat resstat" title="Bones — your currency. Click to trade." onclick="showShop()">${ricon('bones',17)}<span class="v" style="color:#e8c24a">${Math.floor(G.writ)}</span></div>`
     +`<div class="sep"></div>`;
   const hideWhenEmpty=["bonesil","ingot","wafer","die","core"];
@@ -978,6 +992,7 @@ function buildRail(){
   $('rail').appendChild(mk('economy',false,()=>showEconomy(),'Economy — flows & the line'));
   $('rail').appendChild(mk('rites',false,()=>showRites(),'Rites — spend Bones on upgrades'));
   $('rail').appendChild(mk('info',false,()=>showHelp(),'How to play'));
+  $('rail').appendChild(mk('codex',false,()=>showCodex(),'Codex — what everything is'));
   $('rail').appendChild(mk(SND.muted?'soundoff':'sound',!SND.muted,()=>{ SND.resume(); SND.toggleMute(); buildRail(); }, SND.muted?'Sound is off — click for sound':'Mute sound'));
   $('rail').appendChild(mk('options',false,()=>showOptions(),'Options'));
 }
