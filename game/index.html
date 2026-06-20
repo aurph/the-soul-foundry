@@ -49,7 +49,9 @@
   #ledger::after{content:"";position:absolute;left:0;right:0;bottom:-14px;height:20px;
     background:url('assets/ui/stick-bar.png') no-repeat center/100% 100%;opacity:.92;pointer-events:none;
     filter:drop-shadow(0 2px 3px #000a)}
-  #boot .wordmark{width:min(470px,84vw);margin:4px 0;mix-blend-mode:screen;filter:drop-shadow(0 0 26px #d98a3a26)}
+  #boot .wordmark{font-family:'Pirata One','Iowan Old Style',serif;font-weight:normal;
+    font-size:clamp(36px,7vw,62px);letter-spacing:4px;line-height:1.05;margin:8px 0 2px;
+    color:#c4b89e;opacity:.9;text-shadow:0 1px 1px #000a;text-transform:none}
 
   /* top ledger */
   #ledger{position:fixed;top:0;left:0;right:0;height:46px;z-index:30;display:flex;align-items:center;
@@ -204,7 +206,7 @@
 
 <div id="boot">
   <div class="sub">a desolate foundry of the dead</div>
-  <img src="assets/ui/wordmark.png" class="wordmark" alt="THE SOUL FOUNDRY">
+  <h1 class="wordmark">The Soul Foundry</h1>
   <div class="bar"><i></i></div>
   <div class="msg" id="bootmsg">waking the engine…</div>
 </div>
@@ -374,14 +376,20 @@ const BIOME_HSL={ forest:[0.26,0.24,0.27], silica:[0.10,0.07,0.5], ash:[0.03,0.1
   ruins:[0.58,0.09,0.33], graves:[0.31,0.13,0.31], bog:[0.22,0.22,0.23] };
 function biomeColor(x,z,h,slope){
   const c=new THREE.Color();
-  if(h<-4) c.setHSL(0.08,0.08,0.17); else if(h<-1) c.setHSL(0.09,0.13,0.25);
-  else if(h<6) c.setHSL(0.10,0.14,0.33); else c.setHSL(0.08,0.08,0.45);
+  if(h<-4) c.setHSL(0.07,0.10,0.15); else if(h<-1) c.setHSL(0.08,0.14,0.23);
+  else if(h<6) c.setHSL(0.09,0.13,0.31); else c.setHSL(0.08,0.07,0.46);
+  // MACRO desolation — big low-freq patches so the floor reads as a varied wasteland, not a slab, at any zoom
+  const m1=fbm(x*0.021+40,z*0.021-30), m2=fbm(x*0.013-15,z*0.013+22), m3=fbm(x*0.034+7,z*0.034+9);
+  c.offsetHSL(0,0,(m1-0.5)*0.20);                                                 // broad light/dark relief
+  if(m2>0.60){ const t=(m2-0.60)/0.40; c.offsetHSL(-0.04*t, 0.18*t, -0.06*t); }   // dried-blood rust flats
+  else if(m2<0.34){ const t=(0.34-m2)/0.34; c.offsetHSL(0.0,-0.05*t,-0.12*t); }   // charred ash hollows
+  if(m3>0.64){ const t=(m3-0.64)/0.36; c.offsetHSL(0.13*t, 0.12*t, -0.02*t); }    // sickly moss-green stains
   const rg=regionAt(x,z);
   if(rg){ const b=BIOME_HSL[rg.reg.type]; const bc=new THREE.Color().setHSL(b[0],b[1],b[2]);
     const t=Math.pow(rg.t,0.5)*0.95; c.lerp(bc,t); }
-  // mottled ground: patchy lightness + slight hue drift so the floor reads as textured dirt, not a flat gradient
-  const patch=(fbm(x*0.13+3,z*0.13-2)-0.5)*0.17 + (fbm(x*0.55,z*0.55)-0.5)*0.08;
-  c.offsetHSL((fbm(x*0.09,z*0.09)-0.5)*0.04, (fbm(x*0.21-5,z*0.21)-0.5)*0.12, patch - clamp(slope*0.7,0,0.45)*0.4);
+  // fine dirt grain
+  const patch=(fbm(x*0.13+3,z*0.13-2)-0.5)*0.16 + (fbm(x*0.55,z*0.55)-0.5)*0.08;
+  c.offsetHSL((fbm(x*0.09,z*0.09)-0.5)*0.04, (fbm(x*0.21-5,z*0.21)-0.5)*0.11, patch - clamp(slope*0.7,0,0.45)*0.4);
   return c;
 }
 function buildTerrain(){
@@ -1335,8 +1343,8 @@ function scatterWorld(){
   for(const cr of closeRing){ const a=(cr[1]/6)*6.283+rr(-0.35,0.35), rad=rr(13,21), x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0) continue; placeNode(cr[0],x,z); }
   // ambient props across the open land (denser, closer to centre — leave only a small build clearing)
-  for(let i=0;i<340;i++){ const x=rr(-HALF+3,HALF-3), z=rr(-HALF+3,HALF-3);
-    if(Math.hypot(x,z)<9) continue; if(terrainHeight(x,z)<-3.2) continue; if(regionAt(x,z)) continue;
+  for(let i=0;i<480;i++){ const x=rr(-HALF+3,HALF-3), z=rr(-HALF+3,HALF-3);
+    if(Math.hypot(x,z)<8) continue; if(terrainHeight(x,z)<-3.2) continue; if(regionAt(x,z)) continue;
     const r=rnd(); dropProp(r<0.45?makeDeadTree2(rr(0.6,1.2)):r<0.7?makeRock():r<0.86?makeBonePile():makeAshMound(), x,z, r<0.45);
   }
   // Haunted Mound: stark white crosses + sigils staked across the dark land
@@ -1360,32 +1368,41 @@ function scatterWorld(){
     dropProp(r<0.4?makeDeadTree2(rr(0.7,1.4)):r<0.62?makeBonePile():r<0.8?makeRock():r<0.92?makeAshMound():(rnd()<0.5?makeSigilCross():makeSigilRing()), x,z, r<0.4); }
   scatterGroundDetail();
 }
-// thousands of tiny props via instancing (one draw call each) for a dense desolate floor
+// tens of thousands of instanced props (one draw call each) — a dense desolate floor that never reads blank
 function scatterGroundDetail(){
   const M=new THREE.Matrix4();
-  const mk=(geo,mat,count,yfn,sfn,minH)=>{ const im=new THREE.InstancedMesh(geo,mat,count); let n=0;
-    for(let i=0;i<count;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF); const h=terrainHeight(x,z); if(h<(minH||-3.4))continue;
+  const mk=(geo,mat,count,yfn,sfn,minH,clear)=>{ const im=new THREE.InstancedMesh(geo,mat,count); let n=0;
+    for(let i=0;i<count;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF); const h=terrainHeight(x,z); if(h<(minH||-3.4))continue; if(clear&&Math.hypot(x,z)<clear)continue;
       const s=sfn(); M.makeScale(s.x,s.y,s.z); M.setPosition(x,h+yfn(s),z); im.setMatrixAt(n++,M); }
     im.count=n; im.instanceMatrix.needsUpdate=true; im.frustumCulled=false; scene.add(im); return im; };
-  mk(new THREE.DodecahedronGeometry(0.5,0), MAT(0x474a50), 3800, s=>0.12, ()=>{const a=rr(0.35,1.5);return{x:a,y:a*rr(0.5,1),z:a};});      // pale rubble & stones
-  mk(new THREE.ConeGeometry(0.12,0.95,4), MAT(0x3d4231), 4400, s=>s.y*0.4, ()=>{const a=rr(0.7,2.0);return{x:1,y:a,z:1};});           // tufts of dead grass
-  mk(new THREE.IcosahedronGeometry(0.22,0), MAT(0x575347), 2800, s=>0.1, ()=>{const a=rr(0.45,1.3);return{x:a,y:a*0.6,z:a};});         // bone-grey debris
-  mk(new THREE.BoxGeometry(0.5,0.18,0.5), MAT(0x4f463a), 1400, s=>0.06, ()=>{const a=rr(0.6,1.8);return{x:a,y:1,z:a*rr(0.6,1)};});     // flat broken slabs / dirt patches
-  // DEAD TREES EVERYWHERE: 800 leaning bare snags, instanced into a single draw call — a dead forest blanketing the valley
-  const snagGeo=new THREE.CylinderGeometry(0.03,0.30,4.0,5);
-  const snags=new THREE.InstancedMesh(snagGeo, MAT(0x191510), 800); let tn=0;
+  mk(new THREE.DodecahedronGeometry(0.6,0), MAT(0x53565d), 7000, s=>0.12, ()=>{const a=rr(0.4,1.9);return{x:a,y:a*rr(0.5,1),z:a};});       // pale rubble & stones
+  mk(new THREE.DodecahedronGeometry(0.95,0), MAT(0x6b6760), 1600, s=>0.18, ()=>{const a=rr(0.7,2.7);return{x:a,y:a*rr(0.5,0.9),z:a};});     // bigger boulders (read from afar)
+  mk(new THREE.ConeGeometry(0.13,1.2,4), MAT(0x444a33), 8200, s=>s.y*0.45, ()=>{const a=rr(0.6,2.5);return{x:1,y:a,z:1};});               // dead grass tufts
+  mk(new THREE.IcosahedronGeometry(0.24,0), MAT(0x655f50), 5200, s=>0.1, ()=>{const a=rr(0.4,1.5);return{x:a,y:a*0.6,z:a};});             // bone-grey debris
+  mk(new THREE.BoxGeometry(0.5,0.18,0.5), MAT(0x564c3e), 2400, s=>0.06, ()=>{const a=rr(0.6,2.2);return{x:a,y:1,z:a*rr(0.6,1)};});       // broken slabs / dirt
+  mk(new THREE.IcosahedronGeometry(0.17,0), MAT(0xbab296), 3200, s=>0.08, ()=>{const a=rr(0.35,1.15);return{x:a,y:a*0.5,z:a};}, -3.0, 7);  // pale scattered BONES (high contrast)
+  // DEAD FOREST — a blanket of leaning bare snags, the main readable texture from above
+  const snagGeo=new THREE.CylinderGeometry(0.03,0.33,4.8,5);
+  const snags=new THREE.InstancedMesh(snagGeo, MAT(0x171309), 3200); let tn=0;
   const TM=new THREE.Matrix4(),TQ=new THREE.Quaternion(),TE=new THREE.Euler(),TP=new THREE.Vector3(),TS=new THREE.Vector3();
-  for(let i=0;i<800;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF), h=terrainHeight(x,z); if(h<-3.0||Math.hypot(x,z)<8) continue;
-    const sc=rr(0.5,1.8); TE.set(rr(-0.17,0.17),rr(0,6),rr(-0.17,0.17)); TQ.setFromEuler(TE); TP.set(x,h+2.0*sc,z); TS.set(sc,sc,sc);
+  for(let i=0;i<3200;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF), h=terrainHeight(x,z); if(h<-3.0||Math.hypot(x,z)<8) continue;
+    const sc=rr(0.5,2.3); TE.set(rr(-0.18,0.18),rr(0,6),rr(-0.18,0.18)); TQ.setFromEuler(TE); TP.set(x,h+2.4*sc,z); TS.set(sc,sc,sc);
     TM.compose(TP,TQ,TS); snags.setMatrixAt(tn++,TM); }
   snags.count=tn; snags.instanceMatrix.needsUpdate=true; snags.frustumCulled=false; scene.add(snags);
-  // a second instanced layer of shorter forked stumps for variety
-  const stubGeo=new THREE.CylinderGeometry(0.18,0.34,1.1,5);
-  const stubs=new THREE.InstancedMesh(stubGeo, MAT(0x201a12), 300); let sn=0;
-  for(let i=0;i<300;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF), h=terrainHeight(x,z); if(h<-3.0||Math.hypot(x,z)<8) continue;
-    const sc=rr(0.6,1.5); TE.set(rr(-0.2,0.2),rr(0,6),rr(-0.2,0.2)); TQ.setFromEuler(TE); TP.set(x,h+0.55*sc,z); TS.set(sc,sc,sc);
+  // shorter forked stumps
+  const stubGeo=new THREE.CylinderGeometry(0.18,0.36,1.2,5);
+  const stubs=new THREE.InstancedMesh(stubGeo, MAT(0x221a12), 1200); let sn=0;
+  for(let i=0;i<1200;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF), h=terrainHeight(x,z); if(h<-3.0||Math.hypot(x,z)<8) continue;
+    const sc=rr(0.6,1.7); TE.set(rr(-0.2,0.2),rr(0,6),rr(-0.2,0.2)); TQ.setFromEuler(TE); TP.set(x,h+0.6*sc,z); TS.set(sc,sc,sc);
     TM.compose(TP,TQ,TS); stubs.setMatrixAt(sn++,TM); }
   stubs.count=sn; stubs.instanceMatrix.needsUpdate=true; stubs.frustumCulled=false; scene.add(stubs);
+  // dead bramble — low dark forked clumps for ground chaos between the snags
+  const bramGeo=new THREE.ConeGeometry(0.5,0.7,5);
+  const bram=new THREE.InstancedMesh(bramGeo, MAT(0x14110b), 2800); let bn=0;
+  for(let i=0;i<2800;i++){ const x=rr(-HALF,HALF), z=rr(-HALF,HALF), h=terrainHeight(x,z); if(h<-3.0) continue;
+    const sc=rr(0.5,1.7); TE.set(rr(-0.3,0.3),rr(0,6),rr(-0.3,0.3)); TQ.setFromEuler(TE); TP.set(x,h+0.25*sc,z); TS.set(sc*rr(0.8,1.5),sc*rr(0.5,1),sc*rr(0.8,1.5));
+    TM.compose(TP,TQ,TS); bram.setMatrixAt(bn++,TM); }
+  bram.count=bn; bram.instanceMatrix.needsUpdate=true; bram.frustumCulled=false; scene.add(bram);
 }
 function nearestNode(type,x,z){ let best=null,bd=1e9; for(const n of nodes){ if(n.type!==type||n.amount<=0)continue;
   const d=(n.x-x)*(n.x-x)+(n.z-z)*(n.z-z); if(d<bd){bd=d;best=n;} } return best?{node:best,dist:Math.sqrt(bd)}:null; }
