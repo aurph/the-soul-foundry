@@ -998,6 +998,10 @@ function showCodex(){ SND.resume();
      <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Materials — click for detail</div>${resList}</div>
      <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Buildings — the line</div>${bldList}</div>
     </div>
+    <div style="margin-top:12px;font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">The bound dead — put the right caste on the right stage</div>
+    <div class="optrow"><span><b style="font-weight:normal;color:var(--ink-bright)">Husk</b> <span style="color:var(--ink-dim);font-size:11px">${ricon('dead',12)}1 ${ricon('compute',12)}2</span></span><span style="color:var(--ink-dim);font-size:11px;max-width:230px;text-align:right">Generalist. Steady anywhere, master of none.</span></div>
+    <div class="optrow"><span><b style="font-weight:normal;color:var(--ink-bright)">Stump</b> <span style="color:var(--ink-dim);font-size:11px">${ricon('dead',12)}2 ${ricon('compute',12)}1</span></span><span style="color:var(--ink-dim);font-size:11px;max-width:230px;text-align:right">Extractor. Best at Exhumer/Dredge + hauling; crude at fine work.</span></div>
+    <div class="optrow"><span><b style="font-weight:normal;color:var(--ink-bright)">Reaper</b> <span style="color:var(--ink-dim);font-size:11px">${ricon('dead',12)}1 ${ricon('compute',12)}4</span></span><span style="color:var(--ink-dim);font-size:11px;max-width:230px;text-align:right">Renderer. Best at Crematory/Litho/Ossuary/Datacenter; resists Dread; no upkeep.</span></div>
     <p style="margin-top:10px;color:var(--ink-dim);font-size:11.5px">The dead are exhumed, rendered in the Crematory, and refined up the chain into Compute, the quota the engine demands. Everything traces back to a corpse.</p>
     <p style="margin-top:6px"><span class="btn" onclick="hideOverlay()">Close</span> <span class="btn" onclick="showChronicle()">The Chronicle</span></p>`); }
 function renderLedger(){
@@ -1162,6 +1166,8 @@ function refreshInspect(){
      <div class="barwrap"><div class="t">Condition${v.resolve<0.5?' — fading, needs soul-ash':''}</div><div class="pbar"><i style="width:${(v.resolve*100)|0}%;background:linear-gradient(90deg,${v.resolve<0.35?'#9e3b2c,#b8884e':'#6f7a55,#b8884e'})"></i></div></div>
      <div class="row"><span>Speed</span><b>${v.speed.toFixed(1)}</b></div>
      <div class="row"><span>Carry cap</span><b>${CARRY[v.caste]||7}${v.carryAmt?(' ('+Math.floor(v.carryAmt)+' '+(v.carryRes?RES[v.carryRes].name:'')+')'):''}</b></div>
+     <div class="row"><span>Specialty</span><b style="font-size:11px">${v.caste==='stump'?'Extraction & hauling':v.caste==='reaper'?'Rendering & fine work':'Generalist'}</b></div>
+     ${v.assigned?(()=>{ const a=affinity(v.caste,v.assigned.kind); const lab=a>=1.15?'well-suited':a<=0.85?'ill-suited':'steady'; const col=a>=1.15?'#6f9a55':a<=0.85?'#9e3b2c':'var(--ink-bright)'; return `<div class="row"><span>Suited to ${v.assigned.def.name}</span><b style="color:${col};font-size:11px">${lab} · ${Math.round(a*100)}%</b></div>`; })():''}
      ${v.assigned?`<div style="margin-top:8px"><span class="btn" onclick="unassignSel()">Recall to idle</span></div>`:`<div style="margin-top:8px;color:var(--ink-dim);font-size:11px">Idle. Select a workplace to assign husks.</div>`}
      </div>`;
   } else if(selBld){ const b=selBld, d=b.def;
@@ -1175,7 +1181,14 @@ function refreshInspect(){
     if(d.workers>0){ body+=`<div class="row"><span>Workers</span><b>${b.workers.length} / ${d.workers}</b></div>
       <div style="margin:6px 0"><span class="btn" onclick="addWorker()">+ assign</span> <span class="btn" onclick="remWorker()">− recall</span> <span style="color:var(--ink-dim);font-size:11px">${idleHusks().length} idle</span></div>`;
       if(b.workers.length){ body+=`<div class="obj-list">`+b.workers.map(w=>`<span class="tag" title="${cap1(w.caste)} husk">${w.name} · <span style="color:var(--ember-soft)">${huskStateLabel(w)}</span></span>`).join('')+`</div>`; }
-      else body+=`<div style="color:var(--ink-dim);font-size:11px;margin-bottom:4px">No husks here yet — press + assign to staff it.</div>`; }
+      else body+=`<div style="color:var(--ink-dim);font-size:11px;margin-bottom:4px">No husks here yet — press + assign to staff it.</div>`;
+      if(d.kind==="gather"||d.kind==="refine"||d.kind==="datacenter"){
+        const best=['reaper','worker','stump'].reduce((a,c)=>affinity(c,b.kind)>affinity(a,b.kind)?c:a);
+        const crew=b.workers.filter(w=>!w.dead); const eff=crew.length?crew.reduce((s,w)=>s+affinity(w.caste,b.kind),0)/crew.length:0;
+        const col=eff>=1.15?'#6f9a55':eff&&eff<=0.85?'#9e3b2c':'var(--ink-bright)';
+        body+=`<div class="row"><span>Best worked by</span><b style="font-size:11px">${casteName(best)}s</b></div>`;
+        if(crew.length) body+=`<div class="row"><span>Crew efficiency</span><b style="color:${col};font-size:11px">${Math.round(eff*100)}%</b></div>`;
+      } }
     if(d.kind==="gather") body+=`<div class="row"><span>Harvests</span><b>${ricon(d.res,14)} ${RES[d.res].name}</b></div>`;
     if(d.recipe){ const ins2=Object.entries(d.recipe.in).map(([r,n])=>ricon(r,13)+n+'×').join(' + ');
       const outs=Object.entries(d.recipe.out).map(([r,n])=>ricon(r,13)+n+'×').join(' + ');
