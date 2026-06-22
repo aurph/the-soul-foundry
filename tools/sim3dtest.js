@@ -229,6 +229,27 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;   // restore clean state for following tests
 }
 
+// --- challenge clock + quota suppression ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode='campaign'; T.G.over=null; T.G.time=999; T.G.graceT=0;
+  T.G.quota={need:5,period:150,t:0.001,level:1}; T.G.stock.compute=50;
+  T.stepEconomy(1/30);
+  ok("campaign: quota still levels up past grace", T.G.quota.level===2 && T.G.stock.compute<50,
+     "lvl="+T.G.quota.level+" compute="+T.G.stock.compute);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode='challenge'; T.G.challengeDur=600; T.G.over=null; T.G.time=300; T.G.graceT=0;
+  T.G.quota={need:5,period:150,t:0.001,level:1}; T.G.stock.compute=50; T.G.endedChallenge=false;
+  T.stepEconomy(1/30);
+  ok("challenge: quota level is untouched", T.G.quota.level===1, "lvl="+T.G.quota.level);
+  ok("challenge: compute is NOT drained by a tithe", T.G.stock.compute===50, "compute="+T.G.stock.compute);
+  T.spawnVillager(0,0,"reaper"); T.G.dread=0;   // a live crew + no Dread so only the clock ends the run
+  T.G.time=T.G.challengeDur-0.001; T.G.over=null; T.G.endedChallenge=false;
+  T.stepEconomy(1/30);
+  ok("challenge: hitting challengeDur ends the run", T.G.over==='time' || T.G.endedChallenge===true,
+     "over="+T.G.over+" ended="+T.G.endedChallenge);
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.G.quota={need:5,period:150,t:150,level:1};
+}
+
 // --- research rites multiply the economy ---
 { T.G.tech={}; const baseG=T.techMul('gather'), baseC=T.techMul('carry');
   ok("techMul defaults to 1x", baseG===1&&baseC===1, "g="+baseG+" c="+baseC);

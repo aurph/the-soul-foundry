@@ -1020,6 +1020,8 @@ function renderLedger(){
   $('ledger').innerHTML=h;
 }
 function renderQuota(){
+  if(modeCfg().timeLimit){ const left=Math.max(0,(G.challengeDur||0)-(G.time||0)); const m=Math.floor(left/60), s=Math.floor(left%60);
+    const red=left<30; $('quota').innerHTML=`<b style="color:${red?'#9e3b2c':'var(--ember)'}">TIME ${m}:${String(s).padStart(2,'0')}</b> &nbsp;·&nbsp; score <b>${Math.round((G.computeRendered||0)*100)}</b>`; return; }
   const q=G.quota, t=Math.max(0,Math.ceil(q.t));
   const graceT=(G.graceT==null?150:G.graceT);
   if((G.time||0)<graceT){ $('quota').innerHTML=`<b>GRACE</b> &nbsp; the engine is patient &nbsp;·&nbsp; first tithe in <span style="color:var(--ink)">${Math.ceil(graceT-(G.time||0))}s</span>`; return; }
@@ -1027,6 +1029,11 @@ function renderQuota(){
 }
 // surface the single most pressing problem, with its cause and the fix — so the player always knows WHY
 function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.classList.remove('show'); return; }
+  if(modeCfg().timeLimit){ const pop=villagers.filter(v=>!v.dead).length; let msg='';
+    if(pop===0) msg="No husks bound. Open the Binding Pyre and bind one (1 corpse + 2 Compute).";
+    else if((G.stock.soulash||0)<=0.5) msg="Soul-ash is out — your husks weaken. Staff a Crematory.";
+    else if(!buildings.some(b=>b.kind==="datacenter"&&b.workers.length>0)) msg="No Datacenter running — staff the chain end to render Compute and score.";
+    if(msg){ el.textContent=msg; el.classList.add('show'); } else el.classList.remove('show'); return; }
   const pop=villagers.filter(v=>!v.dead).length, assigned=villagers.filter(v=>!v.dead&&v.assigned).length;
   let msg='';
   if(pop===0) msg="No husks bound. Open the Binding Pyre at the centre and bind one — 1 corpse + 2 Compute.";
@@ -2205,7 +2212,7 @@ function stepEconomy(dt){
   // No pressure during the opening grace, so a new player can find their feet.
   const grace=(G.time||0) < (G.graceT==null?150:G.graceT);
   let wards=0; for(const b of buildings) if(b.kind==="ward") wards+=1;
-  const basePressure=grace?0:(G.basePressure||0.6);
+  const basePressure=(grace||!modeCfg().quota)?0:(G.basePressure||0.6);
   G.dread=clamp(G.dread + (basePressure - renderers*1.0 - wards*0.6*techMul('ward'))*dt, 0,100);
   // hauntings
   if(G.dread>55 && rnd()<0.03*dt*(G.dread/100)){ const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ const v=pick(cand); v.resolve=Math.max(0,v.resolve-0.25); SND.sfx('haunt'); if(typeof toast==="function")toast(v.name+" is gripped by a haunting.","bad"); } }
@@ -2219,7 +2226,7 @@ function stepEconomy(dt){
   // population cap from dens — husks are BOUND at the Pyre, never spawned for free
   G.popCap=6+buildings.filter(b=>b.kind==="den").reduce((a,b)=>a+b.def.houses,0);
   // quota — frozen during the opening grace
-  if(!grace){ G.quota.t-=dt;
+  if(modeCfg().quota && !grace){ G.quota.t-=dt;
   if(G.quota.t<=0){ const need=G.quota.need;
     if((G.stock.compute||0)>=need){ G.stock.compute-=need; G.writ+=need*8; G.dread=Math.max(0,G.dread-12); G.quota.level++;
       G.quota.need=Math.ceil(need*1.4); SND.sfx('bell'); toast("Quota met. The engine endures. (Tithe paid: "+(need*8)+" Bones)","good");
@@ -2236,6 +2243,7 @@ function stepEconomy(dt){
   G.rateWinT=(G.rateWinT==null?PEAK_WIN:G.rateWinT)-dt;
   if(G.rateWinT<=0){ const r=((G.rateWinAccum||0)/PEAK_WIN)*60; if(r>(G.peakRate||0)) G.peakRate=r; G.rateWinAccum=0; G.rateWinT=PEAK_WIN; }
   G.time=(G.time||0)+dt;
+  if(modeCfg().timeLimit && (G.time||0)>=(G.challengeDur||0)) endChallenge();
   // sample total resources held over time for the economy line chart
   G.histT=(G.histT==null?0:G.histT)-dt;
   if(G.histT<=0){ G.histT=2.0; if(!G.resHist)G.resHist=[];
@@ -2259,6 +2267,10 @@ function bindHusk(caste){ caste=(caste==='stump'||caste==='reaper')?caste:'worke
   spawnVillager(p.x+rr(-4,4),p.z+rr(-4,4),caste); SND.sfx('rise'); G.husksBoundRun=(G.husksBoundRun||0)+1;
   if(typeof renderLedger==="function")renderLedger(); if(typeof refreshInspect==="function")refreshInspect();
   toast("A "+casteName(caste)+" is bound to the foundry.","good"); return true; }
+function endChallenge(){ if(G.over) return; G.over='time'; G.endedChallenge=true; paused=true;
+  if(typeof SND!=="undefined") SND.sfx('bell');
+  // NB: do NOT remove sf_save here — a challenge run must never clobber the campaign save
+  if(typeof showChallengeEnd==="function") showChallengeEnd(); }
 function endGame(win,why){ if(G.over)return; G.over=win?"win":"lose"; paused=true; SND.sfx(win?'win':'lose'); try{ localStorage.removeItem('sf_save'); }catch(e){}   // clear the autosave so Again/reload starts a fresh valley, not the moment before defeat
   if(typeof showEnd==="function") showEnd(win,why); }
 
