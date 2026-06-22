@@ -104,6 +104,22 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   ok("no soul-ash upkeep erodes resolve", avg()<before-0.2, "avg resolve "+before.toFixed(2)+" -> "+avg().toFixed(2));
 }catch(e){ ok("upkeep test",false,String(e.stack||e)); }
 
+// --- per-caste upkeep (opex): reapers need no soul-ash and hold resolve; husks/stumps decay without it ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.time=999;
+  const w=T.spawnVillager(0,0,"worker"), s=T.spawnVillager(1,0,"stump"), r=T.spawnVillager(2,0,"reaper");
+  w.resolve=s.resolve=r.resolve=0.8;
+  for(let st=0;st<30*60;st++){ T.G.stock.soulash=0; T.stepEconomy(1/30); }
+  ok("a Reaper holds its resolve without soul-ash", r.resolve>0.7, "reaper 0.8->"+r.resolve.toFixed(2));
+  ok("a Husk decays without soul-ash upkeep", w.resolve<0.5, "husk 0.8->"+w.resolve.toFixed(2));
+  ok("a Stump decays without soul-ash upkeep", s.resolve<0.55, "stump 0.8->"+s.resolve.toFixed(2));
+}
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.time=999;
+  T.spawnVillager(0,0,"reaper"); T.spawnVillager(1,0,"reaper");
+  T.G.stock.soulash=100; const before=T.G.stock.soulash;
+  for(let st=0;st<30*30;st++){ T.stepEconomy(1/30); }
+  ok("Reapers draw no soul-ash upkeep", Math.abs(T.G.stock.soulash-before)<0.5, "soulash "+before+"->"+T.G.stock.soulash.toFixed(1));
+}
+
 // placement coverage: after the gentler-terrain fix, most open land must be buildable across seeds
 { let total=0,okp=0; T.buildings.length=0; T.nodes.length=0;
   for(const seed of [42,7,314,999,55,1234]){ T.genRegions(seed);

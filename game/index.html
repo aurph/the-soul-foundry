@@ -1748,6 +1748,7 @@ const buildings=[];
 // CASTE SPECIALIZATION — each caste fits a different stage of the death-to-Compute chain.
 // CARRY/GRATE drive extraction & hauling; AFFINITY scales refining/rendering/compute speed by building.
 const CARRY={worker:7,stump:20,reaper:5}, GRATE={worker:5,stump:8,reaper:3.5};
+const UPKEEP={worker:0.015, stump:0.02, reaper:0};   // soul-ash per husk per second; reapers need none
 const AFFINITY={
   worker:{ exhumer:1.0,dredge:1.0, crematory:1.0, furnace:1.05,mill:1.05, litho:1.0,ossuary:1.0, substation:1.05, datacenter:1.0, market:1.0 },
   stump: { exhumer:1.4,dredge:1.4, crematory:0.9, furnace:1.0, mill:1.0,  litho:0.55,ossuary:0.6, substation:0.95,datacenter:0.65,market:0.85 },
@@ -2155,9 +2156,11 @@ function stepEconomy(dt){
   // renewable nodes (groves/wells) slowly regrow so food + water are sustainable; finite ones push expansion
   for(const n of nodes){ if(n.def.renew && n.amount<n.max){ n.amount=Math.min(n.max,n.amount+n.def.renew*dt);
     if(n.mesh.userData.depleted && n.amount>n.max*0.2){ n.mesh.userData.depleted=false; n.mesh.scale.y/=0.6; } } }
-  // husk upkeep: the engine patches its husks with a trickle of soul-ash. Forgiving, so you don't lose fast.
+  // husk upkeep (opex): soul-ash sustains the husks. Reapers are already past death and need none;
+  // Stumps cost a touch more. Drain scales with who's actually bound. Forgiving, so you don't lose fast.
+  let upDemand=0; for(const v of villagers){ if(!v.dead) upDemand+=(UPKEEP[v.caste]!=null?UPKEEP[v.caste]:0.015); }
   const upkeepOk=(G.stock.soulash||0)>0.01;
-  if(upkeepOk) G.stock.soulash=Math.max(0,G.stock.soulash-pop*0.015*dt);
+  if(upkeepOk) G.stock.soulash=Math.max(0,G.stock.soulash-upDemand*dt);
   // production (refine/datacenter); track crematories rendering the dead — that's what holds the backlog down
   let renderers=0;
   for(const b of buildings){
@@ -2178,9 +2181,11 @@ function stepEconomy(dt){
   G.dread=clamp(G.dread + (basePressure - renderers*1.0 - wards*0.6*techMul('ward'))*dt, 0,100);
   // hauntings
   if(G.dread>55 && rnd()<0.03*dt*(G.dread/100)){ const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ const v=pick(cand); v.resolve=Math.max(0,v.resolve-0.25); SND.sfx('haunt'); if(typeof toast==="function")toast(v.name+" is gripped by a haunting.","bad"); } }
-  // husk resolve: slow decay without soul-ash upkeep, recovers with it
+  // husk resolve: Reapers need no soul-ash and hold steady; others recover with it and decay without.
   for(const v of villagers){ if(v.dead) continue;
-    v.resolve=clamp(v.resolve+(upkeepOk?0.02:-0.012)*dt,0,1);
+    const needsUpkeep=(UPKEEP[v.caste]!=null?UPKEEP[v.caste]:0.015)>0;
+    const dr=needsUpkeep?(upkeepOk?0.02:-0.012):0.01;   // reapers slowly hold/recover regardless
+    v.resolve=clamp(v.resolve+dr*dt,0,1);
     if(v.resolve<=0){ crumble(v); }
   }
   // population cap from dens — husks are BOUND at the Pyre, never spawned for free
