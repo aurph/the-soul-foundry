@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld,getChallengeBest,setChallengeBest,shareURL};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -299,6 +299,16 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   const a=runSeed(12345), b=runSeed(12345);
   ok("same forced seed yields identical computeRendered (determinism)", a===b && a>0, "a="+a+" b="+b);
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.resetRunScore();
+}
+
+// --- challenge end: share link + best round-trip ---
+{ ok("shareURL builds a reproducible challenge link",
+     T.shareURL(42,1200)==='?mode=challenge&seed=42&dur=1200', "got="+T.shareURL(42,1200));
+  let threwB=null, got=null;
+  try{ T.setChallengeBest(1200,{score:9999,seed:42,date:'2026-06-22'}); got=T.getChallengeBest(1200); }catch(e){ threwB=e; }
+  ok("best getter/setter never throws headless", !threwB, threwB?String(threwB):"ok");
+  ok("best round-trips when storage is present (else null headless)",
+     got===null || (got&&got.score===9999&&got.seed===42), "got="+JSON.stringify(got));
 }
 
 // --- research rites multiply the economy ---

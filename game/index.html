@@ -1342,6 +1342,33 @@ function showEnd(win,why){ showOverlayHTML(win?
 function showOverlayHTML(h){ $('modal').innerHTML=h; $('ov').classList.add('show'); }
 function hideOverlay(){ $('ov').classList.remove('show'); }
 
+// challenge: local best per duration + a reproducible share link
+function getChallengeBest(dur){ try{ const s=localStorage.getItem('sf_best_challenge_'+dur); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function setChallengeBest(dur,rec){ try{ localStorage.setItem('sf_best_challenge_'+dur,JSON.stringify(rec)); return true; }catch(e){ return false; } }
+function shareURL(seed,dur){ return '?mode=challenge&seed='+(seed|0)+'&dur='+(dur|0); }
+function showChallengeEnd(){
+  const dur=G.challengeDur||600, seed=WORLD_SEED;
+  const c=G.computeRendered||0, d=G.deadRendered||0, h=G.husksBoundRun||0, p=G.peakRate||0;
+  const score=challengeScore();
+  const prev=getChallengeBest(dur); const beat=!prev || score>prev.score;
+  if(beat) setChallengeBest(dur,{score,seed,date:new Date().toISOString().slice(0,10)});
+  const best=getChallengeBest(dur), mm=Math.floor(dur/60);
+  const row=(lbl,val,w)=>`<div class="row"><span>${lbl} <span style="color:var(--ink-dim)">×${w}</span></span><b>${val}</b></div>`;
+  const link=location.origin+location.pathname+shareURL(seed,dur);
+  showOverlayHTML(`<h1 style="color:#caa15f">RUN COMPLETE</h1>
+    <h2>${mm}-minute challenge · seed ${seed}</h2>
+    <div style="text-align:center;margin:6px 0 10px"><div style="font-size:46px;font-family:'Grenze Gotisch',serif;color:var(--ember)">${score}</div>
+      <div style="color:var(--ink-dim);font-size:12px">${beat?'NEW LOCAL BEST':'best for '+mm+' min: '+(best?best.score:'—')}</div></div>
+    <div style="border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:12.5px">
+      ${row('Compute rendered',Math.floor(c),SCORE_W_COMPUTE)}
+      ${row('Dead rendered',Math.floor(d),SCORE_W_DEAD)}
+      ${row('Husks bound',h,SCORE_W_HUSK)}
+      ${row('Peak Compute/min',Math.round(p),SCORE_W_PEAK)}</div>
+    <p style="margin-top:10px">
+      <span class="btn" onclick="(function(){try{navigator.clipboard&&navigator.clipboard.writeText('${link}');toast('Share link copied.','good');}catch(e){}})()">Copy share link</span>
+      <span class="btn" onclick="location.href='${shareURL(seed,dur)}'">Retry (same seed)</span>
+      <span class="btn" onclick="location.href='?mode=challenge&dur=${dur}'">Again (new seed)</span></p>
+    <p style="font-size:11px;color:var(--ink-dim);word-break:break-all">${link}</p>`); }
 /* film-grain / VHS intensity (persisted) — the owner wants this subtle */
 function getGrain(){ try{ const s=localStorage.getItem('sf_grain'); return s==null?0.15:clamp(+s,0,1); }catch(e){ return 0.15; } }
 function setGrain(level){ level=clamp(level,0,1); try{ const g=document.getElementById('grain'); if(g)g.style.opacity=(level*0.11).toFixed(3);
