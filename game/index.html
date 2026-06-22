@@ -1185,9 +1185,15 @@ function refreshInspect(){
       <div class="barwrap"><div class="t">${b.active?'working':'idle — needs inputs or husks'}</div><div class="pbar"><i style="width:${Math.round((b.prog/d.recipe.time)*100)}%;background:linear-gradient(90deg,#6f7a55,#e8c24a)"></i></div></div>
       <div class="row"><span>Made so far</span><b>${b.cyc||0}</b></div>`; }
     if(d.kind==="bind"){ const pop=villagers.filter(v=>!v.dead).length;
+      const bindRow=(c,role)=>{ const ct=BIND_COST[c]; const can=(G.stock.dead||0)>=ct.dead&&(G.stock.compute||0)>=ct.compute;
+        return `<div style="margin:6px 0"><span class="btn${can?'':' bad'}" onclick="bindHusk('${c}')">Bind ${casteName(c)}</span>
+          <span style="color:var(--ink-dim);font-size:11px">&middot; ${ricon('dead',13)}${ct.dead} ${ricon('compute',13)}${ct.compute}</span>
+          <div style="color:var(--ink-dim);font-size:10.5px;margin-top:2px">${role}</div></div>`; };
       body+=`<div class="row"><span>Husks bound</span><b>${pop} / ${G.popCap||6}</b></div>
-      <div style="margin:7px 0"><span class="btn" onclick="bindHusk()">Bind a husk &middot; 1 corpse + 2 Compute</span></div>
-      <div style="color:var(--ink-dim);font-size:11px">Husks are bound here from the dead. They decay without soul-ash upkeep.</div>`; }
+      ${bindRow('worker','Generalist — steady at any post.')}
+      ${bindRow('stump','Extractor — hauls + gathers; crude at fine work.')}
+      ${bindRow('reaper','Renderer — fine work + Compute; resists Dread; no soul-ash upkeep.')}
+      <div style="color:var(--ink-dim);font-size:11px;margin-top:4px">Husks are bound here from the dead. Most decay without soul-ash upkeep.</div>`; }
     if(d.kind==="market") body+=`<div style="margin-top:6px"><span class="btn" onclick="showShop()">Open the market</span></div><div style="color:var(--ink-dim);font-size:11px;margin-top:4px">Buy and sell goods for Bones.</div>`;
     body+=`<div style="margin-top:10px"><span class="btn bad" onclick="demolishSel()">Demolish (reclaims half)</span></div>`;
     ins.innerHTML=`<div class="hd"><h3>${d.name}</h3><span class="x" onclick="clearInspect()">✕</span></div><div class="bd">${body}</div>`;
@@ -2204,15 +2210,19 @@ function crumble(v){ v.dead=true; SND.sfx('crumble'); scene.remove(v.obj); if(v.
   const idx=villagers.indexOf(v); if(idx>=0)villagers.splice(idx,1); if(selected===v)clearInspect();
   toast("A husk crumbles back to ash.","bad"); }
 // husks are BOUND at the Pyre from a corpse + Compute — never spawned for free
-function bindHusk(){
+// capex tradeoff: a Stump is cheap on Compute but takes two corpses and is slow; a Reaper is
+// dear on Compute but needs no upkeep and does the fine, high-value work; a Husk is the baseline.
+const BIND_COST={ worker:{dead:1,compute:2}, stump:{dead:2,compute:1}, reaper:{dead:1,compute:4} };
+function casteName(c){ return c==='stump'?'Stump':c==='reaper'?'Reaper':'Husk'; }
+function bindHusk(caste){ caste=(caste==='stump'||caste==='reaper')?caste:'worker'; const cost=BIND_COST[caste];
   const cap=6+buildings.filter(b=>b.kind==="den").reduce((a,b)=>a+b.def.houses,0);
   if(villagers.filter(v=>!v.dead).length>=cap){ SND.sfx('deny'); toast("No room for another husk — raise a Bone Den.","bad"); return false; }
-  if((G.stock.dead||0)<1 || (G.stock.compute||0)<2){ SND.sfx('deny'); toast("Binding a husk needs 1 corpse and 2 Compute.","bad"); return false; }
-  G.stock.dead-=1; G.stock.compute-=2;
+  if((G.stock.dead||0)<cost.dead || (G.stock.compute||0)<cost.compute){ SND.sfx('deny'); toast("Binding a "+casteName(caste)+" needs "+cost.dead+" corpse"+(cost.dead>1?"s":"")+" and "+cost.compute+" Compute.","bad"); return false; }
+  G.stock.dead-=cost.dead; G.stock.compute-=cost.compute;
   const p=buildings.find(b=>b.kind==="pyre")||{x:0,z:0};
-  spawnVillager(p.x+rr(-4,4),p.z+rr(-4,4),pick(["worker","worker","stump","reaper"])); SND.sfx('rise');
+  spawnVillager(p.x+rr(-4,4),p.z+rr(-4,4),caste); SND.sfx('rise');
   if(typeof renderLedger==="function")renderLedger(); if(typeof refreshInspect==="function")refreshInspect();
-  toast("A husk is bound to the foundry.","good"); return true; }
+  toast("A "+casteName(caste)+" is bound to the foundry.","good"); return true; }
 function endGame(win,why){ if(G.over)return; G.over=win?"win":"lose"; paused=true; SND.sfx(win?'win':'lose'); try{ localStorage.removeItem('sf_save'); }catch(e){}   // clear the autosave so Again/reload starts a fresh valley, not the moment before defeat
   if(typeof showEnd==="function") showEnd(win,why); }
 

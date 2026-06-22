@@ -121,6 +121,19 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   for(let s=0;s<30*60;s++){ T.stepEconomy(1/30); }
   ok("husks never spawn for free", T.villagers.filter(v=>!v.dead).length<=before, "pop "+before+"->"+T.villagers.filter(v=>!v.dead).length); }
 
+// --- per-caste bind costs (capex tradeoff) ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null;
+  T.placeBuildingFree("den",6,6); T.placeBuildingFree("den",-6,6); T.placeBuildingFree("pyre",0,0);
+  T.G.stock.dead=20; T.G.stock.compute=20;
+  const last=()=>T.villagers.filter(v=>!v.dead).slice(-1)[0];
+  const c0=T.G.stock.compute; T.bindHusk("reaper");
+  ok("binding a Reaper costs more Compute (4) and binds a reaper", last()&&last().caste==="reaper" && T.G.stock.compute===c0-4, "caste="+(last()&&last().caste)+" compute "+c0+"->"+T.G.stock.compute);
+  const d0=T.G.stock.dead; T.bindHusk("stump");
+  ok("binding a Stump costs 2 corpses and little Compute", last()&&last().caste==="stump" && T.G.stock.dead===d0-2, "caste="+(last()&&last().caste)+" dead "+d0+"->"+T.G.stock.dead);
+  const d1=T.G.stock.dead,c1=T.G.stock.compute; T.bindHusk("worker");
+  ok("binding a Husk is the baseline (1 corpse + 2 Compute)", last()&&last().caste==="worker" && T.G.stock.dead===d1-1 && T.G.stock.compute===c1-2, "dead "+d1+"->"+T.G.stock.dead+" compute "+c1+"->"+T.G.stock.compute);
+}
+
 // --- material repositories / stockpiles (the hub) ---
 { T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.stock.dead=0;
   const baseCap=T.storageCap("dead");
