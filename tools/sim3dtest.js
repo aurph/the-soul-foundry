@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -163,6 +163,22 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   ok("a researched rite raises gather rate", T.techMul('gather')>baseG, baseG+" -> "+T.techMul('gather'));
   ok("a researched rite raises carry capacity", T.techMul('carry')>baseC, baseC+" -> "+T.techMul('carry'));
   T.G.tech={}; }
+
+// --- caste chain-role specialization (affinity) ---
+{ const af=T.affinity||(()=>1);
+  ok("Reaper renders best at the Crematory", af('reaper','crematory')>af('worker','crematory') && af('worker','crematory')>af('stump','crematory'), "reaper="+af('reaper','crematory')+" worker="+af('worker','crematory')+" stump="+af('stump','crematory'));
+  ok("Stump is crude at fine work (Litho)", af('stump','litho')<af('worker','litho') && af('reaper','litho')>=af('worker','litho'), "stump="+af('stump','litho')+" worker="+af('worker','litho')+" reaper="+af('reaper','litho'));
+  ok("Stump is the best extractor (Exhumer)", af('stump','exhumer')>af('worker','exhumer') && af('worker','exhumer')>af('reaper','exhumer'), "stump="+af('stump','exhumer')+" worker="+af('worker','exhumer')+" reaper="+af('reaper','exhumer'));
+}
+// production speed scales with worker caste affinity (Reaper crematory out-renders a Stump one)
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null;
+  T.placeBuildingFree("stockpile",0,-12);
+  const crR=T.placeBuildingFree("crematory",-8,0), crS=T.placeBuildingFree("crematory",8,0);
+  for(let i=0;i<3;i++) T.assignHusk(T.spawnVillager(-8,2,"reaper"),crR);
+  for(let i=0;i<3;i++) T.assignHusk(T.spawnVillager(8,2,"stump"),crS);
+  for(let st=0;st<30*150;st++){ T.G.stock.dead=100000; T.G.stock.soulash=200; T.G.stock.bonesil=0; T.G.stock.ichor=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  ok("production scales with caste affinity (Reaper crematory out-renders Stump)", crR.cyc>crS.cyc, "reaper cyc="+crR.cyc+" stump cyc="+crS.cyc);
+}
 
 // --- audio engine is headless-safe (sim hooks must never crash without an AudioContext) ---
 { ok("SND sound engine exists", !!T.SND);

@@ -1739,7 +1739,19 @@ const G={ stock:{}, writ:25, dread:0, warmthRatio:1, popCap:6, over:null,
   quota:{need:5, period:150, t:150, level:1}, grow:24, tech:{} };
 RES_ORDER.forEach(r=>G.stock[r]=0);
 const buildings=[];
-const CARRY={worker:7,stump:18,reaper:5}, GRATE={worker:5,stump:6,reaper:4};
+// CASTE SPECIALIZATION — each caste fits a different stage of the death-to-Compute chain.
+// CARRY/GRATE drive extraction & hauling; AFFINITY scales refining/rendering/compute speed by building.
+const CARRY={worker:7,stump:20,reaper:5}, GRATE={worker:5,stump:8,reaper:3.5};
+const AFFINITY={
+  worker:{ exhumer:1.0,dredge:1.0, crematory:1.0, furnace:1.05,mill:1.05, litho:1.0,ossuary:1.0, substation:1.05, datacenter:1.0, market:1.0 },
+  stump: { exhumer:1.4,dredge:1.4, crematory:0.9, furnace:1.0, mill:1.0,  litho:0.55,ossuary:0.6, substation:0.95,datacenter:0.65,market:0.85 },
+  reaper:{ exhumer:0.7,dredge:0.7, crematory:1.4, furnace:0.95,mill:0.95, litho:1.3, ossuary:1.35,substation:1.0, datacenter:1.35,market:1.0 },
+};
+function affinity(caste,kind){ const a=AFFINITY[caste]||AFFINITY.worker; return (a&&a[kind]!=null)?a[kind]:1.0; }
+// the stage a caste is built for (for tooltips/codex)
+function casteRole(c){ return c==='stump'?'Extractor — best at the Exhumer, Dredge and hauling; crude at fine work.'
+  : c==='reaper'?'Renderer — best at the Crematory, Litho, Ossuary and Datacenter; resists Dread; poor at extraction.'
+  : 'Generalist — steady at any post, master of none.'; }
 const PATHS=new Set(); let pathGroup=null;
 function pathKey(x,z){ return (Math.round(x)+1024)*4096+(Math.round(z)+1024); }
 function onPath(x,z){ return PATHS.has(pathKey(x,z)); }
@@ -2144,10 +2156,11 @@ function stepEconomy(dt){
   let renderers=0;
   for(const b of buildings){
     if(b.def.kind!=="refine"&&b.def.kind!=="datacenter") continue;
-    const present=b.workers.filter(w=>w.atWork&&!w.dead).length;
+    const presentW=b.workers.filter(w=>w.atWork&&!w.dead), present=presentW.length;
+    const aff=present?presentW.reduce((s,w)=>s+affinity(w.caste,b.kind),0)/present:1;   // avg caste fit for this building
     const rec=b.def.recipe; const inOk=Object.keys(rec.in).every(r=>(G.stock[r]||0)>=rec.in[r]);
     const outOk=Object.keys(rec.out).every(r=>storeRoom(r));
-    if(b.built!==false&&present>0&&inOk&&outOk){ b.active=true; b.prog+=dt; if(b.def.render)renderers++;
+    if(b.built!==false&&present>0&&inOk&&outOk){ b.active=true; b.prog+=dt*aff; if(b.def.render)renderers++;
       if(b.prog>=rec.time){ b.prog-=rec.time; for(const r in rec.in)G.stock[r]-=rec.in[r]; for(const r in rec.out)addStock(r,rec.out[r]); b.cyc++; } }
     else b.active=false;
   }
