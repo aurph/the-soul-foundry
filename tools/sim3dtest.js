@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -270,6 +270,17 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   ok("dreadThrottle bottoms at DREAD_THROTTLE_MIN at max Dread", T.dreadThrottle(100)<1 && T.dreadThrottle(100)>=0.34,
      "t100="+T.dreadThrottle(100).toFixed(2));
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.time=0; T.G.over=null; T.G.breach=0; T.G.quota={need:5,period:150,t:150,level:1};
+}
+
+// --- blended score (pure) ---
+{ ok("computeScore is the weighted sum, rounded",
+     T.computeScore(10,20,3,12)===Math.round(10*100+20*3+3*30+12*20),
+     "got="+T.computeScore(10,20,3,12)+" expected="+Math.round(10*100+20*3+3*30+12*20));
+  ok("computeScore is zero for an empty run", T.computeScore(0,0,0,0)===0, "got="+T.computeScore(0,0,0,0));
+  ok("computeScore rounds fractional peakRate", T.computeScore(0,0,0,1.5)===Math.round(1.5*20), "got="+T.computeScore(0,0,0,1.5));
+  T.G.computeRendered=5; T.G.deadRendered=10; T.G.husksBoundRun=2; T.G.peakRate=8;
+  ok("challengeScore reads the live G tallies", T.challengeScore()===T.computeScore(5,10,2,8), "got="+T.challengeScore());
+  T.resetRunScore();
 }
 
 // --- research rites multiply the economy ---

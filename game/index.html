@@ -1021,7 +1021,7 @@ function renderLedger(){
 }
 function renderQuota(){
   if(modeCfg().timeLimit){ const left=Math.max(0,(G.challengeDur||0)-(G.time||0)); const m=Math.floor(left/60), s=Math.floor(left%60);
-    const red=left<30; $('quota').innerHTML=`<b style="color:${red?'#9e3b2c':'var(--ember)'}">TIME ${m}:${String(s).padStart(2,'0')}</b> &nbsp;·&nbsp; score <b>${Math.round((G.computeRendered||0)*100)}</b>`; return; }
+    const red=left<30; $('quota').innerHTML=`<b style="color:${red?'#9e3b2c':'var(--ember)'}">TIME ${m}:${String(s).padStart(2,'0')}</b> &nbsp;·&nbsp; score <b>${challengeScore()}</b>`; return; }
   const q=G.quota, t=Math.max(0,Math.ceil(q.t));
   const graceT=(G.graceT==null?150:G.graceT);
   if((G.time||0)<graceT){ $('quota').innerHTML=`<b>GRACE</b> &nbsp; the engine is patient &nbsp;·&nbsp; first tithe in <span style="color:var(--ink)">${Math.ceil(graceT-(G.time||0))}s</span>`; return; }
@@ -1779,6 +1779,10 @@ function resetRunScore(){ G.computeRendered=0; G.deadRendered=0; G.husksBoundRun
 const DREAD_THROTTLE_MIN=0.35;
 // challenge soft-loss: max Dread throttles output (never ends the run). Campaign uses the breach-loss instead.
 function dreadThrottle(d){ const f=clamp(d/100,0,1); return 1-(1-DREAD_THROTTLE_MIN)*f; }
+// blended challenge score — Compute rendered is the spine; bonuses for throughput, workforce, peak rate.
+const SCORE_W_COMPUTE=100, SCORE_W_DEAD=3, SCORE_W_HUSK=30, SCORE_W_PEAK=20;
+function computeScore(c,d,h,p){ return Math.round((c||0)*SCORE_W_COMPUTE + (d||0)*SCORE_W_DEAD + (h||0)*SCORE_W_HUSK + (p||0)*SCORE_W_PEAK); }
+function challengeScore(){ return computeScore(G.computeRendered,G.deadRendered,G.husksBoundRun,G.peakRate); }
 const buildings=[];
 // CASTE SPECIALIZATION — each caste fits a different stage of the death-to-Compute chain.
 // CARRY/GRATE drive extraction & hauling; AFFINITY scales refining/rendering/compute speed by building.
