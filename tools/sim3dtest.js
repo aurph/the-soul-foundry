@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -248,6 +248,28 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   ok("challenge: hitting challengeDur ends the run", T.G.over==='time' || T.G.endedChallenge===true,
      "over="+T.G.over+" ended="+T.G.endedChallenge);
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.G.quota={need:5,period:150,t:150,level:1};
+}
+
+// --- challenge: very hard to lose (no breach-loss; Dread throttles, not kills) ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode='campaign'; T.G.over=null; T.G.time=999; T.G.graceT=0; T.G.dread=100; T.G.breach=0;
+  T.G.quota={need:5,period:150,t:150,level:1};
+  T.spawnVillager(0,0,"reaper");
+  for(let s=0;s<30*20 && !T.G.over;s++){ T.G.dread=100; T.stepEconomy(1/30); }
+  ok("campaign: sustained max Dread breaches (over=lose)", T.G.over==='lose', "over="+T.G.over);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode='challenge'; T.G.challengeDur=600; T.G.over=null; T.G.time=10; T.G.graceT=0; T.G.dread=100; T.G.breach=0; T.G.endedChallenge=false;
+  T.spawnVillager(0,0,"reaper");
+  for(let s=0;s<30*30;s++){ T.G.dread=100; T.G.time=10; T.stepEconomy(1/30); }
+  ok("challenge: sustained max Dread does NOT set over", !T.G.over, "over="+T.G.over);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode='challenge'; T.G.over=null; T.G.time=300; T.G.dread=0; T.G.endedChallenge=false;
+  for(let s=0;s<30*5;s++) T.stepEconomy(1/30);
+  ok("challenge: zero crew does not end the run", !T.G.over, "over="+T.G.over);
+  ok("dreadThrottle is 1 at zero Dread", Math.abs(T.dreadThrottle(0)-1)<1e-9, "t0="+T.dreadThrottle(0));
+  ok("dreadThrottle bottoms at DREAD_THROTTLE_MIN at max Dread", T.dreadThrottle(100)<1 && T.dreadThrottle(100)>=0.34,
+     "t100="+T.dreadThrottle(100).toFixed(2));
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.time=0; T.G.over=null; T.G.breach=0; T.G.quota={need:5,period:150,t:150,level:1};
 }
 
 // --- research rites multiply the economy ---

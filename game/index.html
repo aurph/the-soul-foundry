@@ -1776,6 +1776,9 @@ const MODES = {
 function modeCfg(){ return MODES[G.mode||'campaign']||MODES.campaign; }
 const PEAK_WIN=10; // seconds — peak Compute/min sampling window
 function resetRunScore(){ G.computeRendered=0; G.deadRendered=0; G.husksBoundRun=0; G.peakRate=0; G.rateWinAccum=0; G.rateWinT=PEAK_WIN; }
+const DREAD_THROTTLE_MIN=0.35;
+// challenge soft-loss: max Dread throttles output (never ends the run). Campaign uses the breach-loss instead.
+function dreadThrottle(d){ const f=clamp(d/100,0,1); return 1-(1-DREAD_THROTTLE_MIN)*f; }
 const buildings=[];
 // CASTE SPECIALIZATION — each caste fits a different stage of the death-to-Compute chain.
 // CARRY/GRATE drive extraction & hauling; AFFINITY scales refining/rendering/compute speed by building.
@@ -2201,7 +2204,7 @@ function stepEconomy(dt){
     const aff=present?presentW.reduce((s,w)=>s+affinity(w.caste,b.kind),0)/present:1;   // avg caste fit for this building
     const rec=b.def.recipe; const inOk=Object.keys(rec.in).every(r=>(G.stock[r]||0)>=rec.in[r]);
     const outOk=Object.keys(rec.out).every(r=>storeRoom(r));
-    if(b.built!==false&&present>0&&inOk&&outOk){ b.active=true; b.prog+=dt*aff; if(b.def.render)renderers++;
+    if(b.built!==false&&present>0&&inOk&&outOk){ b.active=true; b.prog+=dt*aff*(modeCfg().softLoss?dreadThrottle(G.dread):1); if(b.def.render)renderers++;
       if(b.prog>=rec.time){ b.prog-=rec.time;
         for(const r in rec.in){ G.stock[r]-=rec.in[r]; if(r==='dead'&&b.def.kind==='refine') G.deadRendered=(G.deadRendered||0)+rec.in[r]; }
         for(const r in rec.out){ addStock(r,rec.out[r]); if(r==='compute'){ G.computeRendered=(G.computeRendered||0)+rec.out[r]; G.rateWinAccum=(G.rateWinAccum||0)+rec.out[r]; } }
@@ -2237,8 +2240,9 @@ function stepEconomy(dt){
   // random events
   G.eventT=(G.eventT==null?60:G.eventT)-dt; if(G.eventT<=0 && G.time>15){ G.eventT=rr(55,95); fireEvent(); }
   // lose conditions
-  if(villagers.filter(v=>!v.dead).length===0 && G.time>20) endGame(false,"extinct");
-  if(G.dread>=100){ G.breach=(G.breach||0)+dt; if(G.breach>=15) endGame(false,"breach"); } else G.breach=0;
+  if(!modeCfg().softLoss && villagers.filter(v=>!v.dead).length===0 && G.time>20) endGame(false,"extinct");
+  if(!modeCfg().softLoss){ if(G.dread>=100){ G.breach=(G.breach||0)+dt; if(G.breach>=15) endGame(false,"breach"); } else G.breach=0; }
+  else G.breach=0;
   // peak Compute-per-minute over a rolling PEAK_WIN window (deterministic; reads tallies only)
   G.rateWinT=(G.rateWinT==null?PEAK_WIN:G.rateWinT)-dt;
   if(G.rateWinT<=0){ const r=((G.rateWinAccum||0)/PEAK_WIN)*60; if(r>(G.peakRate||0)) G.peakRate=r; G.rateWinAccum=0; G.rateWinT=PEAK_WIN; }
