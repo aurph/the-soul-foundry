@@ -640,9 +640,10 @@ function updateShroud(){ if(!SHROUD.length) return;
     if(t.revealed && t.op>0){ t.op=Math.max(0,t.op-0.06); t.m.material.opacity=t.op; if(t.op<=0.01)t.m.visible=false; }
   }
 }
+function seedWorld(s){ WORLD_SEED=s|0; RNG=mulberry32(WORLD_SEED); genRegions(WORLD_SEED); }
 function bootWorld(seedOverride){
   bootmsg("raising the valley…");
-  WORLD_SEED=(seedOverride!=null?seedOverride:((Date.now())%1e6))|0; RNG=mulberry32(WORLD_SEED); genRegions(WORLD_SEED);
+  seedWorld(seedOverride!=null?seedOverride:((Date.now())%1e6)|0);
   resize(); buildTerrain(); buildEnvironment(); scatterWorld(); buildAsh(); buildShroud();
   Cam.target.set(0,terrainHeight(0,0),0);
   updateCamera();
@@ -1517,12 +1518,27 @@ function loadGame(){ const s=readSave(); if(!s||!s.buildings||!s.buildings.lengt
   try{ applySave(s); if(typeof toast==="function") toast("The foundry stirs from where you left it."); return true; }
   catch(e){ if(console&&console.warn)console.warn("load failed",e); return false; } }
 
+// parse a challenge/share URL: ?mode=challenge&seed=42&dur=1200 (dur must be a known preset)
+function parseParams(search){ const p=new URLSearchParams(search||''); const out={mode:null,seed:null,dur:null};
+  const m=p.get('mode'); if(m==='challenge'||m==='campaign') out.mode=m;
+  const s=p.get('seed'); if(s!=null && s!=='' && isFinite(+s)) out.seed=(+s)|0;
+  const d=p.get('dur'); if(d!=null && [600,1200,1800].includes(+d)) out.dur=+d;
+  return out; }
 function start(){
   setGrain(getGrain()); loadTut();
+  const params=parseParams(location.search);
   const save=readSave();
   loadVillager(ok=>{
+    if(params.mode==='challenge'){
+      G.mode='challenge'; G.challengeDur=params.dur||600;
+      bootWorld(params.seed!=null?params.seed:null); seedSettlement(); resetRunScore(); G.time=0; G.over=null; G.endedChallenge=false;
+      paused=true; if(typeof buildRail==="function") buildRail();
+      setTimeout(()=>{ try{ if(typeof showModePicker==="function") showModePicker(params); }catch(e){} }, 600);
+      return;
+    }
     bootWorld(save?save.seed:null);
-    if(!(save&&loadGame())){ seedSettlement(); setTimeout(()=>{ try{ let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)showHelp(); else showPrologue(); }catch(e){} }, 700); }
+    if(!(save&&loadGame())){ seedSettlement(); setTimeout(()=>{ try{ if(typeof showModePicker==="function") showModePicker(params);
+      else { let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)showHelp(); else showPrologue(); } }catch(e){} }, 700); }
     paused=true; if(typeof buildRail==="function") buildRail();   // start paused — let the player read in and look around first
   });
 }

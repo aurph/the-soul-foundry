@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -41,7 +41,7 @@ const THREE={ WebGLRenderer:function(){return{setClearColor(){},outputEncoding:0
 function el(){return{style:{},dataset:{},innerHTML:"",textContent:"",width:0,height:0,classList:{add(){},remove(){},toggle(){},contains(){return false;}},
   appendChild(){},removeChild(){},remove(){},setAttribute(){},getContext(){return new Proxy({},{get:()=>()=>({}) });},addEventListener(){},setPointerCapture(){},
   getBoundingClientRect(){return{left:0,top:0,width:800,height:600};},set onclick(v){},get onclick(){return null;}};}
-const sandbox={THREE,console,Math,Date,JSON,performance:{now:()=>Date.now()},setTimeout,clearTimeout,
+const sandbox={THREE,console,Math,Date,JSON,URLSearchParams,performance:{now:()=>Date.now()},setTimeout,clearTimeout,
   innerWidth:1280,innerHeight:720,devicePixelRatio:1,requestAnimationFrame(){return 0;},addEventListener(){},removeEventListener(){},
   location:{search:""},navigator:{getGamepads:()=>[]},document:{getElementById:()=>el(),createElement:()=>el(),addEventListener(){},body:el()}};
 sandbox.window=sandbox; sandbox.globalThis=sandbox;
@@ -281,6 +281,24 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.G.computeRendered=5; T.G.deadRendered=10; T.G.husksBoundRun=2; T.G.peakRate=8;
   ok("challengeScore reads the live G tallies", T.challengeScore()===T.computeScore(5,10,2,8), "got="+T.challengeScore());
   T.resetRunScore();
+}
+
+// --- URL params + seed determinism ---
+{ ok("parseParams reads mode/seed/dur", (()=>{ const p=T.parseParams('?mode=challenge&seed=42&dur=1200');
+     return p.mode==='challenge'&&p.seed===42&&p.dur===1200; })(), "parsed="+JSON.stringify(T.parseParams('?mode=challenge&seed=42&dur=1200')));
+  ok("parseParams is empty-safe", (()=>{ const p=T.parseParams(''); return p.mode==null&&p.seed==null&&p.dur==null; })(), "empty");
+  ok("parseParams rejects an out-of-range dur", T.parseParams('?dur=99999').dur==null, "dur="+T.parseParams('?dur=99999').dur);
+  function runSeed(seed){ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null;
+    T.G.mode='challenge'; T.G.challengeDur=600; T.G.graceT=1e9; T.G.dread=0;
+    T.seedWorld(seed); T.resetRunScore(); T.seedSettlement();
+    const cr=T.placeBuildingFree("crematory",-8,0), dc=T.placeBuildingFree("datacenter",8,0);
+    for(let i=0;i<3;i++) T.assignHusk(T.spawnVillager(-8,2,"reaper"),cr);
+    for(let i=0;i<4;i++) T.assignHusk(T.spawnVillager(8,2,"reaper"),dc);
+    for(let st=0;st<30*120;st++){ T.G.stock.dead=100000; T.G.stock.soulash=300; T.G.stock.core=100000; T.G.stock.power=100000; T.G.stock.ichor=100000; T.G.stock.compute=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+    return T.G.computeRendered; }
+  const a=runSeed(12345), b=runSeed(12345);
+  ok("same forced seed yields identical computeRendered (determinism)", a===b && a>0, "a="+a+" b="+b);
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.resetRunScore();
 }
 
 // --- research rites multiply the economy ---
