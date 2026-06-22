@@ -1482,7 +1482,7 @@ function showRites(){ SND.resume();
 let _ledgerT=0;
 function simStep(dt){
   stepEconomy(dt); stepHusks(dt);
-  G.autosaveT=(G.autosaveT==null?25:G.autosaveT)-dt; if(G.autosaveT<=0){ G.autosaveT=25; saveGame(); }
+  G.autosaveT=(G.autosaveT==null?25:G.autosaveT)-dt; if(G.autosaveT<=0){ G.autosaveT=25; if(shouldAutosave()) saveGame(); }
   // weather: a slow drift between clear air and ashfall — atmosphere, and a little tension
   G.wx=(G.wx||0)+dt*0.015; const af=clamp((Math.sin(G.wx)+Math.sin(G.wx*0.37)-0.55)/1.1,0,1);
   if(scene.fog) scene.fog.density=0.0072+af*0.0075;
@@ -1561,6 +1561,7 @@ function applySave(s){
   if(typeof renderLedger==="function"){ renderLedger(); renderQuota(); buildRail(); buildDock(); }
   return true;
 }
+function shouldAutosave(){ return (G.mode||'campaign')==='campaign'; }   // challenge runs never clobber the campaign save
 function saveGame(){ try{ localStorage.setItem('sf_save',JSON.stringify(serializeState())); return true; }catch(e){ return false; } }
 function readSave(){ try{ const s=localStorage.getItem('sf_save'); return s?JSON.parse(s):null; }catch(e){ return null; } }
 function loadGame(){ const s=readSave(); if(!s||!s.buildings||!s.buildings.length) return false;
@@ -1592,7 +1593,7 @@ function start(){
   });
 }
 function beginPlay(){ paused=false; if(typeof buildRail==="function")buildRail(); }
-addEventListener('beforeunload',()=>{ try{ if(!G.over) saveGame(); }catch(e){} });
+addEventListener('beforeunload',()=>{ try{ if(!G.over && shouldAutosave()) saveGame(); }catch(e){} });
 function toast(msg,type){ const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg;
   $('toasts').appendChild(t); setTimeout(()=>{t.style.transition='opacity .5s';t.style.opacity=0;setTimeout(()=>t.remove(),500);},3200); }
 start();
