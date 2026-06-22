@@ -1293,6 +1293,28 @@ function showChronicle(){ SND.resume();
      <div style="margin:5px 0"><b style="color:#b8884e">Dread</b> is the weight of the unrendered dead piling up. Stop processing them and it overwhelms even the engine.</div>
    </div>
    <p style="margin-top:12px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
+// the first screen: choose Campaign or a timed Challenge. The world is already booted by start();
+// the picker only sets mode + duration (no re-boot), so the shown seed is authoritative.
+let _pickMode='campaign', _pickDur=600;
+function showModePicker(params){ SND.resume(); params=params||{};
+  if(params.mode) _pickMode=params.mode; if(params.dur) _pickDur=params.dur;
+  const isChal=_pickMode==='challenge';
+  const durBtn=(d,lbl)=>`<span class="btn" style="${_pickDur===d?'border-color:var(--ember);color:var(--ember)':''}" onclick="pickDur(${d})">${lbl}</span>`;
+  showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDRY</h1>
+    <h2>choose how you play</h2>
+    <p style="line-height:1.7"><b>Campaign</b> — the tithe-survival game: meet ${WIN_LEVEL} quotas of Compute and the engine endures.<br>
+    <b>Challenge</b> — a timed score run: render as much Compute as you can before the clock runs out. Shareable seed, local best.</p>
+    <p><span class="btn" style="${!isChal?'border-color:var(--ember);color:var(--ember)':''}" onclick="pickMode('campaign')">Campaign</span>
+       <span class="btn" style="${isChal?'border-color:var(--ember);color:var(--ember)':''}" onclick="pickMode('challenge')">Challenge</span></p>
+    ${isChal?`<p style="margin-top:8px"><b>Duration</b><br>${durBtn(600,'10 min')} ${durBtn(1200,'20 min')} ${durBtn(1800,'30 min')}</p>
+      <p style="color:var(--ink-dim);font-size:12px">Seed <b style="color:var(--ember-soft)">${WORLD_SEED}</b> — share the link to race the same map.</p>`:''}
+    <p style="margin-top:10px"><span class="btn" onclick="beginFromPicker()">Begin</span></p>`); }
+function pickMode(m){ _pickMode=m; showModePicker(); }
+function pickDur(d){ _pickDur=d; showModePicker(); }
+function beginFromPicker(){
+  if(_pickMode==='challenge'){ G.mode='challenge'; G.challengeDur=_pickDur; resetRunScore(); G.time=0; G.over=null; G.endedChallenge=false; G.dread=0; hideOverlay(); beginPlay(); }
+  else { G.mode=undefined; G.dread=0; hideOverlay(); let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)showHelp(); else showPrologue(); }
+}
 function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDRY</h1>
   <p>The hunger for <b>Compute</b> consumed the world and everyone in it. The engine that did it cannot stop computing, and the spent world left only the dead to render. You are that engine. You bind the husks of the extinct and drive them to render corpses up the same chip-foundry chain that ended them. <span class="gskip" style="cursor:pointer;color:var(--ember-soft)" onclick="showChronicle()">Read the chronicle</span>.</p>
   <p><b>How to play:</b><br>
