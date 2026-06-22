@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -196,6 +196,37 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
      "quota="+T.modeCfg().quota+" timeLimit="+T.modeCfg().timeLimit+" softLoss="+T.modeCfg().softLoss);
   T.G.mode=undefined;
   ok("absent mode still reads campaign (save-compat)", T.modeCfg().quota===true, "quota="+T.modeCfg().quota);
+}
+
+// --- challenge scoring tallies ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null;
+  T.G.graceT=1e9; T.G.dread=0;   // keep campaign quota/Dread dormant so this block can't pollute later tests
+  T.resetRunScore();
+  ok("resetRunScore zeroes the tallies",
+     T.G.computeRendered===0 && T.G.deadRendered===0 && T.G.husksBoundRun===0 && T.G.peakRate===0,
+     "c="+T.G.computeRendered+" d="+T.G.deadRendered+" h="+T.G.husksBoundRun+" p="+T.G.peakRate);
+  T.placeBuildingFree("den",6,6); T.placeBuildingFree("pyre",0,0);
+  T.G.stock.dead=5; T.G.stock.compute=10;
+  T.bindHusk();
+  ok("husksBoundRun increments when a husk is bound", T.G.husksBoundRun===1, "h="+T.G.husksBoundRun);
+  // deadRendered via a Crematory (consumes dead; zero its outputs each step for room)
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.time=999;
+  T.resetRunScore(); T.placeBuildingFree("stockpile",0,-12);
+  const cr=T.placeBuildingFree("crematory",-8,0);
+  for(let i=0;i<3;i++) T.assignHusk(T.spawnVillager(-8,2,"reaper"),cr);
+  for(let st=0;st<30*120;st++){ T.G.stock.dead=100000; T.G.stock.soulash=300; T.G.stock.bonesil=0; T.G.stock.ichor=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  ok("deadRendered tallies Crematory throughput", T.G.deadRendered>0, "deadRendered="+Math.floor(T.G.deadRendered));
+  // computeRendered + peakRate via a Datacenter (inputs supplied; discard compute each step for room)
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.time=999;
+  T.resetRunScore(); T.placeBuildingFree("stockpile",0,-12);
+  const dc=T.placeBuildingFree("datacenter",8,0);
+  for(let i=0;i<4;i++) T.assignHusk(T.spawnVillager(8,2,"reaper"),dc);
+  for(let st=0;st<30*120;st++){ T.G.stock.core=100000; T.G.stock.power=100000; T.G.stock.ichor=100000; T.G.stock.soulash=300; T.G.stock.compute=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  ok("computeRendered tallies Datacenter output", T.G.computeRendered>0, "computeRendered="+Math.floor(T.G.computeRendered));
+  ok("computeRendered equals total Datacenter compute out (cyc*3)", Math.abs(T.G.computeRendered-dc.cyc*3)<1e-6,
+     "computeRendered="+T.G.computeRendered+" expected="+dc.cyc*3);
+  ok("peakRate observed a positive Compute/min", T.G.peakRate>0, "peakRate="+T.G.peakRate.toFixed(1));
+  T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;   // restore clean state for following tests
 }
 
 // --- research rites multiply the economy ---

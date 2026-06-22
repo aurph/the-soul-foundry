@@ -1459,6 +1459,7 @@ function simStep(dt){
 function placeBuildingFree(k,x,z){ const def=BLD[k]; ensureBuildingGLB(k); const mesh=makeBuildingMesh(k,def); mesh.position.set(x,terrainHeight(x,z),z);
   scene.add(mesh); const b={kind:k,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0}; buildings.push(b); groundBuilding(b); return b; }
 function seedSettlement(){
+  resetRunScore();
   G.stock.dead=70; G.stock.soulash=16; G.stock.bonesil=8; G.stock.ichor=6; G.stock.compute=10;
   placeBuildingFree("pyre",0,0);
   placeBuildingFree("den",7,4); placeBuildingFree("den",-7,4);
@@ -1766,6 +1767,8 @@ const MODES = {
   challenge: { quota:false, timeLimit:true,  softLoss:true  },
 };
 function modeCfg(){ return MODES[G.mode||'campaign']||MODES.campaign; }
+const PEAK_WIN=10; // seconds — peak Compute/min sampling window
+function resetRunScore(){ G.computeRendered=0; G.deadRendered=0; G.husksBoundRun=0; G.peakRate=0; G.rateWinAccum=0; G.rateWinT=PEAK_WIN; }
 const buildings=[];
 // CASTE SPECIALIZATION — each caste fits a different stage of the death-to-Compute chain.
 // CARRY/GRATE drive extraction & hauling; AFFINITY scales refining/rendering/compute speed by building.
@@ -2192,7 +2195,10 @@ function stepEconomy(dt){
     const rec=b.def.recipe; const inOk=Object.keys(rec.in).every(r=>(G.stock[r]||0)>=rec.in[r]);
     const outOk=Object.keys(rec.out).every(r=>storeRoom(r));
     if(b.built!==false&&present>0&&inOk&&outOk){ b.active=true; b.prog+=dt*aff; if(b.def.render)renderers++;
-      if(b.prog>=rec.time){ b.prog-=rec.time; for(const r in rec.in)G.stock[r]-=rec.in[r]; for(const r in rec.out)addStock(r,rec.out[r]); b.cyc++; } }
+      if(b.prog>=rec.time){ b.prog-=rec.time;
+        for(const r in rec.in){ G.stock[r]-=rec.in[r]; if(r==='dead'&&b.def.kind==='refine') G.deadRendered=(G.deadRendered||0)+rec.in[r]; }
+        for(const r in rec.out){ addStock(r,rec.out[r]); if(r==='compute'){ G.computeRendered=(G.computeRendered||0)+rec.out[r]; G.rateWinAccum=(G.rateWinAccum||0)+rec.out[r]; } }
+        b.cyc++; } }
     else b.active=false;
   }
   // Dread = the backlog of the unprocessed dead. It climbs as bodies pile up; rendering them (Crematories) + Wards hold it back.
@@ -2226,6 +2232,9 @@ function stepEconomy(dt){
   // lose conditions
   if(villagers.filter(v=>!v.dead).length===0 && G.time>20) endGame(false,"extinct");
   if(G.dread>=100){ G.breach=(G.breach||0)+dt; if(G.breach>=15) endGame(false,"breach"); } else G.breach=0;
+  // peak Compute-per-minute over a rolling PEAK_WIN window (deterministic; reads tallies only)
+  G.rateWinT=(G.rateWinT==null?PEAK_WIN:G.rateWinT)-dt;
+  if(G.rateWinT<=0){ const r=((G.rateWinAccum||0)/PEAK_WIN)*60; if(r>(G.peakRate||0)) G.peakRate=r; G.rateWinAccum=0; G.rateWinT=PEAK_WIN; }
   G.time=(G.time||0)+dt;
   // sample total resources held over time for the economy line chart
   G.histT=(G.histT==null?0:G.histT)-dt;
@@ -2247,7 +2256,7 @@ function bindHusk(caste){ caste=(caste==='stump'||caste==='reaper')?caste:'worke
   if((G.stock.dead||0)<cost.dead || (G.stock.compute||0)<cost.compute){ SND.sfx('deny'); toast("Binding a "+casteName(caste)+" needs "+cost.dead+" corpse"+(cost.dead>1?"s":"")+" and "+cost.compute+" Compute.","bad"); return false; }
   G.stock.dead-=cost.dead; G.stock.compute-=cost.compute;
   const p=buildings.find(b=>b.kind==="pyre")||{x:0,z:0};
-  spawnVillager(p.x+rr(-4,4),p.z+rr(-4,4),caste); SND.sfx('rise');
+  spawnVillager(p.x+rr(-4,4),p.z+rr(-4,4),caste); SND.sfx('rise'); G.husksBoundRun=(G.husksBoundRun||0)+1;
   if(typeof renderLedger==="function")renderLedger(); if(typeof refreshInspect==="function")refreshInspect();
   toast("A "+casteName(caste)+" is bound to the foundry.","good"); return true; }
 function endGame(win,why){ if(G.over)return; G.over=win?"win":"lose"; paused=true; SND.sfx(win?'win':'lose'); try{ localStorage.removeItem('sf_save'); }catch(e){}   // clear the autosave so Again/reload starts a fresh valley, not the moment before defeat
