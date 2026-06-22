@@ -85,20 +85,21 @@
 
   /* bottom build dock */
   #dock{position:fixed;left:0;right:0;bottom:0;z-index:30;border-top:1px solid var(--line);
-    background:linear-gradient(#0d0e12e0,#14151bf6)}
+    background:linear-gradient(#15110bf0,#0c0a07f8)}
   #docktabs{display:flex;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
   #docktabs::-webkit-scrollbar{display:none}
   .tab{flex:0 0 auto;padding:7px 16px;font-size:12px;letter-spacing:.5px;color:var(--ink-dim);cursor:pointer;border-right:1px solid var(--line)}
   .tab.on{color:var(--ember);background:#191b22;box-shadow:inset 0 -2px 0 var(--ember)}
   #dockrow{display:flex;gap:8px;padding:9px 8px;overflow-x:auto;min-height:104px;align-items:stretch;scrollbar-width:thin}
   #dockrow::-webkit-scrollbar{height:6px}#dockrow::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
-  .card{flex:0 0 auto;width:108px;border:1px solid var(--line);border-radius:6px;background:var(--iron2);
-    padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:4px;position:relative}
+  .card{flex:0 0 auto;width:104px;border:1px solid #2c2418;border-radius:6px;background:linear-gradient(#221b12,#191309);
+    padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden}
   .card:hover{border-color:var(--ember-soft)} .card.sel{border-color:var(--ember);box-shadow:0 0 0 1px var(--ember)}
   .card.locked{opacity:.45;filter:grayscale(.7)}
-  .card .th{width:100%;height:58px;border-radius:4px;background:#0c0d11 center/cover no-repeat;border:1px solid #000}
+  .card .cat{position:absolute;top:0;left:0;right:0;height:3px}
+  .card .th{width:100%;height:54px;border-radius:4px;background:#0c0a07 center/cover no-repeat;border:1px solid #000}
   .card .nm{font-size:11px;line-height:1.15;color:var(--ink-bright);height:26px;overflow:hidden}
-  .card .ct{font-size:10px;color:var(--ember-soft)}
+  .card .ct{font-size:10px;color:var(--ink-dim)}
   .card .lk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
     font-size:10px;color:#d8cbb0;background:#0a0b0ed8;border-radius:6px;padding:4px}
   .card .hk{position:absolute;top:3px;right:3px;z-index:3;min-width:16px;height:16px;padding:0 3px;border-radius:3px;
@@ -301,6 +302,7 @@ const SND={
   ctx:null, master:null, sfxGain:null, droneGain:null,
   started:false, muted:false, musicVol:0.55, sfxVol:0.8,
   pool:{}, music:null, dread:null, droneNodes:[],
+  vol:{place:0.3, rise:0.6, crumble:0.6, haunt:0.55, bell:0.8},   // per-sound trims (place/finish were too loud)
   // asset urls — null means "synth only"; the build fills these with vendored paths
   src:{ music:"assets/audio/music.m4a", dread:"assets/audio/dread.m4a", place:"assets/audio/place.mp3",
         bell:"assets/audio/bell.mp3", crumble:"assets/audio/crumble.mp3", haunt:"assets/audio/haunt.mp3", rise:"assets/audio/rise.mp3" },
@@ -326,7 +328,7 @@ const SND={
   sfx(name){ if(!this.started||this.muted) return; const url=this.src[name];
     if(url){ this.playEl(name,url); } else { this.synth(name); } },
   playEl(name,url){ try{ let pool=this.pool[name]; if(!pool){ pool=this.pool[name]=[this.mkEl(url,false,this.sfxVol),this.mkEl(url,false,this.sfxVol),this.mkEl(url,false,this.sfxVol)]; }
-    const a=pool.find(e=>e&&(e.paused||e.ended))||pool[0]; if(a){ a.volume=this.muted?0:this.sfxVol; a.currentTime=0; const p=a.play(); if(p&&p.catch)p.catch(()=>this.synth(name)); } }catch(e){ this.synth(name); } },
+    const a=pool.find(e=>e&&(e.paused||e.ended))||pool[0]; if(a){ a.volume=this.muted?0:this.sfxVol*(this.vol[name]!=null?this.vol[name]:1); a.currentTime=0; const p=a.play(); if(p&&p.catch)p.catch(()=>this.synth(name)); } }catch(e){ this.synth(name); } },
   /* ---- pure-synth SFX + ambient (no assets needed) ---- */
   envOsc(o,g,a,d,glideTo){ const now=this.ctx.currentTime; if(glideTo)o.frequency.exponentialRampToValueAtTime(glideTo,now+a+d);
     const gn=this.ctx.createGain(); gn.gain.setValueAtTime(0.0001,now); gn.gain.exponentialRampToValueAtTime(g,now+a); gn.gain.exponentialRampToValueAtTime(0.0001,now+a+d);
@@ -1142,7 +1144,8 @@ function buildDock(){
     const costStr=Object.keys(def.cost).length? Object.entries(def.cost).map(([r,n])=>n+" "+RES[r].name.split(' ')[0]).join(', ') : 'free';
     const thumb=BLD_IMG[k]?`background:#0c0d11 center/cover no-repeat url('${BLD_IMG[k]}')`
       :`background:#${def.kind==='refine'||def.kind==='datacenter'?'2a2d33':def.kind==='gather'?'2b2519':'33312c'}`;
-    card.innerHTML=`${BLD_HOTKEY[k]?`<div class="hk">${BLD_HOTKEY[k]}</div>`:''}<div class="th" style="${thumb}"></div>
+    const CAT_COL={dwell:'#c9772a',gather:'#7d8a5a',refine:'#5f8f9a',civic:'#9a8fb0'};
+    card.innerHTML=`<div class="cat" style="background:${CAT_COL[bldTab(k)]||'#5f8f9a'}"></div>${BLD_HOTKEY[k]?`<div class="hk">${BLD_HOTKEY[k]}</div>`:''}<div class="th" style="${thumb}"></div>
       <div class="nm">${def.name}</div><div class="ct">${costStr}</div>`;
     card.onclick=()=>selectBuildKind(k);
     row.appendChild(card); }
@@ -1888,7 +1891,7 @@ function makeStockpile(def){
 function updateStockpiles(){ for(const b of buildings){ if(b.kind!=="stockpile"||!b.mesh||!b.mesh.userData.piles) continue;
   for(const p of b.mesh.userData.piles){ const f=pileFill(p.res); p.node.visible=f>0.012; p.node.scale.y=Math.max(0.02,f); } } }
 // ---- chimney smoke for the rendering buildings (render-only; uses Math.random so it never desyncs the sim) ----
-const SMOKERS={crematory:2.0, furnace:1.85, ossuary:1.7};
+const SMOKERS={crematory:3.2, furnace:3.0, ossuary:2.8};   // emit height ~ the roofline, so smoke rises off the top, not the middle
 function ensureSmoke(b){ if(b._smoke||!SMOKERS[b.kind]) return; const puffs=[];
   for(let i=0;i<5;i++){ const m=new THREE.Mesh(new THREE.IcosahedronGeometry(0.26,0),
     new THREE.MeshStandardMaterial({color:0x6b665d,transparent:true,opacity:0,flatShading:true,roughness:1,depthWrite:false}));
@@ -1898,8 +1901,8 @@ function removeSmoke(b){ if(b._smoke){ for(const m of b._smoke) scene.remove(m);
 function animateSmoke(b,dt){ if(!b._smoke) return;
   for(const m of b._smoke){ if(!b.active){ m.visible=false; continue; } m.visible=true;
     m._life+=dt*0.42; if(m._life>1) m._life-=1; const l=m._life;
-    m.position.set(b.x+Math.sin(l*8+b.x*3)*0.24, b._smokeBase+l*1.8, b.z+Math.cos(l*7+b.z*3)*0.24);
-    const sc=0.3+l*1.35; m.scale.set(sc,sc,sc); m.material.opacity=0.5*(1-l)*Math.min(1,l*7); } }
+    m.position.set(b.x+Math.sin(l*8+b.x*3)*(0.12+l*0.3), b._smokeBase+l*1.9, b.z+Math.cos(l*7+b.z*3)*(0.12+l*0.3));   // narrow at the base, drifts out as it rises
+    const sc=0.26+l*1.3; m.scale.set(sc,sc,sc); m.material.opacity=0.5*(1-l)*Math.min(1,l*7); } }
 
 // the Substation: a soul-ash burner that reads as POWER — a dark transformer with bone
 // insulator stacks, arcing wires and an ember glow (no more random oil-well derrick).
