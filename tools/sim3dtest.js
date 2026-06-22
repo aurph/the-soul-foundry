@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -183,6 +183,19 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   ok("save/load restores nodes", T.nodes.length===nn, T.nodes.length+"/"+nn);
   ok("save/load restores resources & Bones", T.G.stock.bonesil===42&&T.G.writ===77, "bonesil="+T.G.stock.bonesil+" bones="+T.G.writ);
   ok("save/load restores quota progress", T.G.quota.level===4, "lvl="+T.G.quota.level);
+}
+
+// --- mode config (Challenge Edition) ---
+{ ok("MODES config exists with campaign + challenge", !!(T.MODES&&T.MODES.campaign&&T.MODES.challenge),
+     "keys="+(T.MODES?Object.keys(T.MODES).join(","):"none"));
+  ok("campaign reads as the default mode", T.modeCfg().quota===true && T.modeCfg().timeLimit===false,
+     "default quota="+T.modeCfg().quota);
+  T.G.mode='challenge';
+  ok("challenge mode disables quota + enables timeLimit + softLoss",
+     T.modeCfg().quota===false && T.modeCfg().timeLimit===true && T.modeCfg().softLoss===true,
+     "quota="+T.modeCfg().quota+" timeLimit="+T.modeCfg().timeLimit+" softLoss="+T.modeCfg().softLoss);
+  T.G.mode=undefined;
+  ok("absent mode still reads campaign (save-compat)", T.modeCfg().quota===true, "quota="+T.modeCfg().quota);
 }
 
 // --- research rites multiply the economy ---

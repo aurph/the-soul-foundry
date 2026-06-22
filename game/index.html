@@ -1760,6 +1760,12 @@ const STORE=260, WIN_LEVEL=8;
 const G={ stock:{}, writ:25, dread:0, warmthRatio:1, popCap:6, over:null,
   quota:{need:5, period:150, t:150, level:1}, grow:24, tech:{} };
 RES_ORDER.forEach(r=>G.stock[r]=0);
+// --- game modes: campaign (the tithe-survival game) | challenge (timed score run) ---
+const MODES = {
+  campaign:  { quota:true,  timeLimit:false, softLoss:false },
+  challenge: { quota:false, timeLimit:true,  softLoss:true  },
+};
+function modeCfg(){ return MODES[G.mode||'campaign']||MODES.campaign; }
 const buildings=[];
 // CASTE SPECIALIZATION — each caste fits a different stage of the death-to-Compute chain.
 // CARRY/GRATE drive extraction & hauling; AFFINITY scales refining/rendering/compute speed by building.
