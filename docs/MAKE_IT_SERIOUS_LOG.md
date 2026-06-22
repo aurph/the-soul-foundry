@@ -87,3 +87,23 @@ Higgsfield: ~533 credits (used ~1 for the blueprint glyph).
 
 **Deferred (noted, not yet done):** none outstanding from this batch. Future polish:
 more building model variety/textures, deeper husk work anims per job, methodology page.
+
+## 2026-06-22 — Caste chain-role specialization (full build, TDD, live)
+Differentiate the three castes by their ROLE IN THE DEATH-TO-COMPUTE CHAIN (not
+AtS-style needs/happiness), turning assignment into a supply-chain puzzle.
+
+- **Phase 1 — Affinity:** AFFINITY table + affinity() scales refine/render/compute
+  speed by worker mix. Reapers render best (Crematory/Litho/Ossuary/Datacenter),
+  Stumps extract (Exhumer/Dredge + big CARRY/GRATE) and are crude at fine work,
+  Husks are generalists. Production prog scales by avg worker affinity. (+4 tests)
+- **Phase 2 — Capex:** per-caste bind costs at the Pyre — Husk 1 corpse+2 Compute,
+  Stump 2 corpses+1 Compute (cheap/slow), Reaper 1 corpse+4 Compute (dear/skilled).
+  Pyre UI = three bind buttons with cost + role. (+3 tests)
+- **Phase 3 — Opex:** Reapers need no soul-ash and self-sustain (payoff for the high
+  bind cost); Husks baseline, Stumps a touch more. Upkeep drain scales by who's
+  bound (UPKEEP table). (+4 tests)
+- **Phase 4 — UI:** husk inspector shows Specialty + suited-to-current-job %;
+  building inspector shows best caste + crew efficiency %; Codex gains a caste legend.
+
+Verify: boottest clean; sim 48/48 (was 37). Why-not-AtS: specialization is by chain
+stage + capex/opex, not food/housing/happiness; no needs system added.
