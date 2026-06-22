@@ -107,3 +107,18 @@ AtS-style needs/happiness), turning assignment into a supply-chain puzzle.
 
 Verify: boottest clean; sim 48/48 (was 37). Why-not-AtS: specialization is by chain
 stage + capex/opex, not food/housing/happiness; no needs system added.
+
+## 2026-06-22 — Challenge Edition Phase 1 (full TDD build, shipped)
+Brainstormed (subagent integration brief + owner forks) -> spec -> subagent plan ->
+10-task TDD build. Timed shareable mode alongside the campaign.
+- Mode system: G.mode + MODES config + modeCfg(); campaign byte-compatible (absent=campaign).
+- Score tallies: computeRendered / deadRendered / husksBoundRun / peak Compute-min.
+- Clock: countdown banner, time-up endChallenge; quota + basePressure suppressed in challenge.
+- Very hard to lose: Dread soft-throttles output (min 0.35), no breach/extinction end.
+- Blended score (computeScore, weights as consts) + live banner.
+- URL ?mode/seed/dur parse + start() routing; seedWorld determinism (same seed = same score).
+- Mode picker (Campaign/Challenge + 10/20/30 + seed), end screen (score breakdown, local
+  best per dur, share/Retry/Again), autosave gated to campaign (never clobbers sf_save).
+- Phase 2 (Neon Postgres + Cloudflare Worker leaderboard) deferred per spec.
+Verify: sim3dtest 83/83 (was 48), boottest clean. Campaign quota/breach/save regressions
+all still green. Determinism a==b. End-to-end 30s run ends on clock with score.

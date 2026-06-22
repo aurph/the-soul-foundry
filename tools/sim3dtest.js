@@ -320,6 +320,19 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   ok("serializeState still campaign-shaped (no mode leak breaks load)", snap.G&&snap.G.quota&&typeof snap.seed==='number', "keys="+Object.keys(snap).join(","));
 }
 
+// --- end-to-end: a short challenge run scores and ends on the clock ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode='challenge'; T.G.challengeDur=30; T.G.over=null; T.G.endedChallenge=false; T.G.dread=0; T.G.graceT=1e9;
+  T.seedWorld(99); T.resetRunScore(); T.G.time=0;
+  T.placeBuildingFree("stockpile",0,-12);
+  const dc=T.placeBuildingFree("datacenter",8,0);
+  for(let i=0;i<4;i++) T.assignHusk(T.spawnVillager(8,2,"reaper"),dc);
+  for(let st=0;st<30*40 && !T.G.over;st++){ T.G.stock.core=100000; T.G.stock.power=100000; T.G.stock.ichor=100000; T.G.stock.soulash=300; T.G.stock.compute=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  ok("end-to-end: a 30s challenge ends on the clock with a score", (T.G.over==='time') && T.challengeScore()>0,
+     "over="+T.G.over+" score="+T.challengeScore()+" time="+T.G.time.toFixed(1));
+  T.G.mode=undefined; T.G.graceT=150; T.G.over=null; T.G.time=0; T.resetRunScore();
+}
+
 // --- research rites multiply the economy ---
 { T.G.tech={}; const baseG=T.techMul('gather'), baseC=T.techMul('carry');
   ok("techMul defaults to 1x", baseG===1&&baseC===1, "g="+baseG+" c="+baseC);
