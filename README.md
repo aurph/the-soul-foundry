@@ -1,5 +1,9 @@
 # THE SOUL FOUNDRY
 
+![The Soul Foundry](media/foundry.png)
+
+**Play it: [the-soul-foundry.vercel.app](https://the-soul-foundry.vercel.app)**
+
 A true-3D, browser-based, desolate colony-automation game. Humanity built a mind
 to end its problems, and the mind's one appetite, Compute, consumed the world and
 everyone in it. It cannot stop computing, and the spent world left only the dead to
