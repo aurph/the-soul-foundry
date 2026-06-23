@@ -2146,6 +2146,12 @@ function moveHusk(v,tx,tz,dt,stop){
     const ox=ob.x-o.position.x, oz=ob.z-o.position.z, od=Math.hypot(ox,oz), R=ob.r+HUSK_R+0.7;
     if(od<R && od>0.001 && (ox*dirx+oz*dirz)/od>0.15){ let tnx=-oz/od, tnz=ox/od; if(tnx*dirx+tnz*dirz<0){ tnx=-tnx; tnz=-tnz; }
       const w=clamp((R-od)/R,0,1)*1.5; dirx+=tnx*w; dirz+=tnz*w; } }
+  // local avoidance: veer around nearby husks — radial push away + a consistent tangential swirl so
+  // approaching husks slide past instead of shoving through each other (position-only, deterministic)
+  for(const v2 of villagers){ if(v2===v||v2.dead) continue; const p2=v2.obj.position;
+    const ox=p2.x-o.position.x, oz=p2.z-o.position.z, od2=ox*ox+oz*oz, AR=1.35;
+    if(od2<AR*AR && od2>1e-4){ const od=Math.sqrt(od2), w=(AR-od)/AR, ux=ox/od, uz=oz/od;
+      dirx+=(-ux)*w*1.2 + (-uz)*w*0.45; dirz+=(-uz)*w*1.2 + (ux)*w*0.45; } }
   { const dl=Math.hypot(dirx,dirz)||1; dirx/=dl; dirz/=dl; }
   let nx=o.position.x+dirx*sp, nz=o.position.z+dirz*sp;
   for(const ob of OBS){ const ex=nx-ob.x, ez=nz-ob.z, ed=Math.hypot(ex,ez), R=ob.r+HUSK_R;
