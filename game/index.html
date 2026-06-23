@@ -1903,16 +1903,11 @@ const BLD_IMG={
 // Pyre + stockpile stay procedural (animated flame / dynamic material piles).
 const BLD_GLB={
   den:"assets/glb/den.glb", exhumer:"assets/glb/woodcutter.glb", dredge:"assets/glb/dredge.glb",
-  crematory:"assets/glb/ventcap.glb", furnace:"assets/glb/furnace.glb",
-  litho:"assets/glb/salvage.glb", ossuary:"assets/glb/assembly.glb",
-  datacenter:"assets/glb/datacenter2.glb", ward:"assets/glb/ward.glb", market:"assets/glb/market.glb",
+  ward:"assets/glb/ward.glb", market:"assets/glb/market.glb",
 };
 const BLD_GLB_CDN={
   den:GCDN+"313cdc68-2ae3-4f96-838a-2a64fdba6915.glb", exhumer:GCDN+"df17a501-c35b-452d-b4ed-82da088c4791.glb",
-  dredge:GCDN+"5c7db5d2-c50f-4fbb-bed0-7f0e3c2f03f0.glb", crematory:GCDN+"0c183f5f-9b88-4a68-9686-9901ece8f9d4.glb",
-  furnace:GCDN+"a115d2bf-ab62-4d8a-ac8b-2708b3546d94.glb",
-  litho:GCDN+"cbdc07eb-b691-4731-b322-26bb0fa0c10d.glb", ossuary:GCDN+"056aae17-a731-43e1-8c00-bcce9959b5e2.glb",
-  datacenter:GCDN+"6261e375-4861-4928-ab93-53f7e65d8b00.glb",
+  dredge:GCDN+"5c7db5d2-c50f-4fbb-bed0-7f0e3c2f03f0.glb",
   ward:GCDN+"1e022908-5cf5-4d9e-9d60-e9995b53799c.glb", market:GCDN+"dfcf36c9-eeee-4511-88b8-99f2e4b8aadc.glb",
 };
 const bldBank={}, bldLoading={};
@@ -2036,11 +2031,75 @@ function makeMill(def){
   g.userData.glow=tr1; g.userData.spin=[{m:disc,ax:'y',sp:2.4},{m:disc2,ax:'y',sp:-1.7}];
   return g;
 }
+// Soul Furnace — a smelter: dark iron body, a molten ember mouth, bone hoops, a chimney (smokes), a bobbing bellows.
+function makeFurnace(def){ const g=new THREE.Group();
+  const iron=MAT(0x26221c,{metalness:0.5,roughness:0.55}), dark=MAT(0x14110c,{metalness:0.4}), bone=MAT(0xb3a98f), ember=emis(0xe8732a);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.1,1.6,8),iron); body.position.y=0.8; g.add(body);
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.6,0.18),ember); mouth.material.emissiveIntensity=0.85; mouth.position.set(0,0.62,0.92); g.add(mouth);
+  const lintel=new THREE.Mesh(new THREE.BoxGeometry(0.92,0.18,0.3),dark); lintel.position.set(0,1.0,0.9); g.add(lintel);
+  const chimney=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,1.3,6),dark); chimney.position.set(0.1,2.05,-0.25); g.add(chimney);
+  for(let i=0;i<3;i++){ const ring=new THREE.Mesh(new THREE.TorusGeometry(0.98,0.06,5,10),bone); ring.rotation.x=Math.PI/2; ring.position.y=0.4+i*0.55; g.add(ring); }
+  const bellows=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.4,0.7),bone); bellows.position.set(-1.05,0.7,0); g.add(bellows);
+  g.userData.glow=mouth; g.userData.bob=[{m:bellows,y0:0.7,amp:0.13,sp:3,ph:0}];
+  return g; }
+// Crematory — a rendering oven: squat stone body, a wide glowing render-mouth, a chimney (smokes), bone posts + a skull.
+function makeCrematory(def){ const g=new THREE.Group();
+  const stone=MAT(0x35322b), dark=MAT(0x14110c,{metalness:0.3}), bone=MAT(0xb3a98f), ember=emis(0xd9531f);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2.0,1.3,1.6),stone); body.position.y=0.65; g.add(body);
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(1.05,0.6,0.18),ember); mouth.material.emissiveIntensity=0.85; mouth.position.set(0,0.5,0.82); g.add(mouth);
+  const lintel=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.2,0.32),dark); lintel.position.set(0,0.92,0.8); g.add(lintel);
+  const chimney=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.3,1.2,6),dark); chimney.position.set(0.6,1.9,-0.25); g.add(chimney);
+  for(const sx of[-1,1]){ const post=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,1.5,6),bone); post.position.set(sx*0.9,0.75,-0.7); g.add(post); }
+  const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(0.16,0),bone); skull.position.set(0,1.45,-0.2); g.add(skull);
+  g.userData.glow=mouth;
+  return g; }
+// Etch-Litho — a sigil press: a gantry over a spinning wafer bed, a glowing etch-beam, bone-capped columns.
+function makeLitho(def){ const g=new THREE.Group();
+  const iron=MAT(0x23262c,{metalness:0.5,roughness:0.5}), bone=MAT(0xb3a98f), teal=emis(0x6fae9b);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.5,1.4),iron); base.position.y=0.25; g.add(base);
+  const bed=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.06,16),MAT(0x6fae9b,{metalness:0.3,roughness:0.4})); bed.position.set(0,0.55,0); g.add(bed);
+  for(const sx of[-1,1]){ const col=new THREE.Mesh(new THREE.BoxGeometry(0.16,1.4,0.16),iron); col.position.set(sx*0.8,1.1,0); g.add(col);
+    const sk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.11,0),bone); sk.position.set(sx*0.8,1.85,0); g.add(sk); }
+  const gantry=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.18,0.3),iron); gantry.position.set(0,1.72,0); g.add(gantry);
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.5,0.3),iron); head.position.set(0,1.45,0); g.add(head);
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.85,0.12),teal); beam.material.emissiveIntensity=0.8; beam.position.set(0,1.0,0); g.add(beam);
+  g.userData.glow=beam; g.userData.spin=[{m:bed,ax:'y',sp:1.6}];
+  return g; }
+// Assembly Ossuary — bone rib-arches over a glowing reliquary core, a turning assembly ring, skull-capped posts.
+function makeOssuary(def){ const g=new THREE.Group();
+  const dark=MAT(0x1a1712,{metalness:0.3}), bone=MAT(0xb3a98f), core=emis(0xb25fae);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.4,1.9),dark); base.position.y=0.2; g.add(base);
+  for(let i=0;i<4;i++){ const a=i/4*6.28; const rib=new THREE.Mesh(new THREE.TorusGeometry(0.9,0.07,5,12,3.14),bone); rib.position.set(0,0.4,0); rib.rotation.set(0,a,0); g.add(rib); }
+  const core1=new THREE.Mesh(new THREE.IcosahedronGeometry(0.3,0),core); core1.material.emissiveIntensity=0.85; core1.position.y=1.0; g.add(core1);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.5,0.05,6,16),bone); ring.rotation.x=Math.PI/2; ring.position.y=1.0; g.add(ring);
+  for(const sx of[-1,1])for(const sz of[-1,1]){ const p=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,1.0,6),bone); p.position.set(sx*0.82,0.5,sz*0.82); g.add(p);
+    const sk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.1,0),bone); sk.position.set(sx*0.82,1.05,sz*0.82); g.add(sk); }
+  g.userData.glow=core1; g.userData.spin=[{m:ring,ax:'y',sp:1.2}];
+  return g; }
+// Spectral Datacenter — the chain's climax: three rising server towers with glowing rack-lines + spinning fans,
+// a compute-core glow, a bone spire. Where the dead finally become thought.
+function makeDatacenter(def){ const g=new THREE.Group();
+  const metal=MAT(0x20242a,{metalness:0.55,roughness:0.5}), dark=MAT(0x121419,{metalness:0.4}), bone=MAT(0xb3a98f), teal=emis(0x6fae9b), comp=emis(0xe8d24a);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.4,2.0),dark); base.position.y=0.2; g.add(base);
+  const fans=[];
+  for(let i=0;i<3;i++){ const h=1.6+i*0.5, tx=-0.7+i*0.7;
+    const tower=new THREE.Mesh(new THREE.BoxGeometry(0.6,h,0.8),metal); tower.position.set(tx,0.4+h/2,0); g.add(tower);
+    for(let r=0;r<5;r++){ const line=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.04,0.02),teal); line.material.emissiveIntensity=0.6; line.position.set(tx,0.62+r*0.26,0.41); g.add(line); }
+    const fan=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.42,0.05),dark); fan.position.set(tx,0.4+h-0.25,0.43); g.add(fan); fans.push({m:fan,ax:'z',sp:6}); }
+  const corebox=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5),comp); corebox.material.emissiveIntensity=0.75; corebox.position.set(0,2.45,0); g.add(corebox);
+  const spire=new THREE.Mesh(new THREE.ConeGeometry(0.2,1.0,5),bone); spire.position.set(0,3.15,0); g.add(spire);
+  g.userData.glow=corebox; g.userData.spin=fans;
+  return g; }
 /* ---- procedural building meshes (fallback until/if the GLB loads) ---- */
 function makeBuildingMesh(kind,def){
   if(kind==="stockpile") return makeStockpile(def);
   if(kind==="substation") return makeSubstation(def);
   if(kind==="mill") return makeMill(def);
+  if(kind==="furnace") return makeFurnace(def);
+  if(kind==="crematory") return makeCrematory(def);
+  if(kind==="litho") return makeLitho(def);
+  if(kind==="ossuary") return makeOssuary(def);
+  if(kind==="datacenter") return makeDatacenter(def);
   if(bldBank[kind]) return makeBuildingGLB(kind,def);
   const g=new THREE.Group(); const stone=MAT(0x35332e), timber=MAT(0x2b251c), iron=MAT(0x1c1f22,{metalness:0.3}), win=emis(0xe8973a);
   const f=def.foot;
