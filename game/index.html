@@ -1901,15 +1901,8 @@ const BLD_IMG={
 };
 // AI building models (image_to_3d), local first + Higgsfield CDN fallback for file://.
 // Pyre + stockpile stay procedural (animated flame / dynamic material piles).
-const BLD_GLB={
-  den:"assets/glb/den.glb", exhumer:"assets/glb/woodcutter.glb", dredge:"assets/glb/dredge.glb",
-  ward:"assets/glb/ward.glb", market:"assets/glb/market.glb",
-};
-const BLD_GLB_CDN={
-  den:GCDN+"313cdc68-2ae3-4f96-838a-2a64fdba6915.glb", exhumer:GCDN+"df17a501-c35b-452d-b4ed-82da088c4791.glb",
-  dredge:GCDN+"5c7db5d2-c50f-4fbb-bed0-7f0e3c2f03f0.glb",
-  ward:GCDN+"1e022908-5cf5-4d9e-9d60-e9995b53799c.glb", market:GCDN+"dfcf36c9-eeee-4511-88b8-99f2e4b8aadc.glb",
-};
+const BLD_GLB={};   // every building is procedural now — no GLB models
+const BLD_GLB_CDN={};
 const bldBank={}, bldLoading={};
 // lazy: a building's AI model streams in the first time you raise that type — keeps first load light,
 // and the procedural mesh stands in until the GLB arrives and swaps itself in.
@@ -2090,7 +2083,61 @@ function makeDatacenter(def){ const g=new THREE.Group();
   const spire=new THREE.Mesh(new THREE.ConeGeometry(0.2,1.0,5),bone); spire.position.set(0,3.15,0); g.add(spire);
   g.userData.glow=corebox; g.userData.spin=fans;
   return g; }
-/* ---- procedural building meshes (fallback until/if the GLB loads) ---- */
+// Bone Den — a low husk-shelter: dark timber walls, a bone-rib roof, an ember-lit doorway, a skull over the door.
+function makeDen(def){ const g=new THREE.Group();
+  const wood=MAT(0x2b231a), dark=MAT(0x140f0a), bone=MAT(0xb3a98f), ember=emis(0xc9772a);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.9,1.5),wood); base.position.y=0.45; g.add(base);
+  for(let i=0;i<3;i++){ const rib=new THREE.Mesh(new THREE.TorusGeometry(0.85,0.06,5,10,3.14),bone); rib.position.set(0,0.9,-0.5+i*0.5); g.add(rib); }
+  const ridge=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.6,5),bone); ridge.rotation.x=Math.PI/2; ridge.position.set(0,1.7,0); g.add(ridge);
+  const door=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.7,0.1),dark); door.position.set(0,0.45,0.78); g.add(door);
+  const glow=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.6,0.05),ember); glow.material.emissiveIntensity=0.4; glow.position.set(0,0.42,0.74); g.add(glow);
+  const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(0.13,0),bone); skull.position.set(0,1.04,0.6); g.add(skull);
+  g.userData.glow=glow;
+  return g; }
+// Grave-Exhumer — a winch over an open grave: a dirt mound + pit, an A-frame, a bucket that bobs as it digs, a headstone.
+function makeExhumer(def){ const g=new THREE.Group();
+  const wood=MAT(0x2b231a), dark=MAT(0x140f0a), bone=MAT(0xb3a98f), dirt=MAT(0x37302a);
+  const mound=new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.85,0.2,9),dirt); mound.position.y=0.1; g.add(mound);
+  const pit=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.35,0.26,8),dark); pit.position.y=0.18; g.add(pit);
+  for(const sx of[-1,1]){ const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,1.5,5),wood); leg.position.set(sx*0.5,0.78,0); leg.rotation.z=sx*0.25; g.add(leg); }
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.2,5),wood); beam.rotation.z=Math.PI/2; beam.position.set(0,1.42,0); g.add(beam);
+  const bucket=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.32,0.3),wood); bucket.position.set(0,0.7,0); g.add(bucket);
+  const hs=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.5,0.1),bone); hs.position.set(0.72,0.35,-0.4); hs.rotation.z=0.12; g.add(hs);
+  g.userData.bob=[{m:bucket,y0:0.7,amp:0.28,sp:1.5,ph:0}];
+  return g; }
+// Waste-Dredge — a heavier rig: an iron mast + boom, a claw-bucket swinging over a spoil heap, bone slats.
+function makeDredge(def){ const g=new THREE.Group();
+  const iron=MAT(0x23262c,{metalness:0.4,roughness:0.6}), bone=MAT(0xb3a98f);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.4,1.4),iron); base.position.y=0.2; g.add(base);
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.12,1.6,6),iron); post.position.set(-0.45,1.0,0); g.add(post);
+  const boom=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.1,0.1),iron); boom.position.set(0.2,1.6,0); boom.rotation.z=-0.25; g.add(boom);
+  const heap=new THREE.Mesh(new THREE.SphereGeometry(0.6,7,5,0,6.283,0,1.3),MAT(0x2a2620)); heap.scale.y=0.45; heap.position.set(0.8,0.12,0); g.add(heap);
+  const claw=new THREE.Mesh(new THREE.ConeGeometry(0.26,0.42,5),iron); claw.rotation.x=Math.PI; claw.position.set(0.8,0.95,0); g.add(claw);
+  for(let i=0;i<3;i++){ const sl=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.04,0.5),bone); sl.position.set(-0.45,0.5+i*0.4,0); g.add(sl); }
+  g.userData.bob=[{m:claw,y0:0.95,amp:0.32,sp:1.2,ph:0}];
+  return g; }
+// Ward Obelisk — a standing stone with bone sigil-bands, a crowning cap, and a glowing ward rune that pulses.
+function makeWard(def){ const g=new THREE.Group();
+  const stone=MAT(0x4a473f), bone=MAT(0xd8d2c0), ember=emis(0xc9772a);
+  const baseR=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.7,0.3,8),stone); baseR.position.y=0.15; g.add(baseR);
+  const ob=new THREE.Mesh(new THREE.BoxGeometry(0.4,2.2,0.4),stone); ob.position.y=1.35; g.add(ob);
+  const cap=new THREE.Mesh(new THREE.ConeGeometry(0.34,0.5,4),stone); cap.rotation.y=0.78; cap.position.y=2.65; g.add(cap);
+  for(let i=0;i<3;i++){ const band=new THREE.Mesh(new THREE.BoxGeometry(0.43,0.05,0.43),bone); band.position.y=0.8+i*0.6; g.add(band); }
+  const rune=new THREE.Mesh(new THREE.IcosahedronGeometry(0.18,0),ember); rune.material.emissiveIntensity=0.6; rune.position.set(0,1.65,0.23); g.add(rune);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.8,0.05,6,16),bone); ring.rotation.x=Math.PI/2; ring.position.y=0.05; g.add(ring);
+  g.userData.glow=rune;
+  return g; }
+// Black Market — a stall: a counter, posts + a draped awning, hanging wares, and a swaying glowing bone-coin lantern.
+function makeMarket(def){ const g=new THREE.Group();
+  const wood=MAT(0x352d22), cloth=MAT(0x3a2e22), bone=MAT(0xb3a98f), coin=emis(0xe8c24a);
+  const counter=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.7,0.7),wood); counter.position.set(0,0.35,0.4); g.add(counter);
+  for(const sx of[-1,1])for(const sz of[-1,1]){ const post=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,1.5,5),wood); post.position.set(sx*0.8,0.75,sz*0.6); g.add(post); }
+  const awning=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.08,1.5),cloth); awning.position.set(0,1.55,0); awning.rotation.x=0.08; g.add(awning);
+  for(let i=0;i<3;i++){ const w=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.25,0.12),bone); w.position.set(-0.5+i*0.5,1.2,-0.5); g.add(w); }
+  const lantern=new THREE.Mesh(new THREE.IcosahedronGeometry(0.14,0),coin); lantern.material.emissiveIntensity=0.55; lantern.position.set(0.7,1.2,0.62); g.add(lantern);
+  g.userData.glow=lantern; g.userData.bob=[{m:lantern,y0:1.2,amp:0.09,sp:2,ph:0}];
+  return g; }
+/* ---- procedural building meshes (all buildings are procedural now) ---- */
 function makeBuildingMesh(kind,def){
   if(kind==="stockpile") return makeStockpile(def);
   if(kind==="substation") return makeSubstation(def);
@@ -2100,6 +2147,11 @@ function makeBuildingMesh(kind,def){
   if(kind==="litho") return makeLitho(def);
   if(kind==="ossuary") return makeOssuary(def);
   if(kind==="datacenter") return makeDatacenter(def);
+  if(kind==="den") return makeDen(def);
+  if(kind==="exhumer") return makeExhumer(def);
+  if(kind==="dredge") return makeDredge(def);
+  if(kind==="ward") return makeWard(def);
+  if(kind==="market") return makeMarket(def);
   if(bldBank[kind]) return makeBuildingGLB(kind,def);
   const g=new THREE.Group(); const stone=MAT(0x35332e), timber=MAT(0x2b251c), iron=MAT(0x1c1f22,{metalness:0.3}), win=emis(0xe8973a);
   const f=def.foot;

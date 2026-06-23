@@ -62,20 +62,19 @@ Two rules keep it sane:
 
 ## Assets
 
-Buildings are AI-generated (a concept image, then an image-to-3D GLB) loaded at
-runtime; the husk characters are hand-built procedural low-poly (flat-shaded
-primitives, no GLB). The UI icons are a custom occult-woodcut set generated with
-Higgsfield and sliced into per-item PNGs by `tools/slicesheet.js`. Music and sound
-effects are AI-generated. Everything is vendored under `game/assets/` and
+Every building and husk is a hand-built procedural low-poly mesh (flat-shaded
+primitives, animated in code — glowing parts, smoke, spinning and bobbing pieces),
+no runtime model files. The dock thumbnails and the custom occult-woodcut UI icon
+set are AI-generated images (sliced per-item by `tools/slicesheet.js`). Music and
+sound effects are AI-generated. Everything is vendored under `game/assets/` and
 `game/vendor/` (Three.js r128), so the build has no third-party runtime dependency.
 
 Audio degrades gracefully: a WebAudio synth drone and synth sound effects always
 play, with the AI clips layered on top when their files load. The game has full
 sound even offline.
 
-Two buildings stay procedural on purpose: the Pyre (it needs its live animated
-flame) and the Reliquary Yard (its material piles rise and fall with your
-stores).
+Two buildings are especially alive: the Pyre (its live animated flame) and the
+Reliquary Yard (its material piles rise and fall with your stores).
 
 ## Layout
 

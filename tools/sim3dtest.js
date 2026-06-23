@@ -333,6 +333,14 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.G.mode=undefined; T.G.graceT=150; T.G.over=null; T.G.time=0; T.resetRunScore();
 }
 
+// --- every building kind builds a procedural mesh without throwing ---
+{ let threwC=null; T.buildings.length=0;
+  try{ for(const k of ["pyre","den","path","exhumer","dredge","crematory","furnace","mill","litho","ossuary","substation","datacenter","stockpile","ward","market"])
+        if(k!=="path") T.placeBuildingFree(k, ((Math.random()*40-20)|0), ((Math.random()*40-20)|0)); }catch(e){ threwC=e; }
+  ok("every building kind builds a procedural mesh without throwing", !threwC, threwC?String(threwC.stack||threwC):"ok");
+  T.buildings.length=0;
+}
+
 // --- research rites multiply the economy ---
 { T.G.tech={}; const baseG=T.techMul('gather'), baseC=T.techMul('carry');
   ok("techMul defaults to 1x", baseG===1&&baseC===1, "g="+baseG+" c="+baseC);
