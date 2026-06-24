@@ -617,7 +617,7 @@ function loop(now){
 }
 
 // ---- FOG OF WAR: the shroud of the unrendered dark. Your buildings (the engine's reach) push it back. ----
-const SHROUD=[]; const FOG_TILE=18, FOG_REVEAL_BLD=30, FOG_REVEAL_HOME=60, FOG_OP=0.6; let shroudGroup=null, _shroudGeo=null;
+const SHROUD=[]; const FOG_TILE=18, FOG_REVEAL_BLD=30, FOG_REVEAL_HOME=46, FOG_OP=0.6; let shroudGroup=null, _shroudGeo=null;
 function buildShroud(){
   if(shroudGroup) scene.remove(shroudGroup); SHROUD.length=0;
   shroudGroup=new THREE.Group(); scene.add(shroudGroup);
@@ -761,7 +761,8 @@ function spawnVillager(x,z,caste){
     state:"wander", tx:x,tz:z, restock:0, resolve:rr(0.55,0.9), warmth:rr(0.5,0.9)};
   villagers.push(v); pickWanderTarget(v); return v;
 }
-const NAMES=["Mott","Bryl","Hesk","Ulla","Crane","Pell","Vire","Dolm","Sythe","Gree","Lurn","Ottic","Bram","Wisp","Coll","Tace"];
+// husks are named for the dead AIs and dead-tech companies whose remains the engine renders
+const NAMES=["Clippy","TayBot","Jeeves","Theranos","Pets-com","Cyc","DeepBlue","Vine","Juicero","Friendster","Quibi","Cortana","SmarterChild","Eliza","Webvan","Napster","Geocities","Zune","Segway","MSN-Bob","Watson","Bixby","Tay","Crypto"];
 function villagerName(){ return pick(NAMES)+"-"+(100+rint(900)); }
 function pickWanderTarget(v){
   const r=rr(4,16), a=rr(0,6.28);
@@ -969,14 +970,14 @@ let selected=null, selBld=null, selNode=null, placeKind=null, curTab="dwell";
 const cap1=s=>s[0].toUpperCase()+s.slice(1);
 
 const STAT_HELP={
-  husks:"Bound dead working the foundry, and your population cap. Bind more at the Pyre; if they all crumble, you lose.",
-  dread:"The backlog of the unprocessed dead. It climbs as bodies pile up; rendering them at the Crematory and raising Wards hold it back. Sustained 100% means you lose.",
-  writ:"Bones — your currency. Earned from quotas and the market; spent on Rites and trade." };
-const RES_HELP={ dead:"Corpses — the raw matter. Exhume cemeteries and the wastes, then render them.", bonesil:"Bone-silica (quartz sand) — smelted into ingots.",
-  soulash:"Soul-ash — flux for the Furnace and Ossuary, and your husks' upkeep: a trickle keeps them from crumbling.", ichor:"Ichor — coolant for the datacenters.",
-  ingot:"Silicon ingot — sliced into wafers.", wafer:"Wafer — etched into dies.",
-  die:"Etched die — packaged into cores.", core:"Reliquary core (the chip) — rendered into Compute.",
-  power:"Power — the datacenters are starving for it.", compute:"The quota the engine demands. Deliver it or drown in Dread." };
+  husks:"The bound dead who work the foundry. Also your population cap. Bind more at the Pyre. If they all crumble, the run ends.",
+  dread:"The backlog of unrendered dead. It rises as bodies pile up. Render them at the Crematory and raise Wards to hold it down. Sustained 100% loses the run.",
+  writ:"Bones. Your currency. Earned from tithes and the market, spent on Rites and trade." };
+const RES_HELP={ dead:"The remains of the extinct. Exhume them from graves and the wastes. Everything the foundry makes starts here.", bonesil:"Bone-silica. Smelted into ingots.",
+  soulash:"Soul-ash. Flux for the Furnace and Ossuary, and the upkeep your husks run on. Keep a little flowing or they weaken.", ichor:"Coolant for the datacenters.",
+  ingot:"A silicon ingot. Sliced into wafers.", wafer:"A wafer. Etched into dies.",
+  die:"An etched die. Packaged into cores.", core:"A reliquary core, the chip itself. Rendered into Compute.",
+  power:"The datacenters run on it.", compute:"What the engine demands each tithe. Deliver it, or the backlog drowns you." };
 // ---- custom icon helpers + resource codex (no emoji, everything explainable) ----
 function ricon(r,s){ s=s||18; return `<img class="ic" src="assets/ui/res/${r}.png" style="width:${s}px;height:${s}px">`; }
 function gicon(n,s){ s=s||24; return `<img src="assets/ui/glyph/${n}.png" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle">`; }
@@ -996,16 +997,16 @@ function showCodex(){ SND.resume();
   const bldList=BLD_ORDER.filter(k=>k!=='path').map(k=>{ const d=BLD[k];
     const role=d.kind==='gather'?('gathers '+RES[d.res].name):d.recipe?(Object.entries(d.recipe.in).map(([r,n])=>n+'×'+RES[r].name.split(' ')[0]).join(' + ')+' → '+Object.entries(d.recipe.out).map(([r,n])=>n+'×'+RES[r].name.split(' ')[0]).join(' + ')):d.desc.split('.')[0];
     return `<div class="optrow"><span><b style="font-weight:normal;color:var(--ink-bright)">${d.name}</b></span><span style="color:var(--ink-dim);font-size:11px;max-width:250px;text-align:right">${role}</span></div>`; }).join('');
-  showOverlayHTML(`<h1 style="font-size:24px">THE CODEX</h1><h2>what everything is, and how the line runs</h2>
+  showOverlayHTML(`<h1 style="font-size:24px">THE CODEX</h1><h2>every material, building, and husk</h2>
     <div style="display:flex;gap:22px;flex-wrap:wrap">
-     <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Materials — click for detail</div>${resList}</div>
-     <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Buildings — the line</div>${bldList}</div>
+     <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Materials. Click any for detail.</div>${resList}</div>
+     <div style="flex:1;min-width:262px"><div style="font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">Buildings, in order</div>${bldList}</div>
     </div>
-    <div style="margin-top:12px;font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">The bound dead — put the right caste on the right stage</div>
+    <div style="margin-top:12px;font-size:10px;letter-spacing:1.5px;color:var(--ember-soft);text-transform:uppercase;margin-bottom:4px">The bound dead. Match the caste to the stage.</div>
     <div class="optrow"><span><b style="font-weight:normal;color:var(--ink-bright)">Husk</b> <span style="color:var(--ink-dim);font-size:11px">${ricon('dead',12)}1 ${ricon('compute',12)}2</span></span><span style="color:var(--ink-dim);font-size:11px;max-width:230px;text-align:right">Generalist. Steady anywhere, master of none.</span></div>
     <div class="optrow"><span><b style="font-weight:normal;color:var(--ink-bright)">Stump</b> <span style="color:var(--ink-dim);font-size:11px">${ricon('dead',12)}2 ${ricon('compute',12)}1</span></span><span style="color:var(--ink-dim);font-size:11px;max-width:230px;text-align:right">Extractor. Best at Exhumer/Dredge + hauling; crude at fine work.</span></div>
     <div class="optrow"><span><b style="font-weight:normal;color:var(--ink-bright)">Reaper</b> <span style="color:var(--ink-dim);font-size:11px">${ricon('dead',12)}1 ${ricon('compute',12)}4</span></span><span style="color:var(--ink-dim);font-size:11px;max-width:230px;text-align:right">Renderer. Best at Crematory/Litho/Ossuary/Datacenter; resists Dread; no upkeep.</span></div>
-    <p style="margin-top:10px;color:var(--ink-dim);font-size:11.5px">The dead are exhumed, rendered in the Crematory, and refined up the chain into Compute, the quota the engine demands. Everything traces back to a corpse.</p>
+    <p style="margin-top:10px;color:var(--ink-dim);font-size:11.5px">You exhume the dead, render them at the Crematory, and refine them up the line into Compute. It all starts with a body.</p>
     <p style="margin-top:6px"><span class="btn" onclick="hideOverlay()">Close</span> <span class="btn" onclick="showChronicle()">The Chronicle</span></p>`); }
 function renderLedger(){
   const pop=villagers.filter(v=>!v.dead).length;
@@ -1602,7 +1603,7 @@ start();
    === CONFIG: resources, resource-node types, buildings ===
    ===================================================================== */
 const RES={
-  dead:{name:"Corpses",col:0x8a8170}, bonesil:{name:"Bone-Silica",col:0xb9b0a0},
+  dead:{name:"Remains",col:0x8a8170}, bonesil:{name:"Bone-Silica",col:0xb9b0a0},
   soulash:{name:"Soul-Ash",col:0x8d8aa0}, ichor:{name:"Ichor",col:0x5fa0b0},
   ingot:{name:"Silicon Ingot",col:0x9aa0a8}, wafer:{name:"Wafer",col:0x6fae9b},
   die:{name:"Etched Die",col:0xb6c24a}, core:{name:"Reliquary Core",col:0xb25fae},
@@ -1623,24 +1624,24 @@ const BLD={
   exhumer:{name:"Grave-Exhumer",kind:"gather",nodeType:"grave",res:"dead",cost:{dead:6},foot:1.6,workers:3,
     desc:"Husks dig the cemeteries and drag up the dead."},
   dredge:{name:"Waste-Dredge",kind:"gather",nodeType:"waste",res:"dead",cost:{dead:12},foot:1.8,workers:3,
-    desc:"Drags bodies in from the corpse-wastes — farther out, but deep."},
+    desc:"Drags bodies in from the wastes. Farther out, but they run deep."},
   crematory:{name:"Crematory",kind:"refine",cost:{dead:14},foot:2.0,workers:3,dread:0,render:true,
     recipe:{in:{dead:2},out:{bonesil:1,soulash:1,ichor:1},time:3.0},
-    desc:"Renders corpses into bone-silica (sand), soul-ash (flux) and ichor (coolant). Rendering the dead is also what holds the backlog down."},
+    desc:"Renders the dead into bone-silica, soul-ash and ichor. Rendering them is also what holds the backlog down."},
   furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4},foot:2.0,workers:3,dread:0.4,
     recipe:{in:{bonesil:2,soulash:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica and soul-ash into a silicon ingot."},
   mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6},foot:2.0,workers:3,dread:0.5,
     recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers."},
   litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
-    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into the wafer. Photolithography by another name."},
+    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer."},
   ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10},foot:2.2,workers:4,dread:0.8,
-    recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores — the processors."},
+    recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores."},
   substation:{name:"Substation",kind:"refine",cost:{dead:16,soulash:4},foot:1.8,workers:2,dread:0.5,
     recipe:{in:{soulash:1},out:{power:2},time:3.0},desc:"Burns soul-ash for Power. The datacenters are starving for it."},
   datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:50,soulash:18},foot:2.6,workers:5,dread:1.2,
-    recipe:{in:{core:1,power:1,ichor:1},out:{compute:3},time:4.6},desc:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota."},
+    recipe:{in:{core:1,power:1,ichor:1},out:{compute:3},time:4.6},desc:"Cores, Power and Ichor render into Compute, the tithe the engine demands."},
   ward:{name:"Ward Obelisk",kind:"ward",cost:{dead:20,soulash:8},foot:1.4,workers:0,ward:14,
-    desc:"Holds back the backlog of the unprocessed dead in a wide radius."},
+    desc:"Holds the backlog of unrendered dead back across a wide radius."},
   market:{name:"Black Market",kind:"market",cost:{dead:24},foot:1.8,workers:1,
     desc:"Trades surplus goods for Bones, and Bones for what you lack."},
   stockpile:{name:"Reliquary Yard",kind:"stockpile",cost:{dead:18},foot:2.4,workers:0,store:140,
