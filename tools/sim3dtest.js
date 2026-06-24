@@ -464,8 +464,8 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
 // --- SPATIAL DREAD: the unrendered dead pool Dread on the ground; rendering + WARD RADIUS pull it back ---
 { ok("spatial dread field is exposed", typeof T.stepDread==='function' && typeof T.dreadAt==='function' && typeof T.dreadBite==='function', "stepDread="+typeof T.stepDread);
   ok("dreadBite is 1 at zero Dread and bottoms at the floor at max", Math.abs(T.dreadBite(0)-1)<1e-9 && Math.abs(T.dreadBite(100)-T.DREAD_BITE_MIN)<1e-9 && T.dreadBite(100)<1, "bite0="+T.dreadBite(0)+" bite100="+T.dreadBite(100));
-  // a full, untapped cemetery radiates Dread onto its own ground
-  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  // a full, untapped cemetery radiates Dread onto its own ground (past the opening Dread-start gate)
+  T.G.time=999; T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
   const g=T.placeNode("grave",40,0); g.amount=g.max;
   for(let s=0;s<30*40;s++) T.stepDread(1/30);
   const dHot=T.dreadAt(40,0);
@@ -491,7 +491,7 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
 }
 // --- spatial dread is DETERMINISTIC + makes PLACEMENT matter (a building mired in the dead works slower) ---
-{ const run=()=>{ T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
+{ const run=()=>{ T.G.time=999; T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
     T.placeNode("grave",30,0); T.placeNode("waste",-20,10);
     for(let s=0;s<30*30;s++) T.stepDread(1/30); return T.dreadSnapshot(); };
   const a=run(), b=run(); let same=a.length===b.length; for(let i=0;i<a.length&&same;i++) if(Math.abs(a[i]-b[i])>1e-9) same=false;
@@ -565,10 +565,10 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
 // --- caste x Dread interlock on PRODUCTION: a Reaper crew out-works a Worker crew in heavy Dread (despite worse affinity) ---
 { const full=new Array(T.DGRID*T.DGRID).fill(100);
   T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField(); T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0;
-  T.placeBuildingFree("stockpile",0,0);
-  const fuR=T.placeBuildingFree("furnace",-30,0), fuW=T.placeBuildingFree("furnace",30,0);   // furnace: workers have the affinity edge (1.05 vs 0.95)
-  for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-30,2,"reaper"),fuR); T.assignHusk(T.spawnVillager(30,2,"worker"),fuW); }
-  for(let st=0;st<30*150;st++){ T.loadDreadField(full); T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  T.placeBuildingFree("stockpile",-9,0); T.placeBuildingFree("stockpile",9,0);   // a hub by each furnace so crews tend (not walk) most of the time
+  const fuR=T.placeBuildingFree("furnace",-9,0), fuW=T.placeBuildingFree("furnace",9,0);   // furnace: workers have the affinity edge (1.05 vs 0.95)
+  for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-9,2,"reaper"),fuR); T.assignHusk(T.spawnVillager(9,2,"worker"),fuW); }
+  for(let st=0;st<30*220;st++){ T.loadDreadField(full); T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
   ok("caste x Dread: a Reaper crew out-works a Worker crew in heavy Dread", fuR.cyc>fuW.cyc, "reaper-crew cyc="+fuR.cyc+" worker-crew cyc="+fuW.cyc);
   T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
@@ -602,7 +602,7 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
 }
 // --- ward suppression falls off with distance, overlapping wards go deeper, and the V toggle flips ---
-{ const dProbe=(setup)=>{ T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
+{ const dProbe=(setup)=>{ T.G.time=999; T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
     const g=T.placeNode("grave",40,0); g.amount=g.max; setup(g); for(let s=0;s<30*40;s++){ g.amount=g.max; T.stepDread(1/30); } return T.dreadAt(40,0); };
   const none=dProbe(()=>{});
   const near=dProbe(()=>{ T.placeBuildingFree("ward",44,0); });   // 4u from the grave -> strong

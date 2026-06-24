@@ -1706,6 +1706,8 @@ function newValley(){ _abandoning=true; try{ localStorage.removeItem('sf_save');
 /* staged tutorial: quiet objectives that advance as the player learns the loop */
 function hasB(k){ return buildings.some(b=>b.kind===k); }
 function staffed(k){ return buildings.some(b=>b.kind===k && b.workers.length>0); }
+// a building of kind k that has actually COMPLETED a cycle — used to pace the tutorial on real output, not just placement
+function worked(k){ return buildings.some(b=>b.kind===k && (b.cyc||0)>0); }
 // a full, ordered tutorial that walks the player all the way to their first Compute
 function bldTarget(k){ return ()=> document.querySelector('[data-bld="'+k+'"]') ? '[data-bld="'+k+'"]' : '[data-tab="'+bldTab(k)+'"]'; }
 const TUT=[
@@ -1714,21 +1716,21 @@ const TUT=[
   {t:"Raise a Grave-Exhumer BESIDE a cemetery (the arrow marks one) and staff it — place it on open ground next to the headstones, then tap it and press + assign.",
    why:"The Exhumer works the cemetery next to it and hauls the dead to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), mkb:'exhumer', sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Crematory and staff it.",
-   why:"It renders corpses into bone-silica, soul-ash and ichor, and rendering the dead is what holds the backlog (Dread) down. The dead you leave lying out pool as a violet Dread haze that slows whatever stands in it — render them, or raise a Ward. Soul-ash is also your husks' upkeep — keep a little flowing or they weaken and crumble.", d:()=>staffed("crematory"), sel:bldTarget('crematory')},
+   why:"It renders corpses into bone-silica, soul-ash and ichor, and rendering the dead is what holds the backlog (Dread) down. The dead you leave lying out pool as a Dread haze (a dark stain on the ground) that slows whatever stands in it — render them, or raise a Ward. Soul-ash is also your husks' upkeep — keep a little flowing or they weaken and crumble.", d:()=>worked("crematory"), sel:bldTarget('crematory')},
   {t:"Open the REFINING tab and raise a Soul Furnace, then staff it.",
-   why:"Bone-silica + soul-ash → a silicon ingot.", d:()=>staffed("furnace"), sel:bldTarget('furnace')},
+   why:"Bone-silica + soul-ash → a silicon ingot.", d:()=>worked("furnace"), sel:bldTarget('furnace')},
   {t:"Raise a Wafer Mill and staff it.",
-   why:"The ingot is sliced into wafers.", d:()=>staffed("mill"), sel:bldTarget('mill')},
+   why:"The ingot is sliced into wafers.", d:()=>worked("mill"), sel:bldTarget('mill')},
   {t:"Raise an Etch-Litho and staff it.",
-   why:"Wafers are etched into dies — the circuits.", d:()=>staffed("litho"), sel:bldTarget('litho')},
+   why:"Wafers are etched into dies — the circuits.", d:()=>worked("litho"), sel:bldTarget('litho')},
   {t:"Raise an Assembly Ossuary and staff it.",
-   why:"Dies + soul-ash are packaged into reliquary cores — the chips.", d:()=>staffed("ossuary"), sel:bldTarget('ossuary')},
+   why:"Dies + soul-ash are packaged into reliquary cores — the chips.", d:()=>worked("ossuary"), sel:bldTarget('ossuary')},
   {t:"Raise a Substation and staff it — the datacenters need Power.",
-   why:"Soul-ash burns into Power. No power, no Compute.", d:()=>staffed("substation"), sel:bldTarget('substation')},
+   why:"Soul-ash burns into Power. No power, no Compute.", d:()=>worked("substation"), sel:bldTarget('substation')},
   {t:"Raise a Silica Excavator on a silica seam (the pale crystals the glow marks) and staff it.",
    why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), mkb:'excavator', sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Spectral Datacenter and staff it.",
-   why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>staffed("datacenter"), sel:bldTarget('datacenter')},
+   why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>worked("datacenter"), sel:bldTarget('datacenter')},
   {t:"Now wait — your first Compute appears in the ledger up top.",
    why:"Short on a material? Add gatherers or another refiner. Short on husks? Bind more at the Pyre.", d:()=>(G.stock.compute||0)>0, sel:()=>'#ledger'},
   {t:"The foundry breathes. Pay each tithe of Compute once the grace ends, and keep rendering the dead. You're on your own now.",
@@ -2305,27 +2307,31 @@ function dreadSnapshot(){ return Array.from(DREAD); }   // for save + tests (nev
 function loadDreadField(arr){ if(arr&&arr.length===DREAD.length){ for(let i=0;i<arr.length;i++) DREAD[i]=+arr[i]||0; return true; } return false; }
 // how hard local Dread bites work/resolve: 0 dread -> 1.0 (no bite), 100 -> DREAD_BITE_MIN.
 // `resist` (0..1) is the crew/husk's Dread resistance — Reapers barely feel the haze (see DREAD_RESIST).
-const DREAD_BITE_MIN=0.5;
+const DREAD_BITE_MIN=0.65;   // worst-case work penalty is -35% (was a harsh -50%)
 function dreadBite(d,resist){ return 1-(1-DREAD_BITE_MIN)*clamp((d||0)/100,0,1)*clamp(resist==null?1:resist,0,1); }
 // CASTE x DREAD interlock: who can stand and work in the pooled dead. Reapers "came at the end to cut the
 // engine's power… unbowed by the backlog" — they resist the haze, so they're the caste you deploy into it.
 const DREAD_RESIST={worker:1.0, stump:1.0, reaper:0.15};
 function dreadResist(caste){ return DREAD_RESIST[caste]!=null?DREAD_RESIST[caste]:1.0; }
 // tuning (per-second rates; integrated against the sim dt)
-const DREAD_EMIT=15.0;         // a full, untapped deposit radiates this much/s into its cell
+const DREAD_EMIT=9.0;          // a full, untapped deposit radiates this much/s into its cell (gentler — won't saturate near the foundry)
 const DREAD_DECAY=0.06;        // the ground slowly forgets
-const DREAD_DIFFUSE=0.18;      // the stain creeps only a little toward neighbours — pooled, not a spreading sheet
+const DREAD_DIFFUSE=0.16;      // the stain creeps only a little toward neighbours — pooled, not a spreading sheet
+// the Dread haze does not begin until the opening is over (~2 min), then ramps up — no green flooding the first minute
+const DREAD_START=120, DREAD_RAMP=120;
+function dreadEmitScale(){ return clamp(((G.time||0)-DREAD_START)/DREAD_RAMP, 0, 1); }
 const DREAD_REND_SUPPRESS=22;  // an ACTIVE rendering building (Crematory) burns the backlog down nearby
 const DREAD_WARD_SUPPRESS=46;  // a Ward Obelisk crushes Dread inside its radius — the strongest hold
 const DREAD_RESOLVE_BITE=0.012;// a husk standing in full Dread loses this much resolve/s on top of upkeep
 const DREAD_GLOBAL_PUSH=0.6;   // how much the field's pressure on the settlement feeds the global meter
 // step the field one sim tick: emit from unrendered dead, suppress from rendering + wards, diffuse, decay.
 function stepDread(dt){
+  const emitScale=dreadEmitScale();   // 0 for the first ~2 min, then ramps to 1 — keeps the opening clean
   // 1) SOURCES — every cemetery/pit radiates Dread by how full it sits (the backlog you haven't rendered)
-  for(const n of nodes){ if((n.type!=='grave'&&n.type!=='waste')||n.amount<=0) continue;
+  if(emitScale>0) for(const n of nodes){ if((n.type!=='grave'&&n.type!=='waste')||n.amount<=0) continue;
     const fill=clamp(n.amount/(n.max||1),0,1);
     const c=dgi(dreadCellX(n.x),dreadCellZ(n.z));
-    DREAD[c]=Math.min(100, DREAD[c]+DREAD_EMIT*fill*dt); }
+    DREAD[c]=Math.min(100, DREAD[c]+DREAD_EMIT*fill*emitScale*dt); }
   // 2) SINKS — active Crematories and Ward Obelisks pull Dread back, with radial falloff (RADIUS finally matters)
   for(const b of buildings){
     let supp=0, rad=0;
@@ -2790,12 +2796,12 @@ function buildingNeedsWorkers(b){ return b.workers.length<b.def.workers && (b.de
 
 /* ---- collision: circular obstacles (buildings) + husk movement/animation ---- */
 let OBS=[];
-function rebuildObstacles(){ OBS=buildings.map(b=>({x:b.x,z:b.z,r:b.def.foot*0.6+0.45})); }
+function rebuildObstacles(){ OBS=buildings.map(b=>({x:b.x,z:b.z,r:b.def.foot*0.5+0.3})); }   // tighter collision so husks fit through gaps between packed buildings
 const HUSK_R=0.5;
 function moveHusk(v,tx,tz,dt,stop){
   stop=stop||0.6; const o=v.obj;
   const dx=tx-o.position.x, dz=tz-o.position.z, d=Math.hypot(dx,dz);
-  if(d<stop){ if(v.act)v.act.timeScale=0; return true; }
+  if(d<stop){ if(v.act)v.act.timeScale=0; v._stuck=0; v._prevD=null; return true; }
   const sp=v.speed*(onPath(o.position.x,o.position.z)?1.35*techMul('path'):1)*dt;
   // steer AROUND buildings in the way (instead of grinding into them), but never around the one we're heading to
   let dirx=dx/d, dirz=dz/d;
@@ -2806,14 +2812,20 @@ function moveHusk(v,tx,tz,dt,stop){
   // local avoidance: veer around nearby husks — radial push away + a consistent tangential swirl so
   // approaching husks slide past instead of shoving through each other (position-only, deterministic)
   for(const v2 of villagers){ if(v2===v||v2.dead) continue; const p2=v2.obj.position;
-    const ox=p2.x-o.position.x, oz=p2.z-o.position.z, od2=ox*ox+oz*oz, AR=1.35;
+    const ox=p2.x-o.position.x, oz=p2.z-o.position.z, od2=ox*ox+oz*oz, AR=1.15;
     if(od2<AR*AR && od2>1e-4){ const od=Math.sqrt(od2), w=(AR-od)/AR, ux=ox/od, uz=oz/od;
-      dirx+=(-ux)*w*1.2 + (-uz)*w*0.45; dirz+=(-uz)*w*1.2 + (ux)*w*0.45; } }
+      dirx+=(-ux)*w*0.9 + (-uz)*w*0.4; dirz+=(-uz)*w*0.9 + (ux)*w*0.4; } }
   { const dl=Math.hypot(dirx,dirz)||1; dirx/=dl; dirz/=dl; }
   let nx=o.position.x+dirx*sp, nz=o.position.z+dirz*sp;
-  for(const ob of OBS){ const ex=nx-ob.x, ez=nz-ob.z, ed=Math.hypot(ex,ez), R=ob.r+HUSK_R;
+  // STUCK FAILSAFE — if a husk hasn't been getting closer to its target, let it slip through buildings so it never
+  // traps itself in a packed cluster (clips briefly, always reaches the post).
+  const bypass=(v._stuck||0)>1.1;
+  if(!bypass) for(const ob of OBS){ const ex=nx-ob.x, ez=nz-ob.z, ed=Math.hypot(ex,ez), R=ob.r+HUSK_R;
     if(ed<R){ if(ed<0.001){ nx=ob.x+R; } else { nx=ob.x+ex/ed*R; nz=ob.z+ez/ed*R; } } }
   o.position.x=nx; o.position.z=nz; o.position.y=terrainHeight(nx,nz);
+  const nd=Math.hypot(tx-nx,tz-nz);   // progress check
+  if(v._prevD!=null && nd > v._prevD - sp*0.3) v._stuck=(v._stuck||0)+dt; else v._stuck=Math.max(0,(v._stuck||0)-dt*1.5);
+  v._prevD=nd;
   o.rotation.y=lerpAngle(o.rotation.y,Math.atan2(dx,dz),0.10);   // turn slowly — these are dead, not nimble
   if(v.act)v.act.timeScale=1.1;
   if(v.proc){ const ud=o.userData;
