@@ -288,7 +288,7 @@
     font:900 40px/1 Arial,Helvetica,sans-serif;color:#8fe86a;text-shadow:0 0 14px #80df68dd,0 3px 6px #000;
     animation:arrowbob 1s ease-in-out infinite}
   #wspot::before{content:'\25BC';display:block}
-  #wspot::after{content:'BUILD HERE';position:absolute;left:50%;top:-19px;transform:translateX(-50%);white-space:nowrap;
+  #wspot::after{content:'BUILD BESIDE';position:absolute;left:50%;top:-19px;transform:translateX(-50%);white-space:nowrap;
     font:bold 11px/1 ui-monospace,Menlo,monospace;letter-spacing:1.5px;color:#cdf2b6;text-shadow:0 1px 4px #000,0 0 9px #80df6866}
   @keyframes arrowbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
 </style>
@@ -929,8 +929,13 @@ function spawnVillager(x,z,caste){
   // carried-load indicator: the husk physically carries the material, shaped to what it is
   const onTop=!!(obj.userData&&obj.userData.carryTop);  // the stump carries loads on its flat top
   const carry=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.32,0.32),MAT(0x6b5a40)); carry.visible=false; carry.position.set(0,onTop?1.22:1.0,onTop?0:0.34); obj.add(carry);
+  // the stump hauls far more (carry 20 vs 7), so it stacks a visible PILE — extra load blocks that appear as the load grows
+  let carryPile=null;
+  if(onTop){ carryPile=[];
+    const offs=[[-0.27,1.16,0.12],[0.26,1.15,-0.13],[0.02,1.46,-0.02]];
+    for(const o of offs){ const m=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,0.3),MAT(0x6b5a40)); m.visible=false; m.position.set(o[0],o[1],o[2]); obj.add(m); carryPile.push(m); } }
   scene.add(obj);
-  const v={obj,mixer,act,proc,staticGLB,caste,carryMesh:carry,
+  const v={obj,mixer,act,proc,staticGLB,caste,carryMesh:carry,carryPile,
     name:villagerName(), job:"idle",
     speed:(caste==="stump"?rr(0.5,0.75):caste==="reaper"?rr(1.05,1.4):rr(1.25,1.6)), phase:rr(0,9),
     state:"wander", tx:x,tz:z, restock:0, resolve:rr(0.55,0.9), warmth:rr(0.5,0.9)};
@@ -990,6 +995,11 @@ function applyPayload(v){ const m=v.carryMesh; if(!m||!v.carryRes) return; const
   try{ if(m.geometry&&m.geometry.dispose)m.geometry.dispose(); m.geometry=sp.g(); }catch(e){}
   try{ if(m.material&&m.material.dispose)m.material.dispose(); m.material=sp.emis?emis(sp.col):MAT(sp.col,sp.metal?{metalness:0.45,roughness:0.5}:null); }catch(e){}
   if(m.rotation&&m.rotation.set) m.rotation.set(sp.rx||0,0,sp.rz||0);
+  // the stump's pile blocks take on the same load shape (with a little rotation variety so it reads as a heap)
+  if(v.carryPile){ for(const pm of v.carryPile){
+    try{ if(pm.geometry&&pm.geometry.dispose)pm.geometry.dispose(); pm.geometry=sp.g(); }catch(e){}
+    try{ pm.material=sp.emis?emis(sp.col):MAT(sp.col,sp.metal?{metalness:0.45,roughness:0.5}:null); }catch(e){}
+    if(pm.rotation&&pm.rotation.set) pm.rotation.set((sp.rx||0)+(pm.position.z||0),(pm.position.x||0)*2.4,(sp.rz||0)+(pm.position.x||0)); } }
   const onTop=!!(v.obj.userData&&v.obj.userData.carryTop); v._payBaseY=(onTop?1.2:0.98); }
 
 /* central hearth: fire light + ember points (a warm anchor in the dead valley) */
@@ -1367,7 +1377,9 @@ const BLD_HOTKEY={ exhumer:'X', dredge:'G', ashcamp:'H', excavator:'Z', cremator
 const BUILD_HOTKEYS={}; for(const k in BLD_HOTKEY) BUILD_HOTKEYS['Key'+BLD_HOTKEY[k]]=k;
 // select a building for placement (shared by the dock cards and the keyboard hotkeys)
 function selectBuildKind(k){ const def=BLD[k]; if(!def) return; SND.resume();
-  if(!canAfford(def.cost)){ SND.sfx('deny'); toast("Not enough materials for "+def.name,"bad"); return; }
+  if(!canAfford(def.cost)){ SND.sfx('deny');
+    const short=Object.keys(def.cost).filter(r=>(G.stock[r]||0)<def.cost[r]).map(r=>def.cost[r]+" "+RES[r].name+" (have "+Math.floor(G.stock[r]||0)+")");
+    toast(def.name+" needs "+short.join(", "),"bad"); return; }
   SND.sfx('click'); curTab=bldTab(k); placeKind=(placeKind===k?null:k); buildDock();
   setHint(placeKind?("Click a grid cell to raise "+def.name+" · R rotate · Esc cancels"):"");
   showGrid(!!placeKind&&BLD[placeKind].kind!=='path'); }
@@ -1699,8 +1711,8 @@ function bldTarget(k){ return ()=> document.querySelector('[data-bld="'+k+'"]') 
 const TUT=[
   {t:"The dead are your raw matter. Open the GATHERING tab below.",
    why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre) for 2 corpses + 4 Compute.", d:()=>curTab==="gather", sel:()=>'[data-tab="gather"]'},
-  {t:"Raise a Grave-Exhumer on a cemetery (the headstones the glow marks) and staff it — tap it, press + assign.",
-   why:"The Exhumer digs up corpses and hauls them to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
+  {t:"Raise a Grave-Exhumer BESIDE a cemetery (the arrow marks one) and staff it — place it on open ground next to the headstones, then tap it and press + assign.",
+   why:"The Exhumer works the cemetery next to it and hauls the dead to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), mkb:'exhumer', sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Crematory and staff it.",
    why:"It renders corpses into bone-silica, soul-ash and ichor, and rendering the dead is what holds the backlog (Dread) down. The dead you leave lying out pool as a violet Dread haze that slows whatever stands in it — render them, or raise a Ward. Soul-ash is also your husks' upkeep — keep a little flowing or they weaken and crumble.", d:()=>staffed("crematory"), sel:bldTarget('crematory')},
   {t:"Open the REFINING tab and raise a Soul Furnace, then staff it.",
@@ -1714,7 +1726,7 @@ const TUT=[
   {t:"Raise a Substation and staff it — the datacenters need Power.",
    why:"Soul-ash burns into Power. No power, no Compute.", d:()=>staffed("substation"), sel:bldTarget('substation')},
   {t:"Raise a Silica Excavator on a silica seam (the pale crystals the glow marks) and staff it.",
-   why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
+   why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), mkb:'excavator', sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Spectral Datacenter and staff it.",
    why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>staffed("datacenter"), sel:bldTarget('datacenter')},
   {t:"Now wait — your first Compute appears in the ledger up top.",
@@ -1746,7 +1758,9 @@ function positionSpotlight(){ const s=document.getElementById('spot'), w=documen
   if(step.sel){ const q=step.sel(); const el=q&&document.querySelector(q);
     if(el && el.getClientRects().length){ const r=el.getBoundingClientRect(); s.style.left=(r.left-5)+'px'; s.style.top=(r.top-5)+'px'; s.style.width=(r.width+10)+'px'; s.style.height=(r.height+10)+'px'; s.style.display='block'; shown=true; } }
   if(!shown) s.style.display='none';
-  if(step.at){ const p=step.at();
+  // hide the world arrow once you've actually built the thing this step points at (then the dock/assign ring guides you)
+  const builtIt=step.mkb && buildings.some(b=>b.kind===step.mkb);
+  if(step.at && !builtIt){ const p=step.at();
     if(p){ const v=new THREE.Vector3(p.x,terrainHeight(p.x,p.z)+1.4,p.z); v.project(camera);
       if(v.z<1){ w.style.left=((v.x*0.5+0.5)*innerWidth)+'px'; w.style.top=((-v.y*0.5+0.5)*innerHeight)+'px'; w.style.display='block'; } else w.style.display='none'; }
     else w.style.display='none'; }
@@ -1785,7 +1799,8 @@ function simStep(dt){
   if(scene.fog) scene.fog.density=0.0072+af*0.0075;
   if(ash&&ash.material) ash.material.opacity=0.42+af*0.46;
   const heavy=af>0.62; if(heavy&&!G._ashOn){ G._ashOn=true; if(typeof toast==="function")toast("Ashfall sweeps down over the valley.","bad"); } else if(!heavy){ G._ashOn=false; }
-  if(selected&&!selected.dead&&selected.obj){ Cam.target.lerp(new THREE.Vector3(selected.obj.position.x,selected.obj.position.y+0.6,selected.obj.position.z),0.05); }
+  if(selected&&!selected.dead&&selected.obj){ const sx=selected.obj.position.x, sz=selected.obj.position.z;
+    Cam.target.lerp(new THREE.Vector3(sx, terrainHeight(sx,sz)+0.9, sz),0.04); }   // follow ground height, not the husk's walk-bob, so the camera doesn't shake
   for(const b of buildings){ const ud=b.mesh.userData;
     if(b.built===false){ b.buildT-=dt; const p=clamp(1-b.buildT/b.buildTotal,0,1);
       b.mesh.scale.y=0.08+p*0.92;
@@ -1820,7 +1835,7 @@ function seedSettlement(){
   placeBuildingFree("den",7,4); placeBuildingFree("den",-7,4);
   placeBuildingFree("stockpile",0,-7);   // the hub — visible from the first moment
   // husks start idle and bound; the tutorial walks the player through raising the line themselves
-  for(let i=0;i<9;i++){ const a=rr(0,6.28), r=rr(3,8); spawnVillager(Math.cos(a)*r, Math.sin(a)*r, pick(["worker","worker","stump","reaper"])); }
+  for(let i=0;i<6;i++){ const a=rr(0,6.28), r=rr(3,8); spawnVillager(Math.cos(a)*r, Math.sin(a)*r, pick(["worker","worker","stump","reaper"])); }
   renderLedger(); buildRail(); buildDock(); renderQuota();
 }
 
@@ -1909,11 +1924,13 @@ let _abandoning=false;   // set by newValley() so the autosave below can't re-wr
 addEventListener('beforeunload',()=>{ try{ if(!_abandoning && !G.over && shouldAutosave()) saveGame(); }catch(e){} });
 // messages linger on-screen (~9s) and stack, so a notice never flashes past before you can read it.
 // Keep only the last few visible at once so the column stays tidy in the open space.
+let _lastToastMsg='',_lastToastEl=null;
 function toast(msg,type){ const wrap=$('toasts'); if(!wrap) return;
+  if(msg===_lastToastMsg && _lastToastEl && _lastToastEl.parentNode) return;   // dedupe: never stack the same notice twice
   const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg;
-  wrap.appendChild(t);
+  wrap.appendChild(t); _lastToastMsg=msg; _lastToastEl=t;
   try{ while(wrap.children && wrap.children.length>5) wrap.removeChild(wrap.firstChild); }catch(e){}   // keep the column short (headless-safe)
-  setTimeout(()=>{t.style.transition='opacity .6s';t.style.opacity=0;setTimeout(()=>t.remove(),600);},9000); }
+  setTimeout(()=>{t.style.transition='opacity .6s';t.style.opacity=0;setTimeout(()=>t.remove(),600);},6500); }
 // the payoff for closing the whole chain the first time: a chime, a golden flash, and a banner so it lands.
 function firstComputeReward(){ try{ if(typeof SND!=="undefined"){ SND.sfx('bell'); setTimeout(()=>{try{SND.sfx('win');}catch(e){}},260); }
   if(typeof toast==="function") toast("First Compute rendered — you closed the whole chain. The engine stirs.","good");
@@ -1947,7 +1964,7 @@ const NODE={
 };
 // buildings. kind: gather(harvests nodes of nodeType) | refine(recipe) | hearth | den | ward | market | datacenter | stockpile
 const BLD={
-  pyre:{name:"The Binding Pyre",kind:"bind",cost:{},foot:2.4,workers:0,
+  pyre:{name:"The Binding Pyre",kind:"bind",cost:{dead:24,ashwood:14},foot:2.4,workers:0,
     desc:"The engine's old server-altar. It re-reads a dead mind's leftover imprint off the racks and binds it into a husk, for a body and a little Compute. Without husks, nothing moves."},
   den:{name:"Bone Den",kind:"den",cost:{dead:12,ashwood:4},foot:1.8,workers:0,houses:4,
     desc:"Shelters bound husks and raises how many the engine can hold at once. Framed from ashwood."},
@@ -1962,20 +1979,20 @@ const BLD={
   crematory:{name:"Crematory",kind:"refine",cost:{dead:14},foot:2.0,workers:3,dread:0,render:true,
     recipe:{in:{dead:2},out:{bonesil:1,soulash:1,ichor:1},time:3.0},
     desc:"Renders the dead into bone-silica, soul-ash and ichor. Rendering them is also what holds the backlog down."},
-  furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4,bonesil:5},foot:2.0,workers:3,dread:0.4,
+  furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4},foot:2.0,workers:3,dread:0.4,
     recipe:{in:{bonesil:2,soulash:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica and soul-ash into a silicon ingot."},
-  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6,ingot:3},foot:2.0,workers:3,dread:0.5,
+  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6},foot:2.0,workers:3,dread:0.5,
     recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers."},
-  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6,wafer:4},foot:2.0,workers:3,dread:0.6,
+  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
     recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer."},
-  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10,die:3},foot:2.2,workers:4,dread:0.8,
+  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10},foot:2.2,workers:4,dread:0.8,
     recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores."},
   substation:{name:"Substation",kind:"refine",cost:{dead:16,soulash:4},foot:1.8,workers:2,dread:0.5,
     recipe:{in:{soulash:1},out:{power:2},time:3.0},desc:"Burns soul-ash for Power. The datacenters are starving for it."},
-  datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:46,soulash:18,silica:8,core:3},foot:2.6,workers:5,dread:1.2,
+  datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:46,soulash:18,silica:8},foot:2.6,workers:5,dread:1.2,
     recipe:{in:{core:1,power:1,ichor:1},out:{compute:3},time:4.6},desc:"Cores, Power and Ichor render into Compute, the tithe the engine demands."},
   ward:{name:"Ward Obelisk",kind:"ward",cost:{dead:14,soulash:8,ashwood:6},foot:1.4,workers:0,ward:14,
-    desc:"Holds the backlog of unrendered dead back across a wide radius."},
+    desc:"Burns back the Dread haze in a circle around it (14u). Buildings and husks inside the ring work and hold up as if the dead weren't piled there. Place it where the haze is worst, or to shield a refiner you can't move."},
   market:{name:"Black Market",kind:"market",cost:{dead:16,ashwood:8},foot:1.8,workers:1,
     desc:"Trades surplus goods for Bones, and Bones for what you lack."},
   stockpile:{name:"Reliquary Yard",kind:"stockpile",cost:{dead:12,ashwood:6},foot:2.4,workers:0,store:140,
@@ -2111,19 +2128,19 @@ function scatterWorld(){
   }
   // SPAWN RING — a mix of harvestable deposits right around the settlement so matter is at hand from the
   // first minute, but NOT all cemeteries (graves recur on a cooldown now, so a few go a long way)
-  for(let k=0;k<10;k++){ const a=rr(0,6.28), rad=rr(13,31); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode(k%4===3?'tree':k%4===2?'waste':'grave', x, z, 7); }
+  for(let k=0;k<14;k++){ const a=rr(0,6.28), rad=rr(12,30); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode(k%4===3?'tree':k%4===2?'waste':'grave', x, z, 6.5); }
   // ashwood stands within easy reach so the first crafts are buildable early
-  for(let k=0;k<5;k++){ const a=rr(0,6.28), rad=rr(15,30); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('tree', x, z, 7); }
-  // silica seams within a short reach — close enough that the Excavator step is a quick detour, not an expedition
-  for(let k=0;k<3;k++){ const a=rr(0,6.28), rad=rr(20,36); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('silica', x, z, 8); }
-  // MATERIAL FIELD — deposits spread across the dry valley, weighted toward the SCARCE materials (ashwood,
-  // silica, the wastes) rather than yet more cemeteries
-  for(let k=0;k<64;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
-    if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<13||regionAt(x,z)) continue;
-    const r=rnd(); tryPlaceNode(r<0.26?'grave':r<0.48?'waste':r<0.76?'tree':'silica', x, z, 8); }
+  for(let k=0;k<5;k++){ const a=rr(0,6.28), rad=rr(14,28); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('tree', x, z, 6.5); }
+  // silica seams within a SHORT reach so the Excavator step never sends you hunting across the map
+  for(let k=0;k<5;k++){ const a=rr(0,6.28), rad=rr(16,34); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('silica', x, z, 7); }
+  // MATERIAL FIELD — a DENSE band of deposits concentrated in the reachable zone around the settlement (not
+  // flung across the whole valley), weighted toward the scarce materials (ashwood, silica, the wastes)
+  for(let k=0;k<78;k++){ const a=rr(0,6.28), rad=rr(14,62); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<12||regionAt(x,z)) continue;
+    const r=rnd(); tryPlaceNode(r<0.24?'grave':r<0.44?'waste':r<0.72?'tree':'silica', x, z, 6.5); }
   // dense trees, rocks and bone heaps hugging the spawn so the start never reads barren
   for(let k=0;k<35;k++){ const a=rr(0,6.28), rad=rr(7,32); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0||Math.hypot(x,z)<13) continue; const r=rnd();
@@ -2827,7 +2844,9 @@ function stepHusks(dt){
     if(v.carryMesh){ const carrying=v.carryAmt>0.1; v.carryMesh.visible=carrying;
       if(carrying){ if(v.carryRes!==v._payRes){ v._payRes=v.carryRes; applyPayload(v); }
         const s=0.62+Math.min(1,v.carryAmt/12)*0.55; v.carryMesh.scale.set(s,s,s);
-        if(v._payBaseY!=null) v.carryMesh.position.y=v._payBaseY; } }
+        if(v._payBaseY!=null) v.carryMesh.position.y=v._payBaseY; }
+      // the stump's heap grows block by block as it loads up (so its big haul is visible, not one wide box)
+      if(v.carryPile){ const ps=0.5+Math.min(1,v.carryAmt/18)*0.45; for(let i=0;i<v.carryPile.length;i++){ const show=carrying && v.carryAmt>(5+i*4.5); v.carryPile[i].visible=show; if(show) v.carryPile[i].scale.set(ps,ps,ps); } } }
     const b=v.assigned;
     if(!b){ // idle until assigned: stand still, only the rare slow shuffle near the Pyre
       v.restock-=dt;
