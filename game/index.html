@@ -465,8 +465,9 @@ function terrainHeight(x,z){
   h=h*(1-shelf*0.8)+1.2*(shelf*0.8);     // settlement shelf: a level dry plateau the spawn sits on
   return h;
 }
-const BIOME_HSL={ forest:[0.26,0.24,0.27], silica:[0.10,0.07,0.5], ash:[0.03,0.12,0.15],
-  ruins:[0.58,0.09,0.33], graves:[0.31,0.13,0.31], bog:[0.22,0.22,0.23] };
+// a dead, desaturated valley — NO green vegetation tints. Dead-brown, ash, bone-grey, cold-blue only.
+const BIOME_HSL={ forest:[0.07,0.11,0.24], silica:[0.58,0.06,0.47], ash:[0.03,0.13,0.16],
+  ruins:[0.58,0.09,0.33], graves:[0.09,0.05,0.36], bog:[0.55,0.10,0.19] };
 function biomeColor(x,z,h,slope){
   const c=new THREE.Color();
   if(h<-4) c.setHSL(0.08,0.08,0.17); else if(h<-1) c.setHSL(0.09,0.13,0.25);
@@ -778,8 +779,11 @@ function makeProcVillager(caste){
     const mL=new THREE.Mesh(new THREE.BoxGeometry(0.17,0.09,0.08),dkw); mL.position.set(-0.16,0.37,0.6); mL.rotation.z=0.8; g.add(mL);  // corners pulled down
     const mR=mL.clone(); mR.position.set(0.16,0.37,0.6); mR.rotation.z=-0.8; g.add(mR);
     for(let i=0;i<2;i++){ const t=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.1,0.05),bark); t.position.set(-0.05+i*0.1,0.43,0.66); g.add(t); }  // splinter teeth
-    const aL=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.06,0.74,8),bark); aL.position.set(-0.5,0.24,0.42); aL.rotation.x=-0.7; g.add(aL);
-    const aR=aL.clone(); aR.position.x=0.5; g.add(aR);
+    // shoulder stubs where the arms join the trunk, so they read as rooted in the body
+    const shL=new THREE.Mesh(new THREE.SphereGeometry(0.13,7,6),bark); shL.position.set(-0.46,0.46,0.28); g.add(shL);
+    const shR=shL.clone(); shR.position.x=0.46; g.add(shR);
+    const aL=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.06,0.74,8),bark); aL.position.set(-0.47,0.26,0.4); aL.rotation.x=-0.7; g.add(aL);
+    const aR=aL.clone(); aR.position.x=0.47; g.add(aR);
     for(let i=0;i<3;i++){ const a=rr(0,6.28); const rt=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.1,rr(0.22,0.38),5),bark); rt.position.set(Math.cos(a)*0.44,0.07,Math.sin(a)*0.44); rt.rotation.set(rr(0.9,1.3),a,0); g.add(rt); }
     g.userData.arms=[aL,aR]; g.userData.carryTop=true; g.scale.setScalar(1.0);
   } else if(caste==="reaper"){
@@ -796,12 +800,15 @@ function makeProcVillager(caste){
     const spine=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.64,6),pale); spine.position.set(0,0.75,0); g.add(spine);
     for(let i=0;i<4;i++){ const w=0.22-i*0.04; const rib=new THREE.Mesh(new THREE.BoxGeometry(w,0.025,0.025),pale); rib.position.set(0,0.97-i*0.12,0.04); g.add(rib); }
     const pelvis=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.08,0.08),pale); pelvis.position.set(0,0.46,0); g.add(pelvis);
-    // a free thin arm + a scythe-staff in a bony hand
-    const aL=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.018,0.5,5),pale); aL.position.set(-0.14,0.8,0.02); aL.rotation.z=0.28; g.add(aL);
-    const staff=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.03,1.5,6),bark); staff.position.set(0.28,0.74,0.1); staff.rotation.z=0.1; g.add(staff);
-    const blade=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.3,0.09),pale); blade.position.set(0.38,1.42,0.1); blade.rotation.z=-0.9; g.add(blade);
-    const armR=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.018,0.42,5),pale); armR.position.set(0.15,0.86,0.06); armR.rotation.z=-0.6; g.add(armR);
-    const hand=new THREE.Mesh(new THREE.IcosahedronGeometry(0.045,0),pale); hand.position.set(0.27,0.96,0.1); g.add(hand);
+    // bony shoulder joints at the top of the ribcage so the arms read as attached to the body
+    const shL=new THREE.Mesh(new THREE.IcosahedronGeometry(0.05,0),pale); shL.position.set(-0.09,0.99,0.02); g.add(shL);
+    const shR=shL.clone(); shR.position.x=0.09; g.add(shR);
+    // a free thin arm + a scythe-staff in a bony hand, both hung from the shoulders (close to the ribcage)
+    const aL=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.018,0.5,5),pale); aL.position.set(-0.11,0.77,0.02); aL.rotation.z=0.2; g.add(aL);
+    const staff=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.03,1.5,6),bark); staff.position.set(0.26,0.74,0.1); staff.rotation.z=0.1; g.add(staff);
+    const blade=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.3,0.09),pale); blade.position.set(0.36,1.42,0.1); blade.rotation.z=-0.9; g.add(blade);
+    const armR=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.018,0.44,5),pale); armR.position.set(0.11,0.82,0.05); armR.rotation.z=-0.42; g.add(armR);
+    const hand=new THREE.Mesh(new THREE.IcosahedronGeometry(0.045,0),pale); hand.position.set(0.24,0.95,0.1); g.add(hand);
     // thin legs
     const lL=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.018,0.42,5),pale); lL.position.set(-0.07,0.22,0); g.add(lL);
     const lR=lL.clone(); lR.position.x=0.07; g.add(lR);
@@ -815,8 +822,12 @@ function makeProcVillager(caste){
     const rec=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.12,0.06),dk); rec.position.set(0,1.27,0.4); g.add(rec);
     eye(-0.085,1.28,0.43); eye(0.085,1.28,0.43);
     const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.03,0.04),dk); mouth.position.set(0,1.15,0.44); g.add(mouth);
-    const aL=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.03,0.62,6),bark); aL.position.set(-0.22,0.8,0.05); aL.rotation.z=0.26; g.add(aL);
-    const aR=aL.clone(); aR.position.x=0.22; aR.rotation.z=-0.26; g.add(aR);
+    // shoulder joints bridge the leaned body to the arms so they read as ATTACHED, not floating
+    const shL=new THREE.Mesh(new THREE.SphereGeometry(0.075,6,5),bark); shL.position.set(-0.15,1.0,0.12); g.add(shL);
+    const shR=shL.clone(); shR.position.x=0.15; g.add(shR);
+    // arms hang from the shoulders, leaning forward WITH the hunched body (it tilts +0.24 on x)
+    const aL=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.03,0.6,6),bark); aL.position.set(-0.16,0.74,0.16); aL.rotation.set(0.24,0,0.16); g.add(aL);
+    const aR=aL.clone(); aR.position.x=0.16; aR.rotation.set(0.24,0,-0.16); g.add(aR);
     const lL=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.04,0.5,6),bark); lL.position.set(-0.1,0.25,0); g.add(lL);
     const lR=lL.clone(); lR.position.x=0.1; g.add(lR);
     g.userData.arms=[aL,aR]; g.userData.legs=[lL,lR]; g.scale.setScalar(0.95);
@@ -1618,9 +1629,10 @@ function simStep(dt){
       continue;   // no animation/production while under construction
     }
     if(b.kind==="pyre"&&ud.light){ const t=performance.now();
-      ud.light.intensity=(b.active?2.8:0.5)+Math.sin(t/110)*0.5+Math.sin(t/53)*0.3;
-      if(ud.flame){ ud.flame.scale.set(1+Math.sin(t/120)*0.08,1+Math.sin(t/80)*0.18,1+Math.cos(t/100)*0.08); ud.flame.rotation.y=Math.sin(t/200)*0.25; }
-      if(ud.tongues){ ud.tongues[0].scale.y=1+Math.sin(t/70)*0.2; ud.tongues[2].scale.y=1+Math.sin(t/45)*0.35; } }
+      // a slow data-core hum, not a campfire flicker — calmer, longer periods
+      ud.light.intensity=(b.active?2.4:0.5)+Math.sin(t/430)*0.32+Math.sin(t/250)*0.16;
+      if(ud.flame){ ud.flame.scale.set(1+Math.sin(t/540)*0.05,1+Math.sin(t/320)*0.1,1+Math.cos(t/500)*0.05); ud.flame.rotation.y+=dt*0.35; }
+      if(ud.tongues){ ud.tongues[0].scale.y=1+Math.sin(t/380)*0.12; ud.tongues[2].scale.y=1+Math.sin(t/260)*0.2; } }
     if(ud.glow){ ud.glow.material.emissiveIntensity=(b.active?0.9:0.35)+Math.sin(performance.now()/200+b.x)*0.2; }
     if(ud.spin){ const m=b.active?1:0.12; for(const s of ud.spin) s.m.rotation[s.ax]+=s.sp*dt*m; }   // moving parts on procedural buildings
     if(ud.bob){ const t=performance.now()/1000; for(const o of ud.bob) o.m.position.y=o.y0+Math.sin(t*o.sp+o.ph)*o.amp*(b.active?1:0.2); }
@@ -1648,8 +1660,11 @@ function seedSettlement(){
 /* =====================================================================
    === SAVE / LOAD: the foundry persists itself to localStorage ===
    ===================================================================== */
+// bump when the world-gen / save shape changes enough that an old save would load a stale world.
+// v2: ashwood + silica nodes, denser deposits, the wave-of-the-dead. Old saves are dropped so the new valley generates.
+const SAVE_VERSION=2;
 function serializeState(){
-  return { v:1, seed:WORLD_SEED,
+  return { v:SAVE_VERSION, seed:WORLD_SEED,
     G:{ stock:Object.assign({},G.stock), writ:G.writ, dread:G.dread, popCap:G.popCap, grow:G.grow, time:G.time||0,
         quota:{need:G.quota.need,period:G.quota.period,t:G.quota.t,level:G.quota.level}, tech:Object.assign({},G.tech||{}) },
     paths:[...PATHS],
@@ -1683,7 +1698,10 @@ function applySave(s){
 function shouldAutosave(){ return (G.mode||'campaign')==='campaign'; }   // challenge runs never clobber the campaign save
 function saveGame(){ try{ localStorage.setItem('sf_save',JSON.stringify(serializeState())); return true; }catch(e){ return false; } }
 function readSave(){ try{ const s=localStorage.getItem('sf_save'); return s?JSON.parse(s):null; }catch(e){ return null; } }
-function loadGame(){ const s=readSave(); if(!s||!s.buildings||!s.buildings.length) return false;
+function loadGame(){ const s=readSave();
+  // a save from an older world-gen would load a stale valley (no new deposits) — drop it and start fresh
+  if(s && s.v!==SAVE_VERSION){ try{ localStorage.removeItem('sf_save'); }catch(e){} return false; }
+  if(!s||!s.buildings||!s.buildings.length) return false;
   try{ applySave(s); if(typeof toast==="function") toast("The foundry stirs from where you left it."); return true; }
   catch(e){ if(console&&console.warn)console.warn("load failed",e); return false; } }
 
@@ -1756,8 +1774,8 @@ const BLD={
     desc:"Husks dig the cemeteries and drag up the dead."},
   dredge:{name:"Waste-Dredge",kind:"gather",nodeType:"waste",res:"dead",cost:{dead:12},foot:1.8,workers:3,
     desc:"Drags bodies in from the wastes. Farther out, but they run deep."},
-  ashcamp:{name:"Ashwood Camp",kind:"gather",nodeType:"tree",res:"ashwood",cost:{dead:6},foot:1.6,workers:2,
-    desc:"Husks strip ashwood from the dead stands — the foundry's first crude build stock. Sit it beside a stand."},
+  ashcamp:{name:"Ashwood Camp",kind:"gather",nodeType:"tree",res:"ashwood",lockNode:"tree",cost:{dead:6},foot:1.6,workers:2,
+    desc:"Husks strip ashwood from the dead stands — the foundry's first crude build stock. It can only stand on an Ashwood Stand."},
   excavator:{name:"Silica Excavator",kind:"gather",nodeType:"silica",res:"silica",lockNode:"silica",cost:{dead:18,ashwood:8},foot:2.0,workers:3,
     desc:"A bore-rig that bites raw silica from a seam for the fab. It can only stand on a silica seam — nowhere else."},
   crematory:{name:"Crematory",kind:"refine",cost:{dead:14},foot:2.0,workers:3,dread:0,render:true,
@@ -1952,7 +1970,7 @@ function scatterGroundDetail(){
     im.count=n; im.instanceMatrix.needsUpdate=true; im.frustumCulled=false; scene.add(im); return im; };
   mk(new THREE.DodecahedronGeometry(0.6,0), MAT(0x53565d), 440, s=>0.12, ()=>{const a=rr(0.4,1.9);return{x:a,y:a*rr(0.5,1),z:a};});       // pale rubble & stones
   mk(new THREE.DodecahedronGeometry(0.7,0), MAT(0x6b6760), 55, s=>0.16, ()=>{const a=rr(0.6,1.4);return{x:a,y:a*rr(0.5,0.9),z:a};}, -3.4, 24);   // boulders: smaller + held well clear of spawn     // bigger boulders (read from afar)
-  mk(new THREE.ConeGeometry(0.13,1.2,4), MAT(0x444a33), 700, s=>s.y*0.45, ()=>{const a=rr(0.6,2.5);return{x:1,y:a,z:1};});               // dead grass tufts
+  mk(new THREE.ConeGeometry(0.13,1.2,4), MAT(0x4a4336), 700, s=>s.y*0.45, ()=>{const a=rr(0.6,2.5);return{x:1,y:a,z:1};});               // dead brown grass-stalk tufts (no green)
   mk(new THREE.IcosahedronGeometry(0.24,0), MAT(0x655f50), 330, s=>0.1, ()=>{const a=rr(0.4,1.5);return{x:a,y:a*0.6,z:a};});             // bone-grey debris
   mk(new THREE.BoxGeometry(0.5,0.18,0.5), MAT(0x564c3e), 160, s=>0.06, ()=>{const a=rr(0.6,2.2);return{x:a,y:1,z:a*rr(0.6,1)};});       // broken slabs / dirt
   mk(new THREE.IcosahedronGeometry(0.17,0), MAT(0xbab296), 220, s=>0.08, ()=>{const a=rr(0.35,1.15);return{x:a,y:a*0.5,z:a};}, -3.0, 7);  // pale scattered BONES (high contrast)

@@ -7,7 +7,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__W={ buildTerrain, buildEnvironment, buildAsh, scatterWorld, scatterGroundDetail, seedSettlement, buildShroud, updateShroud, terrainHeight,
+code+=`\n;this.__W={ buildTerrain, buildEnvironment, buildAsh, scatterWorld, scatterGroundDetail, seedSettlement, buildShroud, updateShroud, terrainHeight, nodes,
   __seed:(s)=>{ WORLD_SEED=s; RNG=mulberry32(s); genRegions(s); } };`;
 
 const noop=()=>{};
@@ -50,5 +50,14 @@ let failed=false;
 for(const [name,fn] of steps){
   try { fn(); console.log('OK   '+name); }
   catch(e){ failed=true; console.log('FAIL '+name+'  ->  '+e.message); console.log(e.stack.split('\n').slice(0,4).join('\n')); break; }
+}
+// deposit census — catch a regression where the world generates with no harvestable deposits
+if(!failed){
+  const byType={}; let nearSpawn=0;
+  for(const n of W.nodes){ byType[n.type]=(byType[n.type]||0)+1; if(Math.hypot(n.x,n.z)<35) nearSpawn++; }
+  console.log('NODES total='+W.nodes.length+' byType='+JSON.stringify(byType)+' near-spawn(<35)='+nearSpawn);
+  const graves=byType.grave||0;
+  if(W.nodes.length<20 || graves<5 || nearSpawn<6) { failed=true; console.log('FAIL deposit census — too few harvestable deposits / graves / near-spawn'); }
+  else console.log('OK   deposit census');
 }
 console.log(failed?'=== BOOT WOULD HANG ===':'=== all world-build steps ran ===');
