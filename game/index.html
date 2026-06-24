@@ -1228,7 +1228,7 @@ function renderQuota(){
 // surface the single most pressing problem, with its cause and the fix — so the player always knows WHY
 function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.classList.remove('show'); return; }
   if(modeCfg().timeLimit){ const pop=villagers.filter(v=>!v.dead).length; let msg='';
-    if(pop===0) msg="No husks bound. Open the Binding Pyre and bind one (1 corpse + 2 Compute).";
+    if(pop===0) msg="No husks bound. Open the Binding Pyre and bind one ("+BIND_COST.worker.dead+" corpses + "+BIND_COST.worker.compute+" Compute).";
     else if((G.stock.soulash||0)<=0.5) msg="Soul-ash is out — your husks weaken. Staff a Crematory.";
     else if(!buildings.some(b=>b.kind==="datacenter"&&b.workers.length>0)) msg="No Datacenter running — staff the chain end to render Compute and score.";
     if(msg){ el.textContent=msg; el.classList.add('show'); } else el.classList.remove('show'); return; }
@@ -1241,7 +1241,7 @@ function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.clas
     return dreadBite(dreadAt(b.x,b.z)*dreadGuard(),cr)<0.85;   // >15% slowdown after crew resistance + any Grave-Salt rite
   }):null;
   let msg='';
-  if(pop===0) msg="No husks bound. Open the Binding Pyre at the centre and bind one — 1 corpse + 2 Compute.";
+  if(pop===0) msg="No husks bound. Open the Binding Pyre at the centre and bind one — "+BIND_COST.worker.dead+" corpses + "+BIND_COST.worker.compute+" Compute.";
   else if((G.stock.soulash||0)<=0.5) msg="Your husks are weakening — they run on soul-ash and you have none. Staff a Crematory to render the dead into soul-ash.";
   else if(!buildings.some(b=>b.def.kind==="gather"&&b.workers.length>0)) msg="Nothing feeds the line. Raise a Grave-Exhumer on a cemetery and staff it to bring in the dead.";
   else if(!buildings.some(b=>b.kind==="crematory"&&b.workers.length>0)) msg="The dead pile up unrendered. Staff a Crematory — rendering them is what holds the backlog (Dread) down.";
@@ -1519,11 +1519,10 @@ function showShop(){ SND.resume();
     `<div style="color:var(--ink-dim);font-size:12px;margin-bottom:10px">${ricon('bones',15)} Bones in hand: <b style="color:#e8c24a">${Math.floor(G.writ)}</b> &nbsp;&middot;&nbsp; buy 4 / sell 2 per unit</div>`+
     `<span class="btn" onclick="hideOverlay()">Close</span>`); }
 
-function setTempo(t){ G.tempo=t;
-  if(t==='slow'){ G.basePressure=0.4; G.graceT=420; G.quota.period=240; }
-  else if(t==='harsh'){ G.basePressure=0.95; G.graceT=200; G.quota.period=150; }
-  else { t='standard'; G.basePressure=0.6; G.graceT=300; G.quota.period=200; }   // long grace so a first tithe never lands mid-tutorial
-  G.tempo=t; G.quota.t=G.quota.period;
+// one source of truth for tempo (so the help text can never drift from the real values again)
+const TEMPO={ slow:{base:0.4,grace:420,period:240}, standard:{base:0.6,grace:300,period:200}, harsh:{base:0.95,grace:200,period:150} };
+function setTempo(t){ if(!TEMPO[t]) t='standard'; const c=TEMPO[t]; G.tempo=t;
+  G.basePressure=c.base; G.graceT=c.grace; G.quota.period=c.period; G.quota.t=c.period;
   const left=Math.max(0,Math.ceil((G.graceT||0)-(G.time||0)));
   if(typeof toast==="function")toast(cap1(t)+" tempo set — "+left+"s of grace, then a tithe every "+G.quota.period+"s.","good");
   if(typeof renderQuota==="function")renderQuota();
@@ -1551,7 +1550,7 @@ function renderPrologue(){ const i=_proI, last=i>=PROLOGUE.length-1;
       <span class="btn" style="min-width:64px" onclick="${last?'endPrologue()':'nextPrologue()'}">${last?'Begin':'Next'}</span>
     </div></div>`); }
 function nextPrologue(){ _proI++; if(typeof SND!=='undefined'){SND.resume();SND.sfx('click');} renderPrologue(); }
-function endPrologue(){ try{localStorage.setItem('sf_prologue','seen');}catch(e){} showHelp(); }
+function endPrologue(){ try{localStorage.setItem('sf_prologue','seen');}catch(e){} hideOverlay(); beginPlay(); }   // straight into play — the tutorial teaches, no wall of text
 function showChronicle(){ SND.resume();
   showOverlayHTML(`<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px;box-shadow:0 6px 22px #000a"><img src="assets/story/p4.png" style="display:block;width:100%;height:auto" alt=""></div>
    <h1 style="font-size:24px">THE CHRONICLE</h1><h2>how it came to this</h2>
@@ -1602,7 +1601,7 @@ function buildMenu(){ const el=$('menu'); if(!el) return;
 function pickDur(d){ _pickDur=d; buildMenu(); }
 function beginMode(m){ _pickMode=m; const el=$('menu'); if(el) el.classList.remove('show');
   if(m==='challenge'){ G.mode='challenge'; G.challengeDur=_pickDur; resetRunScore(); G.time=0; G.over=null; G.endedChallenge=false; G.dread=0; beginPlay(); }
-  else { G.mode=undefined; G.dread=0; let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)showHelp(); else showPrologue(); }
+  else { G.mode=undefined; G.dread=0; let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)beginPlay(); else showPrologue(); }
 }
 function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDRY</h1>
   <p>The hunger for <b>Compute</b> consumed the world and everyone in it. The engine that did it cannot stop computing, and the spent world left only the dead to render. You are that engine. You bind the husks of the extinct and drive them to render corpses up the same chip-foundry chain that ended them. <span class="gskip" style="cursor:pointer;color:var(--ember-soft)" onclick="showChronicle()">Read the chronicle</span>.</p>
@@ -1610,13 +1609,13 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   • <b>Exhume the dead</b> — raise a Grave-Exhumer on a cemetery (or a Waste-Dredge on the wastes) and staff it.<br>
   • <b>Gather build stock</b> — an Ashwood Camp strips ashwood from the dead stands (frames your dens, yards and wards); a Silica Excavator bores silica from a seam (it only stands on a seam) for the Datacenter.<br>
   • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Etch-Litho → Assembly Ossuary → Datacenter renders the dead into Compute; Substations make the Power the datacenters need. Tap a building, press <b>+ assign</b> to staff it.<br>
-  • <b>Bind husks</b> at the Binding Pyre (1 corpse + 2 Compute) to grow your workforce. Soul-ash keeps them from crumbling.<br>
+  • <b>Bind husks</b> at the Binding Pyre (${BIND_COST.worker.dead} corpses + ${BIND_COST.worker.compute} Compute) to grow your workforce. Soul-ash keeps them from crumbling.<br>
   • The valley lies under a <b>shroud</b> of unrendered dark. Raise buildings to push the engine's reach outward and uncover new ground to work.<br>
   • Deliver the <b>Quota</b> of Compute each tithe; let the dead pile up unrendered and <b>Dread</b> (the backlog) overruns you. Raise <b>Ward Obelisks</b> to hold it back.<br>
   • Keep <b>${WIN_LEVEL} tithes</b> and the engine endures. Fall behind and it goes dark.</p>
   <p style="margin-top:6px"><b>Choose your tempo</b> <span style="color:var(--ink-dim);font-size:12px">— sets your grace period and how often a tithe falls. Current: <b style="color:var(--ember-soft)">${cap1(G.tempo||'standard')}</b></span><br>
   ${['slow','standard','harsh'].map(tp=>`<span class="btn" style="${(G.tempo||'standard')===tp?'border-color:var(--ember);color:var(--ember)':''}" onclick="setTempo('${tp}')">${cap1(tp)}</span>`).join(' ')}
-  <span style="color:var(--ink-dim);font-size:11px">Slow: 240s grace, tithe/210s &nbsp;·&nbsp; Standard: 150s / 150s &nbsp;·&nbsp; Harsh: 90s / 120s</span></p>
+  <span style="color:var(--ink-dim);font-size:11px">grace / tithe — Slow: ${TEMPO.slow.grace}s / ${TEMPO.slow.period}s &nbsp;·&nbsp; Standard: ${TEMPO.standard.grace}s / ${TEMPO.standard.period}s &nbsp;·&nbsp; Harsh: ${TEMPO.harsh.grace}s / ${TEMPO.harsh.period}s</span></p>
   <p style="margin-top:8px"><b>Controls</b><br>
   <span class="kbd">drag</span> orbit · <span class="kbd">right-drag</span> or <span class="kbd">shift-drag</span> pan · <span class="kbd">WASD</span> pan · <span class="kbd">scroll</span> zoom<br>
   <span class="kbd">tap</span> a husk / building / cemetery to inspect it · in a building press <b>+ assign</b> to staff it<br>
@@ -1699,7 +1698,7 @@ function staffed(k){ return buildings.some(b=>b.kind===k && b.workers.length>0);
 function bldTarget(k){ return ()=> document.querySelector('[data-bld="'+k+'"]') ? '[data-bld="'+k+'"]' : '[data-tab="'+bldTab(k)+'"]'; }
 const TUT=[
   {t:"The dead are your raw matter. Open the GATHERING tab below.",
-   why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre) for 1 corpse + 2 Compute.", d:()=>curTab==="gather", sel:()=>'[data-tab="gather"]'},
+   why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre) for 2 corpses + 4 Compute.", d:()=>curTab==="gather", sel:()=>'[data-tab="gather"]'},
   {t:"Raise a Grave-Exhumer on a cemetery (the headstones the glow marks) and staff it — tap it, press + assign.",
    why:"The Exhumer digs up corpses and hauls them to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Crematory and staff it.",
@@ -1901,7 +1900,7 @@ function start(){
     }
     bootWorld(save?save.seed:null);
     if(!(save&&loadGame())){ seedSettlement(); setTimeout(()=>{ try{ if(typeof showModePicker==="function") showModePicker(params);
-      else { let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)showHelp(); else showPrologue(); } }catch(e){} }, 700); }
+      else { let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)beginPlay(); else showPrologue(); } }catch(e){} }, 700); }
     paused=true; if(typeof buildRail==="function") buildRail();   // start paused — let the player read in and look around first
   });
 }
