@@ -176,7 +176,7 @@
   #menu .mtag{color:var(--ember-soft);letter-spacing:3px;text-transform:uppercase;font-size:12px;margin:6px 0 24px;text-align:center}
   #menu .cards{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;align-items:stretch;max-width:864px;width:100%}
   .mcard{flex:0 1 350px;max-width:92vw;cursor:pointer;position:relative;border:28px solid transparent;
-    border-image:url('assets/ui/frame-branch.png') 160 stretch;background:#0a0b0ff8;
+    border-image:url('assets/ui/frame-branch.png') 100 stretch;background:#0a0b0ff8;
     display:flex;flex-direction:column;transition:transform .14s ease,filter .14s ease;filter:saturate(.92)}
   .mcard:hover{transform:translateY(-4px);filter:saturate(1.06) brightness(1.05)}
   .mcard .pic{height:182px;background-size:cover;background-position:center 56%;position:relative}
@@ -235,7 +235,7 @@
      ============================================================ */
   #inspect,#goals,.modal,#dock{
     border:var(--wood,30px) solid transparent;
-    border-image:url('assets/ui/frame-branch.png') 160 stretch;
+    border-image:url('assets/ui/frame-branch.png') 100 stretch;   /* solid-log frame (slice ~100 of 640) */
     border-radius:0; backdrop-filter:none;
   }
   #inspect,#goals{--wood:36px; background:#160f08f7}   /* dark wood-brown interior + a thicker wood frame (was near-black with a thin border) */
