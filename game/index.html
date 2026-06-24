@@ -1185,7 +1185,44 @@ const RES_HELP={ dead:"The remains of the extinct. Exhume them from graves and t
   die:"An etched die. Packaged into cores.", core:"A reliquary core, the chip itself. Rendered into Compute.",
   power:"The datacenters run on it.", compute:"What the engine demands each tithe. Deliver it, or the backlog drowns you." };
 // ---- custom icon helpers + resource codex (no emoji, everything explainable) ----
-function ricon(r,s){ s=s||18; return `<img class="ic" src="assets/ui/res/${r}.png" onerror="this.onerror=null;this.src='assets/ui/glyph/gathering.png'" style="width:${s}px;height:${s}px">`; }
+// RESOURCE ICONS — a clean, consistent little 3D form per material, rendered to a crisp thumbnail (same trick as
+// the dock building icons). Sharp + on-theme, not the muddy AI plaques. Cached after first render.
+function resMesh(res){ const g=new THREE.Group();
+  const MA=(col,o)=>new THREE.MeshStandardMaterial(Object.assign({color:col,flatShading:true,roughness:0.82},o||{}));
+  const EM=(col,i)=>new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:i||0.85,flatShading:true,roughness:0.55});
+  const C=(RES[res]&&RES[res].col)||0x9a9a9a;
+  if(res==='dead'){ const sk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.62,0),MA(0xc9c0a7)); g.add(sk);
+    const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.24,0.46),MA(0xc9c0a7)); jaw.position.y=-0.52; g.add(jaw);
+    for(const ex of [-0.24,0.24]){ const e=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.2,0.12),MA(0x17110b)); e.position.set(ex,0.06,0.52); g.add(e); } }
+  else if(res==='ashwood'){ const log=new THREE.Mesh(new THREE.CylinderGeometry(0.36,0.38,1.15,8),MA(0x6b5436)); log.rotation.z=Math.PI/2; g.add(log);
+    const cut=new THREE.Mesh(new THREE.CylinderGeometry(0.38,0.38,0.05,8),MA(0x4a3d29)); cut.rotation.z=Math.PI/2; cut.position.x=0.58; g.add(cut); }
+  else if(res==='silica'){ for(const o of [[-0.22,0,0.95],[0.2,0.1,1.15],[0,-0.22,0.72]]){ const sh=new THREE.Mesh(new THREE.ConeGeometry(0.19,o[2],5),EM(0xb9c6cf,0.3)); sh.position.set(o[0],o[2]*0.25,o[1]); g.add(sh); } }
+  else if(res==='bonesil'){ const m=new THREE.Mesh(new THREE.ConeGeometry(0.62,0.95,7),MA(0xc3bba9)); m.position.y=-0.1; g.add(m); }
+  else if(res==='soulash'){ const m=new THREE.Mesh(new THREE.ConeGeometry(0.62,0.85,7),MA(C)); m.position.y=-0.1; g.add(m); }
+  else if(res==='ichor'){ const v=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.34,0.95,9),EM(C,0.5)); g.add(v);
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.2,8),MA(0x2a2620)); cap.position.y=0.55; g.add(cap); }
+  else if(res==='ingot'){ g.add(new THREE.Mesh(new THREE.BoxGeometry(1.0,0.4,0.5),MA(C,{metalness:0.6,roughness:0.4}))); }
+  else if(res==='wafer'){ for(let i=0;i<3;i++){ const d=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.08,14),EM(C,0.25)); d.position.y=-0.18+i*0.18; g.add(d); } }
+  else if(res==='die'){ g.add(new THREE.Mesh(new THREE.BoxGeometry(0.8,0.18,0.8),EM(C,0.35)));
+    const grid=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.2,0.55),MA(0x2a3010)); grid.position.y=0.02; g.add(grid); }
+  else if(res==='core'){ g.add(new THREE.Mesh(new THREE.BoxGeometry(0.7,0.7,0.7),EM(C,0.9))); }
+  else if(res==='power'){ g.add(new THREE.Mesh(new THREE.ConeGeometry(0.32,1.0,5),EM(C,0.95))); }
+  else if(res==='compute'){ const b=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.7,0.7),EM(C,0.95)); b.rotation.set(0.5,0.6,0); g.add(b); }
+  else { g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.6,0),MA(C))); }
+  return g;
+}
+const RES_THUMB={};
+function resourceThumb(res){ if(RES_THUMB[res]!==undefined) return RES_THUMB[res]; let url=null;
+  try{ ensureThumbRig(); const mesh=resMesh(res); _thumbScene.add(mesh);
+    const box=new THREE.Box3().setFromObject(mesh), c=box.getCenter(new THREE.Vector3()), s=box.getSize(new THREE.Vector3());
+    const r=Math.max(s.x,s.y,s.z)||1, d=r*2.25;
+    _thumbCam.position.set(c.x+d*0.5,c.y+d*0.55,c.z+d*0.92); _thumbCam.lookAt(c.x,c.y,c.z);
+    _thumbR.render(_thumbScene,_thumbCam); url=_thumbR.domElement.toDataURL('image/png'); _thumbScene.remove(mesh);
+  }catch(e){ url=null; } RES_THUMB[res]=url; return url;
+}
+function ricon(r,s){ s=s||18; const t=(typeof resourceThumb==="function")?resourceThumb(r):null;
+  const src=t||('assets/ui/res/'+r+'.png');
+  return `<img class="ic" src="${src}" onerror="this.onerror=null;this.src='assets/ui/glyph/gathering.png'" style="width:${s}px;height:${s}px">`; }
 function gicon(n,s){ s=s||24; return `<img src="assets/ui/glyph/${n}.png" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle">`; }
 function resMadeBy(r){ const m=[]; for(const k of BLD_ORDER){ const d=BLD[k]; if(d.recipe&&d.recipe.out&&d.recipe.out[r])m.push(d.name); if(d.kind==='gather'&&d.res===r)m.push(d.name); } return m; }
 function resUsedBy(r){ const u=[]; for(const k of BLD_ORDER){ const d=BLD[k]; if(d.recipe&&d.recipe.in&&d.recipe.in[r])u.push(d.name); if(d.kind==='bind'&&r==='dead')u.push(d.name); } return u; }
@@ -2738,7 +2775,17 @@ function makeBuildingMesh(kind,def){
     const frame=new THREE.Mesh(new THREE.BoxGeometry(0.18,1.8,0.18),timber); frame.position.set(-f*0.3,1,-f*0.3); g.add(frame);
     const beam=new THREE.Mesh(new THREE.BoxGeometry(f,0.16,0.16),timber); beam.position.set(0,1.7,-f*0.3); g.add(beam);
     const tint=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5),MAT(RES[def.res].col)); tint.position.set(f*0.25,0.6,0); g.add(tint);
-    const lant=new THREE.Mesh(new THREE.IcosahedronGeometry(0.18,0),win); lant.material.emissiveIntensity=0.6; lant.position.set(-f*0.3,1.7,-f*0.3); g.add(lant); }
+    const lant=new THREE.Mesh(new THREE.IcosahedronGeometry(0.18,0),win); lant.material.emissiveIntensity=0.6; lant.position.set(-f*0.3,1.7,-f*0.3); g.add(lant);
+    if(kind==="exhumer"){ // grave-digging SHOVELS leaning on the post + a mound of dug earth
+      const steel=MAT(0x8b9099,{metalness:0.5,roughness:0.5}), haft=MAT(0x3a2f22);
+      for(const sx of [-1,1]){ const sh=new THREE.Group();
+        const hndl=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.045,1.45,6),haft); hndl.position.y=0.72; sh.add(hndl);
+        const blade=new THREE.Mesh(new THREE.BoxGeometry(0.25,0.34,0.04),steel); blade.position.y=0.02; sh.add(blade);
+        const grip=new THREE.Mesh(new THREE.TorusGeometry(0.08,0.025,4,8),haft); grip.rotation.x=Math.PI/2; grip.position.y=1.46; sh.add(grip);
+        sh.position.set(sx*0.42,0,f*0.3); sh.rotation.z=sx*0.34; sh.rotation.x=-0.1; g.add(sh); }
+      const mound=new THREE.Mesh(new THREE.SphereGeometry(0.42,7,5,0,6.283,0,1.3),MAT(0x342c22)); mound.scale.y=0.42; mound.position.set(-f*0.32,0.04,f*0.34); g.add(mound);
+      const bone=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.04,0.4,5),MAT(0xb3a98f)); bone.rotation.z=1.2; bone.position.set(-f*0.32,0.16,f*0.4); g.add(bone); }
+    }
   else if(def.kind==="refine"||def.kind==="datacenter"){ const body=new THREE.Mesh(new THREE.BoxGeometry(f,1.8,f*0.9),stone); body.position.y=0.9; g.add(body);
     const roof=new THREE.Mesh(new THREE.BoxGeometry(f*1.05,0.3,f*0.95),iron); roof.position.y=1.9; g.add(roof);
     for(let i=0;i<3;i++){ const w=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.5,0.05),win); w.position.set(-f*0.3+i*f*0.3,0.95,f*0.45+0.01); g.add(w); }
