@@ -250,14 +250,23 @@
   .cstep .cflow{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--ink-dim)}
   .cstep .cflow img{width:18px;height:18px;vertical-align:middle}
   .carrow{width:2px;height:13px;background:linear-gradient(var(--line),var(--ember-soft));margin-left:17px}
-  /* tutorial green spotlight */
-  #spot{position:fixed;z-index:44;border:2px solid #80df68;border-radius:8px;pointer-events:none;display:none;
-    animation:spotpulse 1.3s ease-in-out infinite}
-  @keyframes spotpulse{0%,100%{box-shadow:0 0 0 3px #80df6840,0 0 16px 4px #80df6844,inset 0 0 12px #80df6822}
-    50%{box-shadow:0 0 0 4px #80df6866,0 0 28px 8px #80df6877,inset 0 0 16px #80df6844}}
-  #wspot{position:fixed;z-index:44;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid #80df68;border-radius:50%;
-    box-shadow:0 0 14px 4px #80df6866;pointer-events:none;display:none;animation:spotpulse 1.3s ease-in-out infinite}
-  #wspot::after{content:'';position:absolute;inset:6px;border-radius:50%;background:#80df6833}
+  /* first-Compute payoff: a golden screen flourish + a pulse on the ledger Compute readout */
+  #flourish{position:fixed;inset:0;z-index:55;pointer-events:none;opacity:0;
+    background:radial-gradient(circle at 50% 56%,#e8c24a26 0%,#e8a23a16 30%,transparent 62%)}
+  #flourish.go{animation:flourish 1.6s ease-out}
+  @keyframes flourish{0%{opacity:0}16%{opacity:1}100%{opacity:0}}
+  #ledger.compflash{animation:compflash 1.6s ease-out}
+  @keyframes compflash{0%,100%{box-shadow:none}28%{box-shadow:inset 0 -3px 0 #e8c24a,0 0 24px #e8c24a66}}
+  /* tutorial green spotlight — bright + thick so the first build is unmistakable */
+  #spot{position:fixed;z-index:44;border:3px solid #8fe86a;border-radius:8px;pointer-events:none;display:none;
+    animation:spotpulse 1.2s ease-in-out infinite}
+  @keyframes spotpulse{0%,100%{box-shadow:0 0 0 3px #80df6855,0 0 18px 5px #80df6855,inset 0 0 12px #80df6833}
+    50%{box-shadow:0 0 0 5px #80df688a,0 0 34px 10px #80df6899,inset 0 0 18px #80df6855}}
+  #wspot{position:fixed;z-index:44;width:38px;height:38px;margin:-19px 0 0 -19px;border:3px solid #8fe86a;border-radius:50%;
+    box-shadow:0 0 18px 5px #80df6888;pointer-events:none;display:none;animation:spotpulse 1.2s ease-in-out infinite}
+  #wspot::after{content:'';position:absolute;inset:7px;border-radius:50%;background:#80df6844}
+  #wspot::before{content:'BUILD HERE';position:absolute;left:50%;top:-22px;transform:translateX(-50%);white-space:nowrap;
+    font:bold 10px/1 ui-monospace,Menlo,monospace;letter-spacing:1.5px;color:#bdf2a6;text-shadow:0 1px 3px #000}
 </style>
 </head>
 <body>
@@ -273,6 +282,7 @@
 <div id="inspect" class="frame twig"></div>
 <div id="goals" class="frame twig"></div>
 <div id="toasts"></div>
+<div id="flourish"></div>
 <div id="hint"></div>
 <div id="tip"></div>
 <div id="spot"></div><div id="wspot"></div>
@@ -1054,7 +1064,7 @@ const STAT_HELP={
   writ:"Bones. Your currency. Earned from tithes and the market, spent on Rites and trade." };
 const RES_HELP={ dead:"The remains of the extinct. Exhume them from graves and the wastes. Everything the foundry makes starts here.",
   ashwood:"Ashwood. Stripped from the dead stands by an Ashwood Camp. The crude early stock your dens, yards and wards are framed from.",
-  silica:"Raw silica. Bored from a seam by an Excavator, which can only stand on a seam. The fab buildings — mill, litho, datacenter — are cut from it.",
+  silica:"Raw silica. Bored from a seam by an Excavator, which can only stand on a seam. The Spectral Datacenter — the chip itself — is cut from it.",
   bonesil:"Bone-silica. Smelted into ingots.",
   soulash:"Soul-ash. Flux for the Furnace and Ossuary, and the upkeep your husks run on. Keep a little flowing or they weaken.", ichor:"Coolant for the datacenters.",
   ingot:"A silicon ingot. Sliced into wafers.", wafer:"A wafer. Etched into dies.",
@@ -1424,6 +1434,7 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   <p>The hunger for <b>Compute</b> consumed the world and everyone in it. The engine that did it cannot stop computing, and the spent world left only the dead to render. You are that engine. You bind the husks of the extinct and drive them to render corpses up the same chip-foundry chain that ended them. <span class="gskip" style="cursor:pointer;color:var(--ember-soft)" onclick="showChronicle()">Read the chronicle</span>.</p>
   <p><b>How to play:</b><br>
   • <b>Exhume the dead</b> — raise a Grave-Exhumer on a cemetery (or a Waste-Dredge on the wastes) and staff it.<br>
+  • <b>Gather build stock</b> — an Ashwood Camp strips ashwood from the dead stands (frames your dens, yards and wards); a Silica Excavator bores silica from a seam (it only stands on a seam) for the Datacenter.<br>
   • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Etch-Litho → Assembly Ossuary → Datacenter renders the dead into Compute; Substations make the Power the datacenters need. Tap a building, press <b>+ assign</b> to staff it.<br>
   • <b>Bind husks</b> at the Binding Pyre (1 corpse + 2 Compute) to grow your workforce. Soul-ash keeps them from crumbling.<br>
   • The valley lies under a <b>shroud</b> of unrendered dark. Raise buildings to push the engine's reach outward and uncover new ground to work.<br>
@@ -1438,7 +1449,7 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   while placing: <span class="kbd">R</span> rotate · <span class="kbd">Esc</span> or <span class="kbd">right-click</span> cancel<br>
   <span class="kbd">Space</span> pause · <span class="kbd">1</span> normal / <span class="kbd">3</span> fast · hover anything for a quick label</p>
   <p style="margin-top:8px"><b>Build hotkeys</b> <span style="color:var(--ink-dim);font-size:11px">— tap to start placing</span><br>
-  <span class="kbd">X</span> Exhumer · <span class="kbd">G</span> Dredge · <span class="kbd">C</span> Crematory · <span class="kbd">F</span> Furnace · <span class="kbd">M</span> Mill · <span class="kbd">L</span> Litho · <span class="kbd">O</span> Ossuary · <span class="kbd">U</span> Substation · <span class="kbd">T</span> Datacenter<br>
+  <span class="kbd">X</span> Exhumer · <span class="kbd">G</span> Dredge · <span class="kbd">H</span> Ashwood Camp · <span class="kbd">Z</span> Excavator · <span class="kbd">C</span> Crematory · <span class="kbd">F</span> Furnace · <span class="kbd">M</span> Mill · <span class="kbd">L</span> Litho · <span class="kbd">O</span> Ossuary · <span class="kbd">U</span> Substation · <span class="kbd">T</span> Datacenter<br>
   <span class="kbd">N</span> Den · <span class="kbd">Y</span> Reliquary Yard · <span class="kbd">V</span> Ward · <span class="kbd">K</span> Market · <span class="kbd">B</span> Bone Path · <span class="kbd">P</span> Pyre</p>
   <p><span class="btn" onclick="hideOverlay()">Begin</span></p>`); }
 function showEnd(win,why){ showOverlayHTML(win?
@@ -1523,6 +1534,8 @@ const TUT=[
    why:"Dies + soul-ash are packaged into reliquary cores — the chips.", d:()=>staffed("ossuary"), sel:bldTarget('ossuary')},
   {t:"Raise a Substation and staff it — the datacenters need Power.",
    why:"Soul-ash burns into Power. No power, no Compute.", d:()=>staffed("substation"), sel:bldTarget('substation')},
+  {t:"Raise a Silica Excavator on a silica seam (the pale crystals the glow marks) and staff it.",
+   why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);return n?{x:n.x,z:n.z}:null;}},
   {t:"Raise a Spectral Datacenter and staff it.",
    why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>staffed("datacenter"), sel:bldTarget('datacenter')},
   {t:"Now wait — your first Compute appears in the ledger up top.",
@@ -1701,6 +1714,15 @@ function beginPlay(){ paused=false; if(typeof buildRail==="function")buildRail()
 addEventListener('beforeunload',()=>{ try{ if(!G.over && shouldAutosave()) saveGame(); }catch(e){} });
 function toast(msg,type){ const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg;
   $('toasts').appendChild(t); setTimeout(()=>{t.style.transition='opacity .5s';t.style.opacity=0;setTimeout(()=>t.remove(),500);},3200); }
+// the payoff for closing the whole chain the first time: a chime, a golden flash, and a banner so it lands.
+function firstComputeReward(){ try{ if(typeof SND!=="undefined"){ SND.sfx('bell'); setTimeout(()=>{try{SND.sfx('win');}catch(e){}},260); }
+  if(typeof toast==="function") toast("First Compute rendered — you closed the whole chain. The engine stirs.","good");
+  const f=(typeof document!=="undefined")&&document.getElementById('flourish');
+  if(f){ f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
+  // throw a green pulse on the ledger's Compute readout so the eye goes there
+  const lg=(typeof document!=="undefined")&&document.getElementById('ledger');
+  if(lg){ lg.classList.remove('compflash'); void lg.offsetWidth; lg.classList.add('compflash'); setTimeout(()=>lg.classList.remove('compflash'),1600); }
+}catch(e){} }
 start();
 
 /* =====================================================================
@@ -1742,11 +1764,11 @@ const BLD={
     desc:"Renders the dead into bone-silica, soul-ash and ichor. Rendering them is also what holds the backlog down."},
   furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4},foot:2.0,workers:3,dread:0.4,
     recipe:{in:{bonesil:2,soulash:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica and soul-ash into a silicon ingot."},
-  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:16,soulash:6,silica:4},foot:2.0,workers:3,dread:0.5,
-    recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers. Its beds are cut from raw silica."},
-  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:16,bonesil:6,silica:6},foot:2.0,workers:3,dread:0.6,
-    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer. Needs clean silica to mask."},
-  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:26,soulash:10,silica:6},foot:2.2,workers:4,dread:0.8,
+  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6},foot:2.0,workers:3,dread:0.5,
+    recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers."},
+  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
+    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer."},
+  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10},foot:2.2,workers:4,dread:0.8,
     recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores."},
   substation:{name:"Substation",kind:"refine",cost:{dead:16,soulash:4},foot:1.8,workers:2,dread:0.5,
     recipe:{in:{soulash:1},out:{power:2},time:3.0},desc:"Burns soul-ash for Power. The datacenters are starving for it."},
@@ -1980,7 +2002,7 @@ const MODES = {
 };
 function modeCfg(){ return MODES[G.mode||'campaign']||MODES.campaign; }
 const PEAK_WIN=10; // seconds — peak Compute/min sampling window
-function resetRunScore(){ G.computeRendered=0; G.deadRendered=0; G.husksBoundRun=0; G.peakRate=0; G.rateWinAccum=0; G.rateWinT=PEAK_WIN; }
+function resetRunScore(){ G.computeRendered=0; G.deadRendered=0; G.husksBoundRun=0; G.peakRate=0; G.rateWinAccum=0; G.rateWinT=PEAK_WIN; G._firstCompute=0; }
 const DREAD_THROTTLE_MIN=0.35;
 // challenge soft-loss: max Dread throttles output (never ends the run). Campaign uses the breach-loss instead.
 function dreadThrottle(d){ const f=clamp(d/100,0,1); return 1-(1-DREAD_THROTTLE_MIN)*f; }
@@ -2582,7 +2604,8 @@ function stepEconomy(dt){
     if(b.built!==false&&present>0&&inOk&&outOk){ b.active=true; b.prog+=dt*aff*(modeCfg().softLoss?dreadThrottle(G.dread):1); if(b.def.render)renderers++;
       if(b.prog>=rec.time){ b.prog-=rec.time;
         for(const r in rec.in){ G.stock[r]-=rec.in[r]; if(r==='dead'&&b.def.kind==='refine') G.deadRendered=(G.deadRendered||0)+rec.in[r]; }
-        for(const r in rec.out){ addStock(r,rec.out[r]); if(r==='compute'){ G.computeRendered=(G.computeRendered||0)+rec.out[r]; G.rateWinAccum=(G.rateWinAccum||0)+rec.out[r]; } }
+        for(const r in rec.out){ addStock(r,rec.out[r]); if(r==='compute'){ G.computeRendered=(G.computeRendered||0)+rec.out[r]; G.rateWinAccum=(G.rateWinAccum||0)+rec.out[r];
+          if(!G._firstCompute){ G._firstCompute=1; if(typeof firstComputeReward==="function") firstComputeReward(); } } }
         b.cyc++; } }
     else b.active=false;
   }
