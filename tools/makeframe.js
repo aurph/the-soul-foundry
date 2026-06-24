@@ -19,7 +19,8 @@ const OUT_PREV  = path.join(__dirname, '_frame-preview.png');
 
 // ---- tunables ----
 const P = {
-  keyTol: 26,          // background = contiguous-from-edge pixels near the sampled bg color
+  keyTol: 30,          // background = contiguous-from-edge pixels near the sampled bg color
+  pocketTol: 44,       // global key for background trapped in concavities — color-only, so dark wood FACES (warmer) survive
   desat: 0.85,         // pull toward luminance (drain the cozy brown)
   tint: [0.96, 0.99, 1.07], // cool it (less red, more blue) -> cold bone-grey
   gain: 1.30,          // lift wood into a visible driftwood range
@@ -123,6 +124,20 @@ function keyBg(img) {
   }
 }
 
+// the contiguous flood can't reach background trapped in the concave curves between
+// sticks — those pockets stay opaque and read as "black background" when sliced into a
+// border. Key them globally by COLOR ONLY (no luminance): the pockets are the same flat
+// dark bg color, while the wood's dark FACES are warmer/browner and sit beyond the
+// tolerance, so they survive and the sticks stay solid. Runs before grading.
+function keyBgGlobal(img, tol) {
+  const { d } = img; const bg = sampleBg(img); const t2 = tol * tol;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    const dr = d[i] - bg[0], dg = d[i + 1] - bg[1], db = d[i + 2] - bg[2];
+    if (dr * dr + dg * dg + db * db < t2) d[i + 3] = 0;
+  }
+}
+
 // paint out a bright corner watermark (Gemini sparkle) before keying
 function removeWatermark(img, bg) {
   const { w, h, d } = img; let x0 = w, y0 = h, x1 = 0, y1 = 0, n = 0;
@@ -221,6 +236,7 @@ function grime(img) {
 const raw = load(SRC);
 removeWatermark(raw, sampleBg(raw));
 keyBg(raw);
+keyBgGlobal(raw, P.pocketTol);   // clear background trapped in the concave curves (color-only; wood survives)
 let B = autocrop(raw);
 B = trunkBand(B);     // tighten to the trunk so the wood reads bold when sliced
 grade(B);

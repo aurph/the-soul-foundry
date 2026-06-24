@@ -55,7 +55,7 @@
 
   /* top ledger */
   #ledger{position:fixed;top:0;left:0;right:0;height:46px;z-index:30;display:flex;align-items:center;
-    gap:0;padding:0 6px;overflow-x:auto;scrollbar-width:none;
+    gap:0;padding:0 130px 0 6px;overflow-x:auto;scrollbar-width:none;
     background:linear-gradient(#14151bf2,#0d0e12e0);border-bottom:1px solid var(--line)}
   #ledger::-webkit-scrollbar{display:none}
   .stat{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-right:1px solid var(--line);flex:0 0 auto}
@@ -76,8 +76,17 @@
     box-shadow:0 4px 18px #0008;display:none}
   #alert.show{display:block}
 
+  /* speed cluster — pulled out of the rail, pinned top-right, kept separate from the economy readout */
+  #speedbar{position:fixed;top:7px;right:10px;z-index:32;display:flex;gap:5px;padding:3px;border-radius:7px;
+    background:linear-gradient(#1c150df2,#100b06f6);border:1px solid #2c2418;box-shadow:0 3px 12px #0008}
+  .sbtn{width:32px;height:32px;border:1px solid var(--line);border-radius:5px;background:var(--iron2);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
+  .sbtn img{width:17px;height:17px;object-fit:contain;filter:saturate(.85) brightness(.9)}
+  .sbtn:hover{border-color:var(--ember-soft)} .sbtn:hover img{filter:brightness(1.06)}
+  .sbtn.on{border-color:var(--ember);background:#241a0f} .sbtn.on img{filter:brightness(1.2) saturate(1.1)}
+
   /* right control rail */
-  #rail{position:fixed;right:8px;top:56px;z-index:28;display:flex;flex-direction:column;gap:6px}
+  #rail{position:fixed;right:8px;top:56px;z-index:28;display:flex;flex-direction:column;gap:9px}
   .rbtn{width:40px;height:40px;border:1px solid var(--line);border-radius:6px;background:var(--iron2);
     color:var(--ink);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer}
   .rbtn.on{border-color:var(--ember);color:var(--ember)}
@@ -231,6 +240,7 @@
 <div id="ledger"></div>
 <div id="quota" class="frame"></div>
 <div id="alert"></div>
+<div id="speedbar"></div>
 <div id="rail"></div>
 <div id="inspect" class="frame twig"></div>
 <div id="goals" class="frame twig"></div>
@@ -1126,9 +1136,13 @@ function buildRail(){
   $('rail').innerHTML='';
   const mk=(gly,on,fn,tt)=>{ const b=document.createElement('div'); b.className='rbtn'+(on?' on':''); b.title=tt||''; b.onclick=fn;
     const im=document.createElement('img'); im.src='assets/ui/glyph/'+gly+'.png'; im.alt=tt||''; b.appendChild(im); return b; };
-  $('rail').appendChild(mk('pause',paused,()=>{paused=!paused;buildRail();},'Pause (Space)'));
-  $('rail').appendChild(mk('play',!paused&&simSpeed===1,()=>{paused=false;simSpeed=1;buildRail();},'Normal speed (1)'));
-  $('rail').appendChild(mk('fast',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'Fast (3)'));
+  // speed controls live up top in their own pill, away from the economy readout
+  const sb=$('speedbar'); if(sb){ sb.innerHTML='';
+    const sk=(gly,on,fn,tt)=>{ const b=document.createElement('div'); b.className='sbtn'+(on?' on':''); b.title=tt||''; b.onclick=fn;
+      const im=document.createElement('img'); im.src='assets/ui/glyph/'+gly+'.png'; im.alt=tt||''; b.appendChild(im); return b; };
+    sb.appendChild(sk('pause',paused,()=>{paused=!paused;buildRail();},'Pause (Space)'));
+    sb.appendChild(sk('play',!paused&&simSpeed===1,()=>{paused=false;simSpeed=1;buildRail();},'Normal speed (1)'));
+    sb.appendChild(sk('fast',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'Fast (3)')); }
   $('rail').appendChild(mk('blueprint',false,()=>showSupplyChain(),'The Line — supply-chain blueprint'));
   $('rail').appendChild(mk('economy',false,()=>showEconomy(),'Economy — live rates & deficits'));
   $('rail').appendChild(mk('rites',false,()=>showRites(),'Rites — spend Bones on upgrades'));
