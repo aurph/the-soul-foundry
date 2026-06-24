@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-24 — Second playtest pass: grip + pacing
+
+The game played like a checklist — too fast, too cheap, quota firing mid-tutorial,
+husks dying while you learn. This pass is about friction and grip.
+
+- **Chain is gated by its own output.** A Wafer Mill now costs ingots to build, an
+  Etch-Litho costs wafers, the Ossuary costs dies, the Datacenter cores. You can't
+  blast to the deep chain — you must run each stage before unlocking the next.
+- **Husks are an investment.** Binding costs more Compute (it's your hard-won
+  output), and gathering is slower, so a husk must work a deposit a while before it
+  has a load worth hauling. No more click-click-spam.
+- **The opening is safe to learn in.** Grace runs much longer (a first tithe never
+  lands mid-tutorial) and husks never crumble during it.
+- **TUTORIAL BUG FIXED:** the world marker computed a NaN position and silently
+  never showed, so the cemetery never "glowed." Fixed, and rebuilt as a big bobbing
+  green arrow over the target.
+- **Dread readout is plain:** "Dread on this ground: N / 100" and "↳ slows this
+  building's work: −N%," so the numbers explain themselves.
+- **Messages linger** (~9s, stacked) instead of flashing past; removed the separate
+  "Annals" window. **Esc** now closes any open text window.
+- **Bound husks look normal** — removed the green-tinted wood from the husk palette.
+
 ## 2026-06-24 — First playtest pass (Jack's notes)
 
 - **CRITICAL FIX: depleted deposits kept being worked.** Renewable cemeteries

@@ -144,7 +144,7 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.G.stock.dead=5; T.G.stock.compute=10;
   const p0=T.villagers.filter(v=>!v.dead).length;
   T.bindHusk();
-  ok("bindHusk binds a husk for a corpse + Compute", T.villagers.filter(v=>!v.dead).length===p0+1 && T.G.stock.dead===4 && T.G.stock.compute===8, "pop "+p0+"->"+T.villagers.filter(v=>!v.dead).length+" dead="+T.G.stock.dead+" compute="+T.G.stock.compute);
+  ok("bindHusk binds a husk for corpses + Compute", T.villagers.filter(v=>!v.dead).length===p0+1 && T.G.stock.dead===3 && T.G.stock.compute===6, "pop "+p0+"->"+T.villagers.filter(v=>!v.dead).length+" dead="+T.G.stock.dead+" compute="+T.G.stock.compute);
   T.G.time=999; T.G.stock.soulash=80; const before=T.villagers.filter(v=>!v.dead).length;
   for(let s=0;s<30*60;s++){ T.stepEconomy(1/30); }
   ok("husks never spawn for free", T.villagers.filter(v=>!v.dead).length<=before, "pop "+before+"->"+T.villagers.filter(v=>!v.dead).length); }
@@ -155,11 +155,11 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.G.stock.dead=20; T.G.stock.compute=20;
   const last=()=>T.villagers.filter(v=>!v.dead).slice(-1)[0];
   const c0=T.G.stock.compute; T.bindHusk("reaper");
-  ok("binding a Reaper costs more Compute (4) and binds a reaper", last()&&last().caste==="reaper" && T.G.stock.compute===c0-4, "caste="+(last()&&last().caste)+" compute "+c0+"->"+T.G.stock.compute);
+  ok("binding a Reaper costs more Compute (6) and binds a reaper", last()&&last().caste==="reaper" && T.G.stock.compute===c0-6, "caste="+(last()&&last().caste)+" compute "+c0+"->"+T.G.stock.compute);
   const d0=T.G.stock.dead; T.bindHusk("stump");
-  ok("binding a Stump costs 2 corpses and little Compute", last()&&last().caste==="stump" && T.G.stock.dead===d0-2, "caste="+(last()&&last().caste)+" dead "+d0+"->"+T.G.stock.dead);
+  ok("binding a Stump costs 3 corpses and little Compute", last()&&last().caste==="stump" && T.G.stock.dead===d0-3, "caste="+(last()&&last().caste)+" dead "+d0+"->"+T.G.stock.dead);
   const d1=T.G.stock.dead,c1=T.G.stock.compute; T.bindHusk("worker");
-  ok("binding a Husk is the baseline (1 corpse + 2 Compute)", last()&&last().caste==="worker" && T.G.stock.dead===d1-1 && T.G.stock.compute===c1-2, "dead "+d1+"->"+T.G.stock.dead+" compute "+c1+"->"+T.G.stock.compute);
+  ok("binding a Husk is the baseline (2 corpses + 4 Compute)", last()&&last().caste==="worker" && T.G.stock.dead===d1-2 && T.G.stock.compute===c1-4, "dead "+d1+"->"+T.G.stock.dead+" compute "+c1+"->"+T.G.stock.compute);
 }
 
 // --- material repositories / stockpiles (the hub) ---

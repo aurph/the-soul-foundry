@@ -283,11 +283,14 @@
     animation:spotpulse 1.2s ease-in-out infinite}
   @keyframes spotpulse{0%,100%{box-shadow:0 0 0 3px #80df6855,0 0 18px 5px #80df6855,inset 0 0 12px #80df6833}
     50%{box-shadow:0 0 0 5px #80df688a,0 0 34px 10px #80df6899,inset 0 0 18px #80df6855}}
-  #wspot{position:fixed;z-index:44;width:38px;height:38px;margin:-19px 0 0 -19px;border:3px solid #8fe86a;border-radius:50%;
-    box-shadow:0 0 18px 5px #80df6888;pointer-events:none;display:none;animation:spotpulse 1.2s ease-in-out infinite}
-  #wspot::after{content:'';position:absolute;inset:7px;border-radius:50%;background:#80df6844}
-  #wspot::before{content:'BUILD HERE';position:absolute;left:50%;top:-22px;transform:translateX(-50%);white-space:nowrap;
-    font:bold 10px/1 ui-monospace,Menlo,monospace;letter-spacing:1.5px;color:#bdf2a6;text-shadow:0 1px 3px #000}
+  /* a big, unmissable bobbing arrow hovering ABOVE the target the tutorial step is pointing at */
+  #wspot{position:fixed;z-index:44;pointer-events:none;display:none;margin:-70px 0 0 -16px;
+    font:900 40px/1 Arial,Helvetica,sans-serif;color:#8fe86a;text-shadow:0 0 14px #80df68dd,0 3px 6px #000;
+    animation:arrowbob 1s ease-in-out infinite}
+  #wspot::before{content:'\25BC';display:block}
+  #wspot::after{content:'BUILD HERE';position:absolute;left:50%;top:-19px;transform:translateX(-50%);white-space:nowrap;
+    font:bold 11px/1 ui-monospace,Menlo,monospace;letter-spacing:1.5px;color:#cdf2b6;text-shadow:0 1px 4px #000,0 0 9px #80df6866}
+  @keyframes arrowbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
 </style>
 </head>
 <body>
@@ -826,7 +829,7 @@ let rProto=null, rClips=null, rReady=false;                   // rigged Reaper h
 // husks are hand-built low-poly now — no GLB load. Defer the callback one tick so bootWorld runs
 // AFTER the rest of the script finishes evaluating (const MAT/NODE/BLD etc. are declared below start()).
 function loadVillager(cb){ bootmsg("binding the husks…"); setTimeout(()=>cb&&cb(true),0); }
-const WOOD=[0x2b2620,0x33291f,0x222a22,0x39301f], CLOTH=[0x1b1c1f,0x232019,0x191a17];
+const WOOD=[0x2b2620,0x33291f,0x2a2420,0x39301f], CLOTH=[0x1b1c1f,0x232019,0x191a17];   // all dark browns now (no green-tinted bark)
 function makeProcVillager(caste){
   // hand-built LOW-POLY husk — cute but pathetic, desolate. No GLBs; a few flat-shaded primitives each.
   const g=new THREE.Group();
@@ -1045,7 +1048,7 @@ canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); if(placeKind){pla
 canvas.addEventListener('wheel',e=>{ e.preventDefault(); Cam.dist=clamp(Cam.dist*(e.deltaY<0?0.9:1.11),Cam.minD,Cam.maxD); },{passive:false});
 addEventListener('keydown',e=>{ SND.resume(); keys.add(e.code);
   if(e.code==='Space'){e.preventDefault(); paused=!paused; if(typeof buildRail==='function')buildRail();}
-  else if(e.code==='Escape'){ if(placeKind){placeKind=null;setHint('');buildDock();showGrid(false);} else if(typeof clearInspect==='function')clearInspect(); }
+  else if(e.code==='Escape'){ if($('ov')&&$('ov').classList.contains('show')){ if(typeof hideOverlay==='function')hideOverlay(); } else if(placeKind){placeKind=null;setHint('');buildDock();showGrid(false);} else if(typeof clearInspect==='function')clearInspect(); }
   else if(e.code==='KeyR' && placeKind){ e.preventDefault(); placeRot+=Math.PI/2; if(typeof updateGhost==='function')updateGhost(); }
   else if(e.code==='KeyV' && !e.ctrlKey && !e.metaKey){ if(typeof toggleDreadViz==='function') toggleDreadViz(); }
   else if(e.code==='Digit1'){simSpeed=1;paused=false;buildRail&&buildRail();}
@@ -1218,7 +1221,7 @@ function renderQuota(){
   if(modeCfg().timeLimit){ const left=Math.max(0,(G.challengeDur||0)-(G.time||0)); const m=Math.floor(left/60), s=Math.floor(left%60);
     const red=left<30; $('quota').innerHTML=`<b style="color:${red?'#9e3b2c':'var(--ember)'}">TIME ${m}:${String(s).padStart(2,'0')}</b> &nbsp;·&nbsp; score <b>${challengeScore()}</b>`; return; }
   const q=G.quota, t=Math.max(0,Math.ceil(q.t));
-  const graceT=(G.graceT==null?150:G.graceT);
+  const graceT=(G.graceT==null?300:G.graceT);
   if((G.time||0)<graceT){ $('quota').innerHTML=`<b>GRACE</b> &nbsp; the engine is patient &nbsp;·&nbsp; first tithe in <span style="color:var(--ink)">${Math.ceil(graceT-(G.time||0))}s</span>`; return; }
   $('quota').innerHTML=`<b>QUOTA · Tithe ${q.level}/${WIN_LEVEL}</b> &nbsp; deliver <b>${q.need}</b> Compute &nbsp;·&nbsp; have ${Math.floor(G.stock.compute||0)} &nbsp;·&nbsp; <span style="color:${t<25?'#9e3b2c':'var(--ink)'}">${t}s</span>`;
 }
@@ -1245,7 +1248,7 @@ function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.clas
   else if(G.dread>=75) msg="Dread is near breaching. Render the dead faster and raise Ward Obelisks, or the backlog overruns you.";
   else if(hotBld) msg="The unrendered dead pool around your "+hotBld.def.name+" and slow its work. Render the backlog, raise a Ward beside it, or post Reapers — they shrug off the haze.";
   else if(pop>0 && assigned===0) msg="Your husks stand idle. Tap a building and press + assign to put them to work.";
-  else if(G.quota.t<35 && (G.stock.compute||0)<G.quota.need && (G.time||0)>=(G.graceT==null?150:G.graceT)) msg="Quota due soon and Compute is short. Staff the Datacenter and the chain feeding it.";
+  else if(G.quota.t<35 && (G.stock.compute||0)<G.quota.need && (G.time||0)>=(G.graceT==null?300:G.graceT)) msg="Quota due soon and Compute is short. Staff the Datacenter and the chain feeding it.";
   if(msg){ el.textContent=msg; el.classList.add('show'); } else el.classList.remove('show'); }
 // the supply-chain blueprint: the whole line from corpse to Compute, with live build/staff status
 const CHAIN_STEPS=[
@@ -1329,7 +1332,6 @@ function buildRail(){
     sb.appendChild(sk('fast',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'Fast (3)')); }
   // The Line / Economy / Rites / Codex now live in the bottom-right economy panel; the rail keeps help/sound/options.
   $('rail').appendChild(mk('info',false,()=>showHelp(),'How to play'));
-  $('rail').appendChild(mk('objective',false,()=>showMsgLog(),'The Annals — read back past messages'));
   $('rail').appendChild(mk(SND.muted?'soundoff':'sound',!SND.muted,()=>{ SND.resume(); SND.toggleMute(); buildRail(); }, SND.muted?'Sound is off — click for sound':'Mute sound'));
   $('rail').appendChild(mk('options',false,()=>showOptions(),'Options'));
 }
@@ -1482,7 +1484,8 @@ function refreshInspect(){
       // the REAL work penalty, accounting for this crew's Dread resistance — a Reaper crew barely feels the haze
       const crew=b.workers?b.workers.filter(w=>!w.dead):[]; const cresist=crew.length?crew.reduce((s,w)=>s+dreadResist(w.caste),0)/crew.length:1;
       const pen=Math.round((1-dreadBite(ldr*dreadGuard(),cresist))*100);
-      if(bites||ldr>3) body+=`<div class="row"><span>Dread here</span><b style="color:${dcol}">${Math.round(ldr)}%${(bites&&pen>0)?` · −${pen}% work`:''}</b></div>`;
+      if(bites||ldr>3){ body+=`<div class="row"><span>Dread on this ground</span><b style="color:${dcol}">${Math.round(ldr)} / 100</b></div>`;
+        if(bites) body+=`<div class="row"><span>↳ slows this building's work</span><b style="color:${pen>0?dcol:'#6f7a55'}">${pen>0?'−'+pen+'%':'none'}</b></div>`; }
       if(bites && ldr>28) body+=`<div style="color:var(--ink-dim);font-size:10.5px;margin:2px 0 4px">The unrendered dead pool here and slow the work${pen<=8?' — though this crew resists it well':''}. Render the backlog down, raise a Ward nearby, post Reapers here, or move it off the dead.</div>`;
     }
     body+=`<div style="margin-top:10px"><span class="btn bad" onclick="demolishSel()">Demolish (reclaims half)</span></div>`;
@@ -1517,9 +1520,9 @@ function showShop(){ SND.resume();
     `<span class="btn" onclick="hideOverlay()">Close</span>`); }
 
 function setTempo(t){ G.tempo=t;
-  if(t==='slow'){ G.basePressure=0.4; G.graceT=240; G.quota.period=210; }
-  else if(t==='harsh'){ G.basePressure=0.95; G.graceT=90; G.quota.period=120; }
-  else { t='standard'; G.basePressure=0.6; G.graceT=150; G.quota.period=150; }
+  if(t==='slow'){ G.basePressure=0.4; G.graceT=420; G.quota.period=240; }
+  else if(t==='harsh'){ G.basePressure=0.95; G.graceT=200; G.quota.period=150; }
+  else { t='standard'; G.basePressure=0.6; G.graceT=300; G.quota.period=200; }   // long grace so a first tithe never lands mid-tutorial
   G.tempo=t; G.quota.t=G.quota.period;
   const left=Math.max(0,Math.ceil((G.graceT||0)-(G.time||0)));
   if(typeof toast==="function")toast(cap1(t)+" tempo set — "+left+"s of grace, then a tithe every "+G.quota.period+"s.","good");
@@ -1698,7 +1701,7 @@ const TUT=[
   {t:"The dead are your raw matter. Open the GATHERING tab below.",
    why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre) for 1 corpse + 2 Compute.", d:()=>curTab==="gather", sel:()=>'[data-tab="gather"]'},
   {t:"Raise a Grave-Exhumer on a cemetery (the headstones the glow marks) and staff it — tap it, press + assign.",
-   why:"The Exhumer digs up corpses and hauls them to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.x,z:n.z}:null;}},
+   why:"The Exhumer digs up corpses and hauls them to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Crematory and staff it.",
    why:"It renders corpses into bone-silica, soul-ash and ichor, and rendering the dead is what holds the backlog (Dread) down. The dead you leave lying out pool as a violet Dread haze that slows whatever stands in it — render them, or raise a Ward. Soul-ash is also your husks' upkeep — keep a little flowing or they weaken and crumble.", d:()=>staffed("crematory"), sel:bldTarget('crematory')},
   {t:"Open the REFINING tab and raise a Soul Furnace, then staff it.",
@@ -1712,7 +1715,7 @@ const TUT=[
   {t:"Raise a Substation and staff it — the datacenters need Power.",
    why:"Soul-ash burns into Power. No power, no Compute.", d:()=>staffed("substation"), sel:bldTarget('substation')},
   {t:"Raise a Silica Excavator on a silica seam (the pale crystals the glow marks) and staff it.",
-   why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);return n?{x:n.x,z:n.z}:null;}},
+   why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Spectral Datacenter and staff it.",
    why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>staffed("datacenter"), sel:bldTarget('datacenter')},
   {t:"Now wait — your first Compute appears in the ledger up top.",
@@ -1904,18 +1907,13 @@ function start(){
 }
 function beginPlay(){ paused=false; if(typeof buildRail==="function")buildRail(); }
 addEventListener('beforeunload',()=>{ try{ if(!G.over && shouldAutosave()) saveGame(); }catch(e){} });
-const MSGLOG=[];   // every notice the engine raises, so a vanished toast can always be read back in The Annals
-function toast(msg,type){ const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg;
-  $('toasts').appendChild(t); setTimeout(()=>{t.style.transition='opacity .5s';t.style.opacity=0;setTimeout(()=>t.remove(),500);},3200);
-  try{ MSGLOG.push({m:msg,k:type||'',t:(typeof G!=='undefined'?(G.time||0):0)}); if(MSGLOG.length>80)MSGLOG.shift(); }catch(e){} }
-function showMsgLog(){ if(typeof SND!=='undefined')SND.resume();
-  const fmt=(s)=>{ const m=Math.floor(s/60),ss=Math.floor(s%60); return m+':'+String(ss).padStart(2,'0'); };
-  const rows = MSGLOG.length ? MSGLOG.slice().reverse().map(e=>{ const col=e.k==='bad'?'#c06a52':e.k==='good'?'#8a9a63':'var(--ink)';
-      return `<div class="optrow" style="align-items:flex-start;gap:10px"><span style="color:var(--ink-dim);font-size:11px;min-width:40px">${fmt(e.t)}</span><span style="color:${col};font-size:12.5px;line-height:1.5;text-align:left">${e.m}</span></div>`; }).join('')
-    : `<div style="color:var(--ink-dim);font-size:12px;padding:8px 0">Nothing has been noted yet.</div>`;
-  showOverlayHTML(`<h1 style="font-size:23px">THE ANNALS</h1><h2>every notice the engine has raised, newest first</h2>
-    <div style="max-height:52vh;overflow-y:auto;margin:10px 0;text-align:left">${rows}</div>
-    <span class="btn" onclick="hideOverlay()">Close</span>`); }
+// messages linger on-screen (~9s) and stack, so a notice never flashes past before you can read it.
+// Keep only the last few visible at once so the column stays tidy in the open space.
+function toast(msg,type){ const wrap=$('toasts'); if(!wrap) return;
+  const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg;
+  wrap.appendChild(t);
+  try{ while(wrap.children && wrap.children.length>5) wrap.removeChild(wrap.firstChild); }catch(e){}   // keep the column short (headless-safe)
+  setTimeout(()=>{t.style.transition='opacity .6s';t.style.opacity=0;setTimeout(()=>t.remove(),600);},9000); }
 // the payoff for closing the whole chain the first time: a chime, a golden flash, and a banner so it lands.
 function firstComputeReward(){ try{ if(typeof SND!=="undefined"){ SND.sfx('bell'); setTimeout(()=>{try{SND.sfx('win');}catch(e){}},260); }
   if(typeof toast==="function") toast("First Compute rendered — you closed the whole chain. The engine stirs.","good");
@@ -1964,17 +1962,17 @@ const BLD={
   crematory:{name:"Crematory",kind:"refine",cost:{dead:14},foot:2.0,workers:3,dread:0,render:true,
     recipe:{in:{dead:2},out:{bonesil:1,soulash:1,ichor:1},time:3.0},
     desc:"Renders the dead into bone-silica, soul-ash and ichor. Rendering them is also what holds the backlog down."},
-  furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4},foot:2.0,workers:3,dread:0.4,
+  furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4,bonesil:5},foot:2.0,workers:3,dread:0.4,
     recipe:{in:{bonesil:2,soulash:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica and soul-ash into a silicon ingot."},
-  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6},foot:2.0,workers:3,dread:0.5,
+  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6,ingot:3},foot:2.0,workers:3,dread:0.5,
     recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers."},
-  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
+  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6,wafer:4},foot:2.0,workers:3,dread:0.6,
     recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer."},
-  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10},foot:2.2,workers:4,dread:0.8,
+  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10,die:3},foot:2.2,workers:4,dread:0.8,
     recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores."},
   substation:{name:"Substation",kind:"refine",cost:{dead:16,soulash:4},foot:1.8,workers:2,dread:0.5,
     recipe:{in:{soulash:1},out:{power:2},time:3.0},desc:"Burns soul-ash for Power. The datacenters are starving for it."},
-  datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:46,soulash:18,silica:8},foot:2.6,workers:5,dread:1.2,
+  datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:46,soulash:18,silica:8,core:3},foot:2.6,workers:5,dread:1.2,
     recipe:{in:{core:1,power:1,ichor:1},out:{compute:3},time:4.6},desc:"Cores, Power and Ichor render into Compute, the tithe the engine demands."},
   ward:{name:"Ward Obelisk",kind:"ward",cost:{dead:14,soulash:8,ashwood:6},foot:1.4,workers:0,ward:14,
     desc:"Holds the backlog of unrendered dead back across a wide radius."},
@@ -2248,7 +2246,8 @@ function challengeScore(){ return computeScore(G.computeRendered,G.deadRendered,
 const buildings=[];
 // CASTE SPECIALIZATION — each caste fits a different stage of the death-to-Compute chain.
 // CARRY/GRATE drive extraction & hauling; AFFINITY scales refining/rendering/compute speed by building.
-const CARRY={worker:7,stump:20,reaper:5}, GRATE={worker:5,stump:8,reaper:3.5};
+// gathering is slower now — a husk must WORK a deposit a while before it has a load worth hauling
+const CARRY={worker:7,stump:20,reaper:5}, GRATE={worker:3.2,stump:5.0,reaper:2.2};
 const UPKEEP={worker:0.015, stump:0.02, reaper:0};   // soul-ash per husk per second; reapers need none
 const AFFINITY={
   worker:{ exhumer:1.0,dredge:1.0, crematory:1.0, furnace:1.05,mill:1.05, litho:1.0,ossuary:1.0, substation:1.05, datacenter:1.0, market:1.0 },
@@ -2948,7 +2947,7 @@ function stepEconomy(dt){
   }
   // Dread = the backlog of the unprocessed dead. It climbs as bodies pile up; rendering them (Crematories) + Wards hold it back.
   // No pressure during the opening grace, so a new player can find their feet.
-  const grace=(G.time||0) < (G.graceT==null?150:G.graceT);
+  const grace=(G.time||0) < (G.graceT==null?300:G.graceT);
   let wards=0; for(const b of buildings) if(b.kind==="ward") wards+=1;
   const basePressure=(grace||!modeCfg().quota)?0:(G.basePressure||0.6);
   // the spatial field presses on the global meter: let the backlog pool unchecked near your foundry and the
@@ -2958,7 +2957,7 @@ function stepEconomy(dt){
   G.dread=clamp(G.dread + (basePressure + fieldPush - renderers*1.0 - wards*0.6*techMul('ward'))*dt, 0,100);
   // teach the spatial Dread the first time it genuinely pools near the settlement (once per run)
   if(!G._dreadTaught && (G.time||0)>10 && typeof dreadFieldPressure==="function" && dreadFieldPressure()>22){ G._dreadTaught=1;
-    if(typeof toast==="function") toast("The unrendered dead are pooling as a Dread haze on the ground — the dark stain slows whatever stands in it. Harvest them, render them at a Crematory, or raise a Ward to push it back. (Re-read notes in The Annals on the right rail.)","bad"); }
+    if(typeof toast==="function") toast("The unrendered dead are pooling as a Dread haze — the dark stain on the ground slows whatever stands in it. Harvest the dead, render them at a Crematory, or raise a Ward Obelisk to push it back.","bad"); }
   // hauntings
   if(G.dread>55 && rnd()<0.03*dt*(G.dread/100)){ const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ const v=pick(cand); v.resolve=Math.max(0,v.resolve-0.25); SND.sfx('haunt'); if(typeof toast==="function")toast(v.name+" is gripped by a haunting.","bad"); } }
   // husk resolve: Reapers need no soul-ash and hold steady; others recover with it and decay without.
@@ -2969,6 +2968,7 @@ function stepEconomy(dt){
     // so they hold steady even in the worst of it. Idle husks milling at the Pyre aren't out in it.
     const localDread=(v.assigned&&v.obj)?dreadAt(v.obj.position.x,v.obj.position.z)*dreadGuard():0;
     v.resolve=clamp(v.resolve+dr*dt - DREAD_RESOLVE_BITE*dreadResist(v.caste)*clamp(localDread/100,0,1)*dt,0,1);
+    if(grace) v.resolve=Math.max(v.resolve,0.35);   // husks never crumble during the opening grace — learn without losing your crew
     if(v.resolve<=0){ crumble(v); }
   }
   // population cap from dens — husks are BOUND at the Pyre, never spawned for free
@@ -3009,7 +3009,8 @@ function crumble(v){ v.dead=true; SND.sfx('crumble'); scene.remove(v.obj); if(v.
 // husks are BOUND at the Pyre from a corpse + Compute — never spawned for free
 // capex tradeoff: a Stump is cheap on Compute but takes two corpses and is slow; a Reaper is
 // dear on Compute but needs no upkeep and does the fine, high-value work; a Husk is the baseline.
-const BIND_COST={ worker:{dead:1,compute:2}, stump:{dead:2,compute:1}, reaper:{dead:1,compute:4} };
+// binding is a real investment now — it spends your hard-won Compute, so husks aren't spammed
+const BIND_COST={ worker:{dead:2,compute:4}, stump:{dead:3,compute:3}, reaper:{dead:2,compute:6} };
 function casteName(c){ return c==='stump'?'Stump':c==='reaper'?'Reaper':'Husk'; }
 function bindHusk(caste){ caste=(caste==='stump'||caste==='reaper')?caste:'worker'; const cost=BIND_COST[caste];
   const cap=6+buildings.filter(b=>b.kind==="den").reduce((a,b)=>a+b.def.houses,0);
