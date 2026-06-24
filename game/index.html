@@ -532,6 +532,37 @@ function stepAsh(dt){
     if(y<0){y=22;} p.setY(i,y); p.setX(i,x); } p.needsUpdate=true;
 }
 
+// --- a few tiny carrion birds drifting at the inner edge of the fog (render-only, Math.random) ---
+let birds=null, birdList=[];
+function buildBirds(){
+  if(birds) scene.remove(birds); birdList=[];
+  birds=new THREE.Group(); birds.frustumCulled=false; scene.add(birds);
+  const N=5;   // extremely few, extremely small — just a flicker of life out in the murk
+  const mat=new THREE.MeshBasicMaterial({color:0x0e1016,transparent:true,opacity:0.82,fog:true,side:THREE.DoubleSide});
+  const wingGeo=new THREE.PlaneGeometry(0.5,0.13);
+  for(let i=0;i<N;i++){
+    const g=new THREE.Group();
+    const wl=new THREE.Mesh(wingGeo,mat), wr=new THREE.Mesh(wingGeo,mat);
+    wl.position.x=-0.27; wr.position.x=0.27; g.add(wl); g.add(wr);
+    const sc=0.6+Math.random()*0.5; g.scale.setScalar(sc);   // all small; faint size variation
+    const b={ g, wl, wr, theta:Math.random()*Math.PI*2, radius:50+Math.random()*26,   // out at the fog's inner edge
+      y:5+Math.random()*6, dir:Math.random()<0.5?1:-1, speed:0.05+Math.random()*0.05,
+      flap:6+Math.random()*3, phase:Math.random()*Math.PI*2, bobAmp:0.6+Math.random()*0.5 };
+    birds.add(g); birdList.push(b);
+  }
+}
+function stepBirds(dt){
+  if(!birds)return;
+  for(const b of birdList){ b.theta+=b.dir*b.speed*dt; b.phase+=b.flap*dt;
+    const x=Math.cos(b.theta)*b.radius, z=Math.sin(b.theta)*b.radius;
+    const y=b.y+Math.sin(b.phase*0.4)*b.bobAmp;   // gentle altitude drift
+    b.g.position.set(x,y,z);
+    b.g.rotation.y=-b.theta+(b.dir>0?Math.PI:0);   // face the direction of travel
+    const f=0.2+Math.abs(Math.sin(b.phase))*0.5;   // wing flap
+    b.wl.rotation.z=f; b.wr.rotation.z=-f;
+  }
+}
+
 // --- environment: sky, endless flats, and a vast DEAD-MEGACITY horizon (no boring cones) ---
 function buildEnvironment(){
   // big sky dome whose BOTTOM matches the fog horizon exactly -> seamless, no visible edge, no black
@@ -614,7 +645,7 @@ let mixers=[];   // animation mixers (villagers)
 let _grainCv=null,_grainCtx=null,_grainT=0,_pauseEl=null;
 function drawGrain(){ if(!_grainCv){ _grainCv=document.getElementById('grain'); if(!_grainCv)return; _grainCtx=_grainCv.getContext('2d'); _grainCv.width=160; _grainCv.height=100; }
   const id=_grainCtx.createImageData(160,100), d=id.data; for(let i=0;i<d.length;i+=4){ const v=(Math.random()*255)|0; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } _grainCtx.putImageData(id,0,0); }
-function tickRender(dt){ stepAsh(dt); for(const m of mixers) m.update(dt); if(typeof updateStockpiles==="function") updateStockpiles(); _grainT+=dt; if(_grainT>0.055){ _grainT=0; drawGrain(); }
+function tickRender(dt){ stepAsh(dt); stepBirds(dt); for(const m of mixers) m.update(dt); if(typeof updateStockpiles==="function") updateStockpiles(); _grainT+=dt; if(_grainT>0.055){ _grainT=0; drawGrain(); }
   if(!_pauseEl)_pauseEl=document.getElementById('pausebar'); if(_pauseEl)_pauseEl.style.display=(paused&&!(typeof G!=="undefined"&&G.over))?'block':'none'; }
 function loop(now){
   requestAnimationFrame(loop);
@@ -657,7 +688,7 @@ function seedWorld(s){ WORLD_SEED=s|0; RNG=mulberry32(WORLD_SEED); genRegions(WO
 function bootWorld(seedOverride){
   bootmsg("raising the valley…");
   seedWorld(seedOverride!=null?seedOverride:((Date.now())%1e6)|0);
-  resize(); buildTerrain(); buildEnvironment(); scatterWorld(); buildAsh(); buildShroud();
+  resize(); buildTerrain(); buildEnvironment(); scatterWorld(); buildAsh(); buildBirds(); buildShroud();
   Cam.target.set(0,terrainHeight(0,0),0);
   updateCamera();
   // reveal
