@@ -149,6 +149,34 @@
   #ov{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
     background:#060709dd;backdrop-filter:blur(5px)}
   #ov.show{display:flex}
+  /* ===== main menu / start screen — two distinct wooden cards, husk portraits ===== */
+  #menu{position:fixed;inset:0;z-index:70;display:none;flex-direction:column;align-items:center;justify-content:center;
+    padding:26px 16px;overflow:auto;background:radial-gradient(circle at 50% 26%,#0d0e12ee,#050608f7);backdrop-filter:blur(4px)}
+  #menu.show{display:flex}
+  #menu .mwm{font-family:'Pirata One','Iowan Old Style',serif;font-size:clamp(34px,6vw,58px);letter-spacing:5px;
+    color:#c8bca0;text-shadow:0 1px 1px #000a,0 0 36px #d98a3a33;margin:0;text-align:center;text-transform:none}
+  #menu .mtag{color:var(--ember-soft);letter-spacing:3px;text-transform:uppercase;font-size:12px;margin:6px 0 24px;text-align:center}
+  #menu .cards{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;align-items:stretch;max-width:864px;width:100%}
+  .mcard{flex:0 1 350px;max-width:92vw;cursor:pointer;position:relative;border:28px solid transparent;
+    border-image:url('assets/ui/frame-branch.png') 160 stretch;background:#0a0b0ff8;
+    display:flex;flex-direction:column;transition:transform .14s ease,filter .14s ease;filter:saturate(.92)}
+  .mcard:hover{transform:translateY(-4px);filter:saturate(1.06) brightness(1.05)}
+  .mcard .pic{height:182px;background-size:cover;background-position:center 56%;position:relative}
+  .mcard .pic::after{content:'';position:absolute;inset:0;box-shadow:inset 0 0 56px 9px #0a0b0fb0}
+  .mcard .tag{position:absolute;top:8px;left:8px;z-index:2;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+    padding:2px 8px;border-radius:3px;background:#0b0c0fe2;border:1px solid var(--line)}
+  .mcard.campaign .tag{color:var(--ember-soft);border-color:#5a3f24}
+  .mcard.challenge .tag{color:#e8c24a;border-color:#6a5a22}
+  .mcard .mbody{padding:13px 16px 16px;display:flex;flex-direction:column;gap:7px;flex:1}
+  .mcard .mt{font-family:'Grenze Gotisch','Iowan Old Style',serif;font-size:26px;letter-spacing:1px;color:var(--ink-bright);line-height:1}
+  .mcard .md{font-size:12.5px;line-height:1.55;color:var(--ink)}
+  .mcard .mdurs{display:flex;gap:6px;margin-top:1px}
+  .mdur{font-size:12px;padding:3px 11px;border:1px solid var(--line);border-radius:4px;color:var(--ink-dim);cursor:pointer;font-variant-numeric:tabular-nums}
+  .mdur:hover{border-color:var(--ember-soft);color:var(--ink-bright)}
+  .mdur.on{border-color:#e8c24a;color:#e8c24a;background:#1d1808}
+  .mcard .mseed{font-size:11px;color:var(--ink-dim)} .mcard .mseed b{color:var(--ember-soft)}
+  .mcard .mcta{margin-top:auto;padding-top:9px;font-size:13px;letter-spacing:.5px;color:var(--ink-bright)}
+  .mcard.campaign:hover .mcta{color:var(--ember)} .mcard.challenge:hover .mcta{color:#e8c24a}
   .modal{width:min(600px,93vw);max-height:88vh;overflow:auto;border-radius:12px;padding:24px 26px;
     background:linear-gradient(#16171d,#101116);border:1px solid var(--line);box-shadow:0 16px 70px #000d}
   .modal h1{margin:0 0 2px;font-size:32px;letter-spacing:4px;color:var(--ink-bright);text-shadow:0 0 24px #d98a3a33}
@@ -255,6 +283,7 @@
   <div id="dockrow"></div>
 </div>
 <div id="ov"><div class="modal" id="modal"></div></div>
+<div id="menu"></div>
 
 <div id="boot">
   <div class="sub">a desolate foundry of the dead</div>
@@ -1352,22 +1381,39 @@ function showChronicle(){ SND.resume();
 let _pickMode='campaign', _pickDur=600;
 function showModePicker(params){ SND.resume(); params=params||{};
   if(params.mode) _pickMode=params.mode; if(params.dur) _pickDur=params.dur;
-  const isChal=_pickMode==='challenge';
-  const durBtn=(d,lbl)=>`<span class="btn" style="${_pickDur===d?'border-color:var(--ember);color:var(--ember)':''}" onclick="pickDur(${d})">${lbl}</span>`;
-  showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDRY</h1>
-    <h2>choose how you play</h2>
-    <p style="line-height:1.7"><b>Campaign</b> — the tithe-survival game: meet ${WIN_LEVEL} quotas of Compute and the engine endures.<br>
-    <b>Challenge</b> — a timed score run: render as much Compute as you can before the clock runs out. Shareable seed, local best.</p>
-    <p><span class="btn" style="${!isChal?'border-color:var(--ember);color:var(--ember)':''}" onclick="pickMode('campaign')">Campaign</span>
-       <span class="btn" style="${isChal?'border-color:var(--ember);color:var(--ember)':''}" onclick="pickMode('challenge')">Challenge</span></p>
-    ${isChal?`<p style="margin-top:8px"><b>Duration</b><br>${durBtn(600,'10 min')} ${durBtn(1200,'20 min')} ${durBtn(1800,'30 min')}</p>
-      <p style="color:var(--ink-dim);font-size:12px">Seed <b style="color:var(--ember-soft)">${WORLD_SEED}</b> — share the link to race the same map.</p>`:''}
-    <p style="margin-top:10px"><span class="btn" onclick="beginFromPicker()">Begin</span></p>`); }
-function pickMode(m){ _pickMode=m; showModePicker(); }
-function pickDur(d){ _pickDur=d; showModePicker(); }
-function beginFromPicker(){
-  if(_pickMode==='challenge'){ G.mode='challenge'; G.challengeDur=_pickDur; resetRunScore(); G.time=0; G.over=null; G.endedChallenge=false; G.dread=0; hideOverlay(); beginPlay(); }
-  else { G.mode=undefined; G.dread=0; hideOverlay(); let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)showHelp(); else showPrologue(); }
+  buildMenu(); const el=$('menu'); if(el) el.classList.add('show');
+}
+function buildMenu(){ const el=$('menu'); if(!el) return;
+  const best=getChallengeBest(_pickDur);
+  const durChip=(d,lbl)=>`<span class="mdur${_pickDur===d?' on':''}" onclick="event.stopPropagation();pickDur(${d})">${lbl}</span>`;
+  el.innerHTML=`
+    <div class="mwm">The Soul Foundry</div>
+    <div class="mtag">a desolate foundry of the dead</div>
+    <div class="cards">
+      <div class="mcard campaign" onclick="beginMode('campaign')" title="Begin the campaign">
+        <div class="pic" style="background-image:url('assets/menu/campaign.png')"><span class="tag">Endless</span></div>
+        <div class="mbody">
+          <div class="mt">Campaign</div>
+          <div class="md">Keep the engine fed. Meet ${WIN_LEVEL} tithes of Compute and hold back the Dread, and the valley grinds on another age. No clock — it ends when you break, or it doesn't.</div>
+          <div class="mcta">Begin the long render →</div>
+        </div>
+      </div>
+      <div class="mcard challenge" onclick="beginMode('challenge')" title="Begin a timed run">
+        <div class="pic" style="background-image:url('assets/menu/challenge.png')"><span class="tag">Timed</span></div>
+        <div class="mbody">
+          <div class="mt">Challenge</div>
+          <div class="md">One fixed run against the clock. Render as much Compute as you can before time's up. Same seed every time, shareable — race a friend on the exact valley.</div>
+          <div class="mdurs">${durChip(600,'10 min')} ${durChip(1200,'20 min')} ${durChip(1800,'30 min')}</div>
+          <div class="mseed">Seed <b>${WORLD_SEED}</b>${best?` &middot; your best <b>${best.score}</b>`:''}</div>
+          <div class="mcta">Begin the run →</div>
+        </div>
+      </div>
+    </div>`;
+}
+function pickDur(d){ _pickDur=d; buildMenu(); }
+function beginMode(m){ _pickMode=m; const el=$('menu'); if(el) el.classList.remove('show');
+  if(m==='challenge'){ G.mode='challenge'; G.challengeDur=_pickDur; resetRunScore(); G.time=0; G.over=null; G.endedChallenge=false; G.dread=0; beginPlay(); }
+  else { G.mode=undefined; G.dread=0; let seen=false; try{seen=localStorage.getItem('sf_prologue')==='seen';}catch(e){} if(seen)showHelp(); else showPrologue(); }
 }
 function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDRY</h1>
   <p>The hunger for <b>Compute</b> consumed the world and everyone in it. The engine that did it cannot stop computing, and the spent world left only the dead to render. You are that engine. You bind the husks of the extinct and drive them to render corpses up the same chip-foundry chain that ended them. <span class="gskip" style="cursor:pointer;color:var(--ember-soft)" onclick="showChronicle()">Read the chronicle</span>.</p>
