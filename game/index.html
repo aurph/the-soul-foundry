@@ -1906,8 +1906,8 @@ function scatterWorld(){
   // a couple of ashwood stands within easy reach so the first crafts are buildable early
   for(let k=0;k<3;k++){ const a=rr(0,6.28), rad=rr(15,28); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('tree', x, z, 7); }
-  // a silica seam set a little further out — the reach the Excavator earns
-  for(let k=0;k<2;k++){ const a=rr(0,6.28), rad=rr(30,46); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+  // a silica seam within a short reach — close enough that the Excavator step is a quick detour, not an expedition
+  for(let k=0;k<2;k++){ const a=rr(0,6.28), rad=rr(22,36); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('silica', x, z, 8); }
   // MATERIAL FIELD — many more clickable, harvestable deposits spread across the dry valley, well spaced
   for(let k=0;k<78;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
