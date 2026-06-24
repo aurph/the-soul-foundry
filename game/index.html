@@ -109,9 +109,12 @@
   .erow .ev{color:var(--ink-bright);font-variant-numeric:tabular-nums}
   .erow .er{font-variant-numeric:tabular-nums;min-width:32px;text-align:right}
   .diline{font-size:11px;color:var(--ink-dim)} .diline b{color:var(--ink-bright);font-weight:normal}
-  .dibtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
-  .dbtn{font-size:11px;padding:3px 10px;border:1px solid var(--line);border-radius:4px;color:var(--ink);cursor:pointer;background:var(--iron2)}
+  .dibtns{display:flex;gap:7px;margin-top:auto}
+  .dbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;letter-spacing:.3px;padding:6px 4px 5px;
+    border:1px solid var(--line);border-radius:5px;color:var(--ink-dim);cursor:pointer;background:var(--iron2);transition:border-color .12s,color .12s}
+  .dbtn img{width:21px;height:21px;object-fit:contain;opacity:.82;transition:opacity .12s}
   .dbtn:hover{border-color:var(--ember-soft);color:var(--ink-bright)}
+  .dbtn:hover img{opacity:1}
   @media(max-width:680px){ #dockinfo{display:none} }
   #docktabs{display:flex;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
   #docktabs::-webkit-scrollbar{display:none}
@@ -1400,10 +1403,10 @@ function renderDockInfo(){ const el=$('dockinfo'); if(!el) return;
     <div class="egrid">${key.map(chip).join('')}</div>
     <div class="diline">Gatherers <b>${gA}/${gN}</b> &middot; Refiners <b>${rA}/${rN}</b>${modeCfg().quota?` &middot; Tithe <b>${q.level}/${WIN_LEVEL}</b>`:''}</div>
     <div class="dibtns">
-      <span class="dbtn" onclick="showSupplyChain()">The Line</span>
-      <span class="dbtn" onclick="showEconomy()">Rates</span>
-      <span class="dbtn" onclick="showRites()">Rites</span>
-      <span class="dbtn" onclick="showCodex()">Codex</span>
+      <span class="dbtn" onclick="showSupplyChain()" title="The Line — the corpse-to-Compute blueprint">${gicon('blueprint',21)}The Line</span>
+      <span class="dbtn" onclick="showEconomy()" title="Rates — live production + the economy ledger">${gicon('economy',21)}Rates</span>
+      <span class="dbtn" onclick="showRites()" title="Rites — spend Bones on permanent upgrades">${gicon('rites',21)}Rites</span>
+      <span class="dbtn" onclick="showCodex()" title="Codex — the in-game manual">${gicon('codex',21)}Codex</span>
     </div>`;
 }
 
