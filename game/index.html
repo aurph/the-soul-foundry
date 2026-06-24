@@ -305,7 +305,7 @@ const SND={
   ctx:null, master:null, sfxGain:null, droneGain:null,
   started:false, muted:false, musicVol:0.55, sfxVol:0.8,
   pool:{}, music:null, dread:null, droneNodes:[],
-  vol:{place:0.3, rise:0.6, crumble:0.6, haunt:0.55, bell:0.8},   // per-sound trims (place/finish were too loud)
+  vol:{place:0.22, rise:0.55, crumble:0.6, haunt:0.55, bell:0.7},   // per-sound trims; place is the soft 'assembling' cue
   // asset urls — null means "synth only"; the build fills these with vendored paths
   src:{ music:"assets/audio/music.m4a", dread:"assets/audio/dread.m4a", place:"assets/audio/place.mp3",
         bell:"assets/audio/bell.mp3", crumble:"assets/audio/crumble.mp3", haunt:"assets/audio/haunt.mp3", rise:"assets/audio/rise.mp3" },
