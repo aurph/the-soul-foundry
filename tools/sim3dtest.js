@@ -14,6 +14,7 @@ code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,NODE,placeBuildingFree,place
   toggleDreadViz:(typeof toggleDreadViz!=='undefined'?toggleDreadViz:null), dreadResist:(typeof dreadResist!=='undefined'?dreadResist:null),
   driftPeriod:(typeof driftPeriod!=='undefined'?driftPeriod:null), driftLevel:(typeof driftLevel!=='undefined'?driftLevel:null),
   dreadGuard:(typeof dreadGuard!=='undefined'?dreadGuard:null),
+  depleteNode:(typeof depleteNode!=='undefined'?depleteNode:null), regrowNode:(typeof regrowNode!=='undefined'?regrowNode:null),
   DREAD_RESIST:(typeof DREAD_RESIST!=='undefined'?DREAD_RESIST:null), DREAD_GLOBAL_PUSH:(typeof DREAD_GLOBAL_PUSH!=='undefined'?DREAD_GLOBAL_PUSH:null),
   get _dreadVizOn(){ return typeof _dreadVizOn!=='undefined'?_dreadVizOn:null; }};`;
 
@@ -656,6 +657,23 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   ok("a retired-'embers' save migrates to the Grave-Salt rite (the paid upgrade stays effective)", T.G.tech.salt===true && !T.G.tech.embers, "tech="+JSON.stringify(T.G.tech));
   T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.G.tech={}; if(T.resetRunScore)T.resetRunScore();
+}
+
+// --- worked-out deposits go EMPTY + stop; renewable ones RESET after a cooldown; the rest are gone for good ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0;
+  T.spawnVillager(0,0,"reaper");   // one living husk so the extinction-loss doesn't halt the sim mid-cooldown
+  const g=T.placeNode("grave",30,0); g.amount=0; T.depleteNode(g);
+  ok("a worked-out renewable deposit goes empty + onto a cooldown", g.amount===0 && g.cooldown>0 && g.mesh.userData.depleted===true, "amt="+g.amount+" cd="+(g.cooldown||0).toFixed(0)+" empty="+g.mesh.userData.depleted);
+  for(let s=0;s<30*12;s++) T.stepEconomy(1/30);
+  ok("an empty deposit does NOT trickle back during cooldown (the bug: no pecking at a done node)", g.amount===0, "amt="+g.amount.toFixed(2)+" cd="+g.cooldown.toFixed(0));
+  g.cooldown=0.001; for(let s=0;s<30*2;s++) T.stepEconomy(1/30);
+  ok("a renewable deposit RESETS to full once its cooldown ends", g.amount===g.max && g.mesh.userData.depleted===false, "amt="+g.amount+"/"+g.max+" empty="+g.mesh.userData.depleted);
+  const w=T.placeNode("waste",-30,0); w.amount=0; T.depleteNode(w);
+  ok("a non-renewable deposit is gone for good (no cooldown reset)", w.cooldown===0, "cd="+w.cooldown);
+  for(let s=0;s<30*6;s++) T.stepEconomy(1/30);
+  ok("a depleted non-renewable stays depleted", w.amount===0 && w.mesh.userData.depleted===true, "amt="+w.amount+" empty="+w.mesh.userData.depleted);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
 }
 
 console.log("\n=== "+pass+" passed, "+fail+" failed ===");

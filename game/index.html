@@ -754,7 +754,8 @@ function updateShroud(){ if(!SHROUD.length) return;
 // ground where the unrendered dead lie, creeps, and pulls back where you render or ward. Render-only;
 // reads the live DREAD field each frame. This is the legibility layer: you SEE where the backlog bites. ----
 let _dreadViz=null, _dreadVizT=0, _dreadVizAcc=0, _dreadVizOn=true;
-const _DLO=[0.10,0.05,0.16], _DHI=[0.40,0.10,0.46];   // dark indigo-violet at the edges -> dusky violet at the core
+const _DLO=[0.05,0.07,0.05], _DHI=[0.17,0.24,0.13];   // near-black at the edge -> dark, desaturated necrotic green at the core (rot/miasma, not garish)
+const _DREAD_SHOW=22;                                  // only render ground the backlog has genuinely sickened (keeps it pooled, not a world sheet)
 // a soft radial-alpha smudge so each cell is a circular blob, not a hard square — overlapping blobs blend
 // into one organic stain instead of a visible grid.
 function dreadTileTexture(){
@@ -783,13 +784,13 @@ function updateDreadViz(dt){
   const im=_dreadViz.im;
   if(!_dreadVizOn){ if(im.visible) im.visible=false; return; }
   im.visible=true;
-  _dreadVizT+=dt||0; im.material.opacity=0.6*(0.92+Math.sin(_dreadVizT*1.4)*0.08);   // global pulse — cheap, per-frame
+  _dreadVizT+=dt||0; im.material.opacity=0.4*(0.92+Math.sin(_dreadVizT*1.4)*0.08);   // global pulse — cheap, per-frame; low so the haze never dominates
   _dreadVizAcc+=dt||0; if(_dreadViz.shown && _dreadVizAcc<0.08) return;               // throttle the per-cell rebuild to ~12fps
   _dreadVizAcc=0; _dreadViz.shown=true;
   const M=_dreadViz._M, col=_dreadViz._C, p=_dreadViz.pos; let touched=false;
   for(let i=0;i<DGRID*DGRID;i++){ const d=DREAD[i], j=i*3;
-    if(d<5){ M.makeScale(0.0001,0.0001,0.0001); M.setPosition(p[j],p[j+1],p[j+2]); im.setMatrixAt(i,M); touched=true; continue; }
-    const f=clamp(d/100,0,1), b=0.4+0.6*f;   // extra-dark near the threshold so edges read faint, cores read strong
+    if(d<_DREAD_SHOW){ M.makeScale(0.0001,0.0001,0.0001); M.setPosition(p[j],p[j+1],p[j+2]); im.setMatrixAt(i,M); touched=true; continue; }
+    const f=clamp((d-_DREAD_SHOW)/(100-_DREAD_SHOW),0,1), b=0.35+0.65*f;   // fade in FROM the threshold so edges read faint, cores read strong
     M.makeScale(1,1,1); M.setPosition(p[j],p[j+1],p[j+2]); im.setMatrixAt(i,M);
     im.setColorAt(i, col.setRGB((_DLO[0]+(_DHI[0]-_DLO[0])*f)*b, (_DLO[1]+(_DHI[1]-_DLO[1])*f)*b, (_DLO[2]+(_DHI[2]-_DLO[2])*f)*b)); touched=true; }
   if(touched){ im.instanceMatrix.needsUpdate=true; if(im.instanceColor) im.instanceColor.needsUpdate=true; }
@@ -928,7 +929,7 @@ function spawnVillager(x,z,caste){
   scene.add(obj);
   const v={obj,mixer,act,proc,staticGLB,caste,carryMesh:carry,
     name:villagerName(), job:"idle",
-    speed:(caste==="stump"?rr(0.8,1.2):caste==="reaper"?rr(2.0,2.6):rr(2.4,3.0)), phase:rr(0,9),
+    speed:(caste==="stump"?rr(0.5,0.75):caste==="reaper"?rr(1.05,1.4):rr(1.25,1.6)), phase:rr(0,9),
     state:"wander", tx:x,tz:z, restock:0, resolve:rr(0.55,0.9), warmth:rr(0.5,0.9)};
   villagers.push(v); pickWanderTarget(v); return v;
 }
@@ -1328,6 +1329,7 @@ function buildRail(){
     sb.appendChild(sk('fast',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'Fast (3)')); }
   // The Line / Economy / Rites / Codex now live in the bottom-right economy panel; the rail keeps help/sound/options.
   $('rail').appendChild(mk('info',false,()=>showHelp(),'How to play'));
+  $('rail').appendChild(mk('objective',false,()=>showMsgLog(),'The Annals — read back past messages'));
   $('rail').appendChild(mk(SND.muted?'soundoff':'sound',!SND.muted,()=>{ SND.resume(); SND.toggleMute(); buildRail(); }, SND.muted?'Sound is off — click for sound':'Mute sound'));
   $('rail').appendChild(mk('options',false,()=>showOptions(),'Options'));
 }
@@ -1367,6 +1369,32 @@ function selectBuildKind(k){ const def=BLD[k]; if(!def) return; SND.resume();
   SND.sfx('click'); curTab=bldTab(k); placeKind=(placeKind===k?null:k); buildDock();
   setHint(placeKind?("Click a grid cell to raise "+def.name+" · R rotate · Esc cancels"):"");
   showGrid(!!placeKind&&BLD[placeKind].kind!=='path'); }
+// DOCK THUMBNAILS — render each building's ACTUAL procedural mesh to a small image, so the dock icon is
+// exactly what you place (focused + representative), not a mismatched woodcut plaque. Rendered once, cached.
+let _thumbR=null,_thumbScene=null,_thumbCam=null; const BLD_THUMB={};
+function ensureThumbRig(){ if(_thumbR) return;
+  const cv=document.createElement('canvas'); cv.width=cv.height=132;
+  _thumbR=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,preserveDrawingBuffer:true,powerPreference:"low-power"});
+  _thumbR.setPixelRatio(1); _thumbR.setSize(132,132,false); _thumbR.setClearColor(0x000000,0);
+  if(THREE.sRGBEncoding!=null) _thumbR.outputEncoding=THREE.sRGBEncoding;
+  _thumbScene=new THREE.Scene();
+  _thumbScene.add(new THREE.HemisphereLight(0xc2cad6,0x33302a,1.15));
+  const dl=new THREE.DirectionalLight(0xfff2dd,1.05); dl.position.set(4,7,5); _thumbScene.add(dl);
+  const dl2=new THREE.DirectionalLight(0x6a7282,0.5); dl2.position.set(-5,3,-4); _thumbScene.add(dl2);
+  _thumbCam=new THREE.PerspectiveCamera(30,1,0.1,200);
+}
+function buildingThumb(kind){ if(kind==='path') return null; if(BLD_THUMB[kind]!==undefined) return BLD_THUMB[kind];
+  let url=null;
+  try{ ensureThumbRig();
+    const mesh=makeBuildingMesh(kind,BLD[kind]); _thumbScene.add(mesh);
+    const box=new THREE.Box3().setFromObject(mesh), c=box.getCenter(new THREE.Vector3()), s=box.getSize(new THREE.Vector3());
+    const r=Math.max(s.x,s.y,s.z)||2, d=r*1.9;
+    _thumbCam.position.set(c.x+d*0.82,c.y+d*0.72,c.z+d*0.95); _thumbCam.lookAt(c.x,c.y+s.y*0.08,c.z);
+    _thumbR.render(_thumbScene,_thumbCam); url=_thumbR.domElement.toDataURL('image/png');
+    _thumbScene.remove(mesh);
+  }catch(e){ url=null; }
+  BLD_THUMB[kind]=url; return url;
+}
 function buildDock(){
   const tabs=$('docktabs'); tabs.innerHTML='';
   const TAB_GLY={dwell:'dwelling',gather:'gathering',refine:'refining',civic:'civic'};
@@ -1376,8 +1404,9 @@ function buildDock(){
   for(const k of BLD_ORDER){ const def=BLD[k]; if(bldTab(k)!==curTab) continue;
     const card=document.createElement('div'); card.className='card'+(placeKind===k?' sel':'')+(canAfford(def.cost)?'':' locked'); card.dataset.bld=k;
     const costHTML=Object.keys(def.cost).length? Object.entries(def.cost).map(([r,n])=>`${ricon(r,12)}<span class="cn">${n}</span>`).join(' ') : '<span style="color:var(--rot)">free</span>';
-    // woodcut building icon (assets/ui/bld/<k>.png) with a category-glyph fallback — no more white-bg photos
-    const icon=`<img src="assets/ui/bld/${k}.png" onerror="this.onerror=null;this.src='assets/ui/glyph/${TAB_GLY[bldTab(k)]||'refining'}.png'">`;
+    // the dock icon IS the building's real procedural model (rendered to a thumbnail), with a glyph fallback
+    const thumb=(typeof buildingThumb==="function")?buildingThumb(k):null;
+    const icon=thumb?`<img src="${thumb}">`:`<img src="assets/ui/glyph/${TAB_GLY[bldTab(k)]||'refining'}.png">`;
     card.innerHTML=`<div class="cat" style="background:${CAT_COL[bldTab(k)]||'#5f8f9a'}"></div>${BLD_HOTKEY[k]?`<div class="hk">${BLD_HOTKEY[k]}</div>`:''}<div class="th">${icon}</div>
       <div class="nm">${def.name}</div><div class="ct">${costHTML}</div>`;
     card.title=def.name+". "+def.desc;   // hover (after the browser's delay) shows the full description
@@ -1784,7 +1813,7 @@ function placeBuildingFree(k,x,z){ const def=BLD[k]; ensureBuildingGLB(k); const
   scene.add(mesh); const b={kind:k,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0}; buildings.push(b); groundBuilding(b); return b; }
 function seedSettlement(){
   resetRunScore();
-  G.stock.dead=70; G.stock.ashwood=14; G.stock.soulash=16; G.stock.bonesil=8; G.stock.ichor=6; G.stock.compute=10;
+  G.stock.dead=90; G.stock.ashwood=28; G.stock.silica=10; G.stock.soulash=26; G.stock.bonesil=16; G.stock.ichor=12; G.stock.compute=10;
   placeBuildingFree("pyre",0,0);
   placeBuildingFree("den",7,4); placeBuildingFree("den",-7,4);
   placeBuildingFree("stockpile",0,-7);   // the hub — visible from the first moment
@@ -1875,8 +1904,18 @@ function start(){
 }
 function beginPlay(){ paused=false; if(typeof buildRail==="function")buildRail(); }
 addEventListener('beforeunload',()=>{ try{ if(!G.over && shouldAutosave()) saveGame(); }catch(e){} });
+const MSGLOG=[];   // every notice the engine raises, so a vanished toast can always be read back in The Annals
 function toast(msg,type){ const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg;
-  $('toasts').appendChild(t); setTimeout(()=>{t.style.transition='opacity .5s';t.style.opacity=0;setTimeout(()=>t.remove(),500);},3200); }
+  $('toasts').appendChild(t); setTimeout(()=>{t.style.transition='opacity .5s';t.style.opacity=0;setTimeout(()=>t.remove(),500);},3200);
+  try{ MSGLOG.push({m:msg,k:type||'',t:(typeof G!=='undefined'?(G.time||0):0)}); if(MSGLOG.length>80)MSGLOG.shift(); }catch(e){} }
+function showMsgLog(){ if(typeof SND!=='undefined')SND.resume();
+  const fmt=(s)=>{ const m=Math.floor(s/60),ss=Math.floor(s%60); return m+':'+String(ss).padStart(2,'0'); };
+  const rows = MSGLOG.length ? MSGLOG.slice().reverse().map(e=>{ const col=e.k==='bad'?'#c06a52':e.k==='good'?'#8a9a63':'var(--ink)';
+      return `<div class="optrow" style="align-items:flex-start;gap:10px"><span style="color:var(--ink-dim);font-size:11px;min-width:40px">${fmt(e.t)}</span><span style="color:${col};font-size:12.5px;line-height:1.5;text-align:left">${e.m}</span></div>`; }).join('')
+    : `<div style="color:var(--ink-dim);font-size:12px;padding:8px 0">Nothing has been noted yet.</div>`;
+  showOverlayHTML(`<h1 style="font-size:23px">THE ANNALS</h1><h2>every notice the engine has raised, newest first</h2>
+    <div style="max-height:52vh;overflow-y:auto;margin:10px 0;text-align:left">${rows}</div>
+    <span class="btn" onclick="hideOverlay()">Close</span>`); }
 // the payoff for closing the whole chain the first time: a chime, a golden flash, and a banner so it lands.
 function firstComputeReward(){ try{ if(typeof SND!=="undefined"){ SND.sfx('bell'); setTimeout(()=>{try{SND.sfx('win');}catch(e){}},260); }
   if(typeof toast==="function") toast("First Compute rendered — you closed the whole chain. The engine stirs.","good");
@@ -2027,7 +2066,7 @@ function makeNode(type){
     for(let i=0;i<2;i++){ const cl=new THREE.Mesh(new THREE.BoxGeometry(rr(0.8,1.3),0.04,rr(0.6,1.0)),MAT(0x3a3329));
       cl.position.set(rr(-0.7,0.7),rr(0.45,0.72),rr(-0.7,0.7)); cl.rotation.set(rr(-0.32,0.32),rr(0,6),rr(-0.32,0.32)); g.add(cl); } }
   const amt=def.amount[0]*rr(0.8,1.2);
-  return {type,def,mesh:g,amount:amt,max:amt};
+  return {type,def,mesh:g,amount:amt,max:amt,cooldown:0};
 }
 function placeNode(type,x,z){ const n=makeNode(type); n.x=x; n.z=z; n.mesh.position.set(x,terrainHeight(x,z),z); n.mesh.rotation.y=rr(0,6); scene.add(n.mesh); nodes.push(n); return n; }
 // deposits are ~2.5u wide; keep them a clear distance apart so they never clip into each other
@@ -2065,27 +2104,28 @@ function scatterWorld(){
     const nNodes=2+(rg()*2|0);
     const addNodes=(type,n)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(0.7); if(terrainHeight(x,z)<-3.2)continue; tryPlaceNode(type,x,z,7); } };
     const addProps=(maker,n,rot)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(1.0); if(terrainHeight(x,z)<-3.2||Math.hypot(x,z)<13)continue; dropProp(maker(),x,z,rot); } };  // keep region decoration out of the spawn pad
-    if(g.type==='forest'){ addNodes('grave',nNodes); addNodes('tree',2); addProps(()=>makeDeadTree2(rr(0.7,1.5)),20,true); addProps(()=>makeBonePile(),3); }
-    else if(g.type==='silica'){ addNodes('silica',2); addNodes('waste',1); addProps(()=>makeShard(),16,true); addProps(()=>makeRock(),5); }
-    else if(g.type==='ash'){ addNodes('tree',2); addNodes('waste',1); addProps(()=>makeAshMound(),16); addProps(()=>makeDeadTree2(rr(0.6,1.0)),4,true); }
-    else if(g.type==='ruins'){ addNodes('waste',2); addProps(()=>makeWreck(),8,true); addProps(()=>makeMonolith(),3); addProps(()=>makeServerTower(),6,true); }
-    else if(g.type==='graves'){ addNodes('grave',3); addProps(()=>makeBonePile(),16); addProps(()=>makeRock(),4); }
-    else { addNodes('grave',2); addProps(()=>makeAshMound(),9); addProps(()=>makeDeadTree2(rr(0.6,1.1)),9,true); }
+    if(g.type==='forest'){ addNodes('grave',2); addNodes('tree',3); addProps(()=>makeDeadTree2(rr(0.7,1.5)),20,true); addProps(()=>makeBonePile(),3); }
+    else if(g.type==='silica'){ addNodes('silica',3); addNodes('waste',1); addProps(()=>makeShard(),16,true); addProps(()=>makeRock(),5); }
+    else if(g.type==='ash'){ addNodes('tree',3); addNodes('waste',1); addProps(()=>makeAshMound(),16); addProps(()=>makeDeadTree2(rr(0.6,1.0)),4,true); }
+    else if(g.type==='ruins'){ addNodes('waste',2); addNodes('silica',1); addProps(()=>makeWreck(),8,true); addProps(()=>makeMonolith(),3); addProps(()=>makeServerTower(),6,true); }
+    else if(g.type==='graves'){ addNodes('grave',2); addProps(()=>makeBonePile(),16); addProps(()=>makeRock(),4); }
+    else { addNodes('grave',1); addNodes('tree',1); addProps(()=>makeAshMound(),9); addProps(()=>makeDeadTree2(rr(0.6,1.1)),9,true); }
   }
-  // SPAWN GRAVEYARD — a dense ring of harvestable deposits (real models) right around the
-  // settlement, close and reachable, so the dead are at hand from the first minute
-  for(let k=0;k<16;k++){ const a=rr(0,6.28), rad=rr(13,31); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
-    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode(k%5===4?'waste':'grave', x, z, 7); }
-  // a couple of ashwood stands within easy reach so the first crafts are buildable early
-  for(let k=0;k<3;k++){ const a=rr(0,6.28), rad=rr(15,28); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+  // SPAWN RING — a mix of harvestable deposits right around the settlement so matter is at hand from the
+  // first minute, but NOT all cemeteries (graves recur on a cooldown now, so a few go a long way)
+  for(let k=0;k<10;k++){ const a=rr(0,6.28), rad=rr(13,31); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode(k%4===3?'tree':k%4===2?'waste':'grave', x, z, 7); }
+  // ashwood stands within easy reach so the first crafts are buildable early
+  for(let k=0;k<5;k++){ const a=rr(0,6.28), rad=rr(15,30); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('tree', x, z, 7); }
-  // a silica seam within a short reach — close enough that the Excavator step is a quick detour, not an expedition
-  for(let k=0;k<2;k++){ const a=rr(0,6.28), rad=rr(22,36); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+  // silica seams within a short reach — close enough that the Excavator step is a quick detour, not an expedition
+  for(let k=0;k<3;k++){ const a=rr(0,6.28), rad=rr(20,36); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('silica', x, z, 8); }
-  // MATERIAL FIELD — many more clickable, harvestable deposits spread across the dry valley, well spaced
-  for(let k=0;k<78;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
+  // MATERIAL FIELD — deposits spread across the dry valley, weighted toward the SCARCE materials (ashwood,
+  // silica, the wastes) rather than yet more cemeteries
+  for(let k=0;k<64;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
     if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<13||regionAt(x,z)) continue;
-    const r=rnd(); tryPlaceNode(r<0.46?'grave':r<0.74?'waste':r<0.89?'tree':'silica', x, z, 8); }
+    const r=rnd(); tryPlaceNode(r<0.26?'grave':r<0.48?'waste':r<0.76?'tree':'silica', x, z, 8); }
   // dense trees, rocks and bone heaps hugging the spawn so the start never reads barren
   for(let k=0;k<35;k++){ const a=rr(0,6.28), rad=rr(7,32); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0||Math.hypot(x,z)<13) continue; const r=rnd();
@@ -2257,8 +2297,8 @@ const DREAD_RESIST={worker:1.0, stump:1.0, reaper:0.15};
 function dreadResist(caste){ return DREAD_RESIST[caste]!=null?DREAD_RESIST[caste]:1.0; }
 // tuning (per-second rates; integrated against the sim dt)
 const DREAD_EMIT=15.0;         // a full, untapped deposit radiates this much/s into its cell
-const DREAD_DECAY=0.05;        // the ground slowly forgets
-const DREAD_DIFFUSE=0.4;       // the stain creeps toward neighbouring cells
+const DREAD_DECAY=0.06;        // the ground slowly forgets
+const DREAD_DIFFUSE=0.18;      // the stain creeps only a little toward neighbours — pooled, not a spreading sheet
 const DREAD_REND_SUPPRESS=22;  // an ACTIVE rendering building (Crematory) burns the backlog down nearby
 const DREAD_WARD_SUPPRESS=46;  // a Ward Obelisk crushes Dread inside its radius — the strongest hold
 const DREAD_RESOLVE_BITE=0.012;// a husk standing in full Dread loses this much resolve/s on top of upkeep
@@ -2630,20 +2670,30 @@ function makeBuildingMesh(kind,def){
   const g=new THREE.Group(); const stone=MAT(0x35332e), timber=MAT(0x2b251c), iron=MAT(0x1c1f22,{metalness:0.3}), win=emis(0xe8973a);
   const f=def.foot;
   if(kind==="pyre"){
-    // The Binding Pyre is a server-altar: the engine re-reads a dead mind's residual imprint off its old
-    // racks and binds it into a husk. A glowing data-core replaces the campfire (still pulses via ud.flame).
-    const metal=MAT(0x20242a,{metalness:0.5,roughness:0.5}), dark=MAT(0x121419,{metalness:0.4}), bone=MAT(0xb3a98f);
-    const base=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.7,0.5,10),dark); base.position.y=0.25; g.add(base);
-    for(let i=0;i<8;i++){ const a=i/8*6.28; const rack=new THREE.Mesh(new THREE.BoxGeometry(0.45,1.0,0.25),metal); rack.position.set(Math.cos(a)*1.15,0.6,Math.sin(a)*1.15); rack.rotation.y=-a; g.add(rack);
-      const ln=new THREE.Mesh(new THREE.BoxGeometry(0.36,0.5,0.02),new THREE.MeshBasicMaterial({color:0x6fae9b,fog:false})); ln.position.set(Math.cos(a)*1.27,0.6,Math.sin(a)*1.27); ln.rotation.y=-a; g.add(ln); }
-    for(let i=0;i<4;i++){ const a=i/4*6.28+0.4; const post=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,1.6,6),bone); post.position.set(Math.cos(a)*1.5,0.8,Math.sin(a)*1.5); g.add(post);
-      const sk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.13,0),bone); sk.position.set(Math.cos(a)*1.5,1.7,Math.sin(a)*1.5); g.add(sk); }
-    const flame=new THREE.Group(); flame.position.y=0.55; g.add(flame);
-    const c1=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.34,1.3,8),new THREE.MeshBasicMaterial({color:0x2f6f78,fog:false})); c1.position.y=0.65; flame.add(c1);
-    const c2=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.2,1.5,7),new THREE.MeshBasicMaterial({color:0x6fae9b,fog:false})); c2.position.y=0.75; flame.add(c2);
-    const c3=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.22,0.22),new THREE.MeshBasicMaterial({color:0xe8d24a,fog:false})); c3.position.y=1.55; flame.add(c3);
-    g.userData.flame=flame; g.userData.tongues=[c1,c2,c3];
-    const L=new THREE.PointLight(0x5fae9b,2.4,42,2); L.position.y=2.2; g.add(L); g.userData.light=L; }
+    // The Binding Pyre is a SERVER ALTAR: a ring of server cabinets studded with blade-lights around a central
+    // server tower and a glowing data-core where the engine re-reads a dead mind off the racks and binds it.
+    const metal=MAT(0x20242a,{metalness:0.55,roughness:0.5}), dark=MAT(0x101319,{metalness:0.45}), bone=MAT(0xb3a98f);
+    const teal=()=>new THREE.MeshBasicMaterial({color:0x6fae9b,fog:false});
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(1.55,1.8,0.5,12),dark); base.position.y=0.25; g.add(base);
+    // ring of server CABINETS, each face a stack of glowing blade rows -> unmistakably a rack of servers
+    for(let i=0;i<6;i++){ const a=i/6*6.28;
+      const cab=new THREE.Mesh(new THREE.BoxGeometry(0.66,1.55,0.42),metal); cab.position.set(Math.cos(a)*1.28,0.98,Math.sin(a)*1.28); cab.rotation.y=-a; g.add(cab);
+      const vent=new THREE.Mesh(new THREE.BoxGeometry(0.5,1.3,0.02),dark); vent.position.set(Math.cos(a)*1.49,0.98,Math.sin(a)*1.49); vent.rotation.y=-a; g.add(vent);
+      for(let r=0;r<5;r++){ const lit=new THREE.Mesh(new THREE.BoxGeometry(0.46,0.07,0.03),teal());
+        lit.position.set(Math.cos(a)*1.50,0.46+r*0.26,Math.sin(a)*1.50); lit.rotation.y=-a; g.add(lit); } }
+    // central server tower with side blade-lights
+    const tower=new THREE.Mesh(new THREE.BoxGeometry(0.74,2.0,0.74),dark); tower.position.y=1.1; g.add(tower);
+    for(let r=0;r<6;r++)for(const s of [-1,1]){ const lit=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.13,0.04),teal()); lit.position.set(s*0.2,0.55+r*0.26,0.38); g.add(lit); }
+    // the data-core: a pulsing read-head where the dead mind is re-rendered (animated via ud.flame/tongues)
+    const flame=new THREE.Group(); flame.position.y=1.15; g.add(flame);
+    const core=new THREE.Mesh(new THREE.IcosahedronGeometry(0.34,0),new THREE.MeshBasicMaterial({color:0x9fe6d4,fog:false})); core.position.y=1.0; flame.add(core);
+    const halo=new THREE.Mesh(new THREE.TorusGeometry(0.52,0.05,6,22),teal()); halo.rotation.x=Math.PI/2; halo.position.y=1.0; flame.add(halo);
+    const spark=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.2,0.2),new THREE.MeshBasicMaterial({color:0xe8d24a,fog:false})); spark.position.y=1.95; flame.add(spark);
+    g.userData.flame=flame; g.userData.tongues=[core,halo,spark];
+    // the occult touch kept: bone posts + skulls at the corners
+    for(let i=0;i<4;i++){ const a=i/4*6.28+0.4; const post=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,1.75,6),bone); post.position.set(Math.cos(a)*1.72,0.87,Math.sin(a)*1.72); g.add(post);
+      const sk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.13,0),bone); sk.position.set(Math.cos(a)*1.72,1.85,Math.sin(a)*1.72); g.add(sk); }
+    const L=new THREE.PointLight(0x5fae9b,2.4,42,2); L.position.y=2.5; g.add(L); g.userData.light=L; }
   else if(kind==="den"){ const base=new THREE.Mesh(new THREE.BoxGeometry(f,1.3,f),timber); base.position.y=0.65; g.add(base);
     const roof=new THREE.Mesh(new THREE.ConeGeometry(f*0.9,1.0,4),MAT(0x1d1a14)); roof.position.y=1.7; roof.rotation.y=Math.PI/4; g.add(roof);
     const w=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.06),win); w.material.emissiveIntensity=0.5; w.position.set(0,0.8,f/2+0.01); g.add(w); }
@@ -2748,17 +2798,17 @@ function moveHusk(v,tx,tz,dt,stop){
   for(const ob of OBS){ const ex=nx-ob.x, ez=nz-ob.z, ed=Math.hypot(ex,ez), R=ob.r+HUSK_R;
     if(ed<R){ if(ed<0.001){ nx=ob.x+R; } else { nx=ob.x+ex/ed*R; nz=ob.z+ez/ed*R; } } }
   o.position.x=nx; o.position.z=nz; o.position.y=terrainHeight(nx,nz);
-  o.rotation.y=lerpAngle(o.rotation.y,Math.atan2(dx,dz),0.22);
+  o.rotation.y=lerpAngle(o.rotation.y,Math.atan2(dx,dz),0.10);   // turn slowly — these are dead, not nimble
   if(v.act)v.act.timeScale=1.1;
   if(v.proc){ const ud=o.userData;
-    if(v.caste==="stump"){ // a big stump dragging itself: both arms reach forward then pull, body lurches, slow
-      v.phase+=dt*2.4; const reach=Math.sin(v.phase);
+    if(v.caste==="stump"){ // a big stump dragging itself: both arms reach forward then pull, body heaves, slow
+      v.phase+=dt*v.speed*3.0; const reach=Math.sin(v.phase);
       if(ud.arms[0])ud.arms[0].rotation.x=-0.5-reach*0.85; if(ud.arms[1])ud.arms[1].rotation.x=-0.5-reach*0.85;
-      o.position.y+=Math.max(0,reach)*0.07; o.rotation.z=Math.sin(v.phase*0.5)*0.04;
-    } else { v.phase+=dt*9; const sw=Math.sin(v.phase)*0.5;
+      o.position.y+=Math.max(0,reach)*0.08; o.rotation.z=Math.sin(v.phase*0.5)*0.07;   // heavier heave + tilt
+    } else { v.phase+=dt*v.speed*3.4; const sw=Math.sin(v.phase)*0.6;   // step rate rides the ACTUAL speed -> feet keep up, no gliding
       if(ud.legs[0])ud.legs[0].rotation.x=sw; if(ud.legs[1])ud.legs[1].rotation.x=-sw;
-      if(ud.arms[0])ud.arms[0].rotation.x=-sw*0.6; if(ud.arms[1])ud.arms[1].rotation.x=sw*0.6;
-      o.position.y+=Math.abs(Math.sin(v.phase))*0.05; } }
+      if(ud.arms[0])ud.arms[0].rotation.x=-sw*0.5; if(ud.arms[1])ud.arms[1].rotation.x=sw*0.5;
+      o.position.y+=Math.abs(Math.sin(v.phase))*0.07; o.rotation.z=Math.sin(v.phase)*0.06; } }   // heavier trudge + a tired sway
   if(v.staticGLB){ v.phase+=dt*4; o.rotation.z=Math.sin(v.phase*0.5)*0.04; o.position.y+=Math.abs(Math.sin(v.phase))*0.025; } // hunched reaper shuffle
   return false;
 }
@@ -2836,9 +2886,19 @@ function workAnim(v,dt){ const o=v.obj; v.wphase=(v.wphase||0)+dt*5; const s=Mat
 function huskStateLabel(v){ if(!v||!v.assigned) return "idle"; const k=v.assigned.def.kind;
   if(k==="gather") return v.job==="harvest"?"harvesting":v.job==="toDrop"?"hauling":"fetching";
   return v.atWork?"working":"walking over"; }
-function depleteNode(n){ if(n.def.renew) return; n.amount=0; if(!n.mesh.userData.depleted){ n.mesh.userData.depleted=true;
-  n.mesh.traverse(o=>{ if(o.isMesh&&o.material){ o.material=o.material.clone(); o.material.color&&o.material.color.multiplyScalar(0.5); o.material.emissiveIntensity&&(o.material.emissiveIntensity=0);} });
-  n.mesh.scale.y*=0.6; } }
+// a worked-out deposit goes EMPTY (dug-out, dimmed, sunk) and stops being harvested. Renewable deposits
+// (cemeteries, ashwood stands) reset to full after a cooldown; the wastes + silica seams are gone for good.
+const REGROW_MIN=40, REGROW_MAX=80;
+function depleteNode(n){ n.amount=0;
+  if(!n.mesh.userData.depleted){ n.mesh.userData.depleted=true;
+    n.mesh.traverse(o=>{ if(o.isMesh&&o.material){ o.material=o.material.clone(); o.material.color&&o.material.color.multiplyScalar(0.5); o.material.emissiveIntensity&&(o.material.emissiveIntensity=0);} });
+    n.mesh.scale.y*=0.55; }
+  n.cooldown = n.def.renew ? rr(REGROW_MIN,REGROW_MAX) : 0;   // renewable -> resets after a cooldown; else gone for good
+}
+function regrowNode(n){ n.amount=n.max;
+  if(n.mesh.userData.depleted){ n.mesh.userData.depleted=false; n.mesh.scale.y/=0.55;
+    n.mesh.traverse(o=>{ if(o.isMesh&&o.material&&o.material.color) o.material.color.multiplyScalar(1/0.5); }); }   // restore the dimmed materials
+}
 
 /* ---- random events: the dead world intrudes ---- */
 const EVENTS=[
@@ -2855,9 +2915,9 @@ function fireEvent(){ const e=pick(EVENTS); e.f(); if(typeof toast==="function")
 function stepEconomy(dt){
   if(G.over) return;
   const pop=villagers.filter(v=>!v.dead).length;
-  // renewable nodes (groves/wells) slowly regrow so food + water are sustainable; finite ones push expansion
-  for(const n of nodes){ if(n.def.renew && n.amount<n.max){ n.amount=Math.min(n.max,n.amount+n.def.renew*dt);
-    if(n.mesh.userData.depleted && n.amount>n.max*0.2){ n.mesh.userData.depleted=false; n.mesh.scale.y/=0.6; } } }
+  // worked-out renewable deposits sit EMPTY on a cooldown, then reset to full in one go (no endless pecking at a
+  // 'done' node, no slow trickle). Non-renewable deposits have cooldown 0 and stay gone.
+  for(const n of nodes){ if(n.cooldown>0){ n.cooldown-=dt; if(n.cooldown<=0 && n.def.renew && n.amount<=0) regrowNode(n); } }
   // SPATIAL DREAD — step the field of the unrendered dead (uses last tick's b.active for render-suppression; the
   // 1-tick lag is imperceptible and stays deterministic). Drives the local bite + the global push below.
   stepDread(dt);
@@ -2897,8 +2957,8 @@ function stepEconomy(dt){
   const fieldPush=(modeCfg().quota && !grace)?clamp(dreadFieldPressure()/100,0,1)*DREAD_GLOBAL_PUSH:0;
   G.dread=clamp(G.dread + (basePressure + fieldPush - renderers*1.0 - wards*0.6*techMul('ward'))*dt, 0,100);
   // teach the spatial Dread the first time it genuinely pools near the settlement (once per run)
-  if(!G._dreadTaught && (G.time||0)>10 && typeof dreadFieldPressure==="function" && dreadFieldPressure()>30){ G._dreadTaught=1;
-    if(typeof toast==="function") toast("The unrendered dead are pooling as a Dread haze on the ground — it slows whatever stands in it. Harvest them, render them at a Crematory, or raise a Ward to push it back.","bad"); }
+  if(!G._dreadTaught && (G.time||0)>10 && typeof dreadFieldPressure==="function" && dreadFieldPressure()>22){ G._dreadTaught=1;
+    if(typeof toast==="function") toast("The unrendered dead are pooling as a Dread haze on the ground — the dark stain slows whatever stands in it. Harvest them, render them at a Crematory, or raise a Ward to push it back. (Re-read notes in The Annals on the right rail.)","bad"); }
   // hauntings
   if(G.dread>55 && rnd()<0.03*dt*(G.dread/100)){ const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ const v=pick(cand); v.resolve=Math.max(0,v.resolve-0.25); SND.sfx('haunt'); if(typeof toast==="function")toast(v.name+" is gripped by a haunting.","bad"); } }
   // husk resolve: Reapers need no soul-ash and hold steady; others recover with it and decay without.

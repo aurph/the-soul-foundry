@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-24 — First playtest pass (Jack's notes)
+
+- **CRITICAL FIX: depleted deposits kept being worked.** Renewable cemeteries
+  trickle-regrew, so husks pecked a "done" node forever. Now a worked-out deposit
+  goes EMPTY (dug-out, dimmed) and stops; renewable ones RESET to full after a
+  cooldown; the wastes and silica seams are gone for good.
+- **Reworked the Dread haze.** It read like spilt purple. Now a dark, desaturated
+  necrotic green, much lower opacity, only rendered where the backlog is genuinely
+  high, and much less diffusion — pooled dark stains at untapped cemeteries, not a
+  world-covering sheet. Empty deposits emit no Dread, so harvesting clears it.
+- **Husks move like the dead.** Cut their speed, tied the step cadence to actual
+  speed so feet keep up (no more gliding), heavier sway and slower turns.
+- **Balance.** Far fewer cemeteries (graves ~41→25), more ashwood/silica/waste,
+  richer starting stock so the chain doesn't starve.
+- **The Annals.** A notification log (right-rail) to read back any message that
+  flashed past, so the Dread-haze nudge (and everything else) is reviewable.
+- **Dock icons are the real models.** Each card now renders the building's actual
+  procedural mesh to a focused thumbnail instead of a mismatched plaque.
+- **The Binding Pyre reads as a server** — a ring of server cabinets with
+  blade-lights around a central tower and a pulsing data-core.
+
 ## 2026-06-24 — Spatial Dread (the consequence layer)
 
 Ran a full council review of the game's direction. Verdict: it looked finished but
