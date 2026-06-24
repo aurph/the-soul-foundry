@@ -497,8 +497,8 @@ const BIOME_HSL={ forest:[0.07,0.11,0.24], silica:[0.58,0.06,0.47], ash:[0.03,0.
   ruins:[0.58,0.09,0.33], graves:[0.09,0.05,0.36], bog:[0.55,0.10,0.19] };
 function biomeColor(x,z,h,slope){
   const c=new THREE.Color();
-  if(h<-4) c.setHSL(0.08,0.08,0.17); else if(h<-1) c.setHSL(0.09,0.13,0.25);
-  else if(h<6) c.setHSL(0.10,0.14,0.33); else c.setHSL(0.08,0.08,0.45);
+  if(h<-4) c.setHSL(0.09,0.12,0.17); else if(h<-1) c.setHSL(0.10,0.17,0.24);
+  else if(h<6) c.setHSL(0.11,0.22,0.30); else c.setHSL(0.09,0.12,0.44);   // warmer, more saturated earth (less flat grey)
   const rg=regionAt(x,z);
   if(rg){ const b=BIOME_HSL[rg.reg.type]; const bc=new THREE.Color().setHSL(b[0],b[1],b[2]);
     const t=Math.pow(rg.t,0.5)*0.95; c.lerp(bc,t); }
@@ -1449,7 +1449,7 @@ function refreshInspect(){
      <div class="row"><span>Carry cap</span><b>${CARRY[v.caste]||7}${v.carryAmt?(' ('+Math.floor(v.carryAmt)+' '+(v.carryRes?RES[v.carryRes].name:'')+')'):''}</b></div>
      <div class="row"><span>Specialty</span><b style="font-size:11px">${v.caste==='stump'?'Extraction & hauling':v.caste==='reaper'?'Rendering & fine work':'Generalist'}</b></div>
      ${v.assigned?(()=>{ const a=affinity(v.caste,v.assigned.kind); const lab=a>=1.15?'well-suited':a<=0.85?'ill-suited':'steady'; const col=a>=1.15?'#6f9a55':a<=0.85?'#9e3b2c':'var(--ink-bright)'; return `<div class="row"><span>Suited to ${v.assigned.def.name}</span><b style="color:${col};font-size:11px">${lab} · ${Math.round(a*100)}%</b></div>`; })():''}
-     ${v.assigned?`<div style="margin-top:8px"><span class="btn" onclick="unassignSel()">Recall to idle</span></div>`:`<div style="margin-top:8px;color:var(--ink-dim);font-size:11px">Idle. Select a workplace to assign husks.</div>`}
+     ${v.assigned?`<div style="margin-top:8px"><span class="btn" onclick="unassignSel()">Recall to idle</span></div>`:`<div style="margin-top:8px"><span class="btn" onclick="putSelToWork()">Put to work →</span> <span style="color:var(--ink-dim);font-size:11px">sends it to the best post that needs hands</span></div>`}
      </div>`;
   } else if(selBld){ const b=selBld, d=b.def;
     ins.classList.add('show');
@@ -1514,6 +1514,14 @@ function refreshInspect(){
   } else ins.classList.remove('show');
 }
 function unassignSel(){ if(selected){ assignHusk(selected,null); selected.job="idle"; refreshInspect(); } }
+// send the selected idle husk to the post that needs hands and best fits its caste (nearest on ties)
+function putSelToWork(){ const v=selected; if(!v||v.dead) return;
+  const needy=buildings.filter(b=>buildingNeedsWorkers(b));
+  if(!needy.length){ if(typeof toast==="function")toast("No post needs hands right now — raise or staff a building first.","bad"); SND.sfx('deny'); return; }
+  needy.sort((a,b)=>{ const fa=(typeof affinity==="function"?affinity(v.caste,a.kind):1), fb=(typeof affinity==="function"?affinity(v.caste,b.kind):1);
+    if(Math.abs(fb-fa)>0.01) return fb-fa;   // best caste fit first
+    return Math.hypot(a.x-v.obj.position.x,a.z-v.obj.position.z)-Math.hypot(b.x-v.obj.position.x,b.z-v.obj.position.z); });   // then nearest
+  assignHusk(v,needy[0]); SND.sfx('click'); if(typeof toast==="function")toast(v.name+" sent to the "+needy[0].def.name+".","good"); refreshInspect(); }
 function addWorker(){ if(!selBld)return; const idle=idleHusks(); if(!idle.length){ toast("No idle husks. Recall some, or wait for more to rise.","bad"); return; }
   idle.sort((a,b)=>Math.hypot(a.obj.position.x-selBld.x,a.obj.position.z-selBld.z)-Math.hypot(b.obj.position.x-selBld.x,b.obj.position.z-selBld.z));
   if(selBld.workers.length<selBld.def.workers){ assignHusk(idle[0],selBld); refreshInspect(); } }
@@ -1832,12 +1840,13 @@ function placeBuildingFree(k,x,z){ const def=BLD[k]; ensureBuildingGLB(k); const
   scene.add(mesh); const b={kind:k,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0}; buildings.push(b); groundBuilding(b); return b; }
 function seedSettlement(){
   resetRunScore();
-  G.stock.dead=90; G.stock.ashwood=28; G.stock.silica=10; G.stock.soulash=26; G.stock.bonesil=16; G.stock.ichor=12; G.stock.compute=10;
+  // start POOR — just enough to raise the first post or two. Everything else you must GATHER and render.
+  G.stock.dead=20; G.stock.ashwood=10; G.stock.silica=0; G.stock.soulash=4; G.stock.bonesil=0; G.stock.ichor=0; G.stock.compute=6;
   placeBuildingFree("pyre",0,0);
   placeBuildingFree("den",7,4); placeBuildingFree("den",-7,4);
   placeBuildingFree("stockpile",0,-7);   // the hub — visible from the first moment
   // husks start idle and bound; the tutorial walks the player through raising the line themselves
-  for(let i=0;i<6;i++){ const a=rr(0,6.28), r=rr(3,8); spawnVillager(Math.cos(a)*r, Math.sin(a)*r, pick(["worker","worker","stump","reaper"])); }
+  for(let i=0;i<4;i++){ const a=rr(0,6.28), r=rr(3,8); spawnVillager(Math.cos(a)*r, Math.sin(a)*r, pick(["worker","worker","stump","reaper"])); }
   renderLedger(); buildRail(); buildDock(); renderQuota();
 }
 
@@ -2186,6 +2195,12 @@ function scatterGroundDetail(){
   mk(new THREE.IcosahedronGeometry(0.24,0), MAT(0x655f50), 330, s=>0.1, ()=>{const a=rr(0.4,1.5);return{x:a,y:a*0.6,z:a};});             // bone-grey debris
   mk(new THREE.BoxGeometry(0.5,0.18,0.5), MAT(0x564c3e), 160, s=>0.06, ()=>{const a=rr(0.6,2.2);return{x:a,y:1,z:a*rr(0.6,1)};});       // broken slabs / dirt
   mk(new THREE.IcosahedronGeometry(0.17,0), MAT(0xbab296), 220, s=>0.08, ()=>{const a=rr(0.35,1.15);return{x:a,y:a*0.5,z:a};}, -3.0, 7);  // pale scattered BONES (high contrast)
+  // EARTHY GROUND COVER — muted moss/scrub + dead grass + dirt patches, brought in CLOSE to the build area (clear 6)
+  // so the ground reads as living earth, not a barren grey plate. Sickly desaturated green, not lush.
+  mk(new THREE.IcosahedronGeometry(0.3,0), MAT(0x46513b), 560, s=>0.05, ()=>{const a=rr(0.5,1.7);return{x:a,y:a*0.4,z:a};}, -3.0, 6);      // sage/olive moss clumps
+  mk(new THREE.ConeGeometry(0.1,0.75,4), MAT(0x545a40), 680, s=>s.y*0.45, ()=>{const a=rr(0.5,1.9);return{x:1,y:a,z:1};}, -3.0, 6);          // greyed-green grass tufts
+  mk(new THREE.IcosahedronGeometry(0.26,0), MAT(0x3d4633), 300, s=>0.04, ()=>{const a=rr(0.6,1.8);return{x:a,y:a*0.3,z:a};}, -3.0, 6);       // low dark scrub
+  mk(new THREE.BoxGeometry(0.5,0.09,0.5), MAT(0x4a4136), 260, s=>0.03, ()=>{const a=rr(0.6,2.0);return{x:a,y:1,z:a*rr(0.7,1)};}, -3.0, 6);   // turned-earth dirt patches
   // DEAD FOREST — a blanket of leaning bare snags, the main readable texture from above
   const snagGeo=new THREE.CylinderGeometry(0.03,0.33,4.8,5);
   const snags=new THREE.InstancedMesh(snagGeo, MAT(0x171309), 120); let tn=0;
@@ -2266,7 +2281,7 @@ const buildings=[];
 // CASTE SPECIALIZATION — each caste fits a different stage of the death-to-Compute chain.
 // CARRY/GRATE drive extraction & hauling; AFFINITY scales refining/rendering/compute speed by building.
 // gathering is slower now — a husk must WORK a deposit a while before it has a load worth hauling
-const CARRY={worker:7,stump:20,reaper:5}, GRATE={worker:3.2,stump:5.0,reaper:2.2};
+const CARRY={worker:5,stump:13,reaper:4}, GRATE={worker:1.8,stump:2.8,reaper:1.3};   // gathering is slow + hauls are smaller, so accumulating matter is real work
 const UPKEEP={worker:0.015, stump:0.02, reaper:0};   // soul-ash per husk per second; reapers need none
 const AFFINITY={
   worker:{ exhumer:1.0,dredge:1.0, crematory:1.0, furnace:1.05,mill:1.05, litho:1.0,ossuary:1.0, substation:1.05, datacenter:1.0, market:1.0 },
@@ -2858,7 +2873,7 @@ function stepHusks(dt){
         const s=0.62+Math.min(1,v.carryAmt/12)*0.55; v.carryMesh.scale.set(s,s,s);
         if(v._payBaseY!=null) v.carryMesh.position.y=v._payBaseY; }
       // the stump's heap grows block by block as it loads up (so its big haul is visible, not one wide box)
-      if(v.carryPile){ const ps=0.5+Math.min(1,v.carryAmt/18)*0.45; for(let i=0;i<v.carryPile.length;i++){ const show=carrying && v.carryAmt>(5+i*4.5); v.carryPile[i].visible=show; if(show) v.carryPile[i].scale.set(ps,ps,ps); } } }
+      if(v.carryPile){ const ps=0.55+Math.min(1,v.carryAmt/13)*0.4; for(let i=0;i<v.carryPile.length;i++){ const show=carrying && v.carryAmt>(0.5+i*3.5); v.carryPile[i].visible=show; if(show) v.carryPile[i].scale.set(ps,ps,ps); } } }
     const b=v.assigned;
     if(!b){ // idle until assigned: stand still, only the rare slow shuffle near the Pyre
       v.restock-=dt;

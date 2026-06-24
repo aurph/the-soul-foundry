@@ -500,13 +500,13 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   // (Furnaces don't render, so they don't self-clean the ground — the bite is visible. graceT high so no breach.)
   T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
   T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0;
-  T.placeBuildingFree("stockpile",0,0);
-  const gd=T.placeNode("grave",60,0); gd.amount=gd.max;        // a full grave keeps the south-east ground dreadful
-  const fuClean=T.placeBuildingFree("furnace",-60,0), fuDread=T.placeBuildingFree("furnace",60,3);
-  for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-60,2,"worker"),fuClean); T.assignHusk(T.spawnVillager(60,5,"worker"),fuDread); }
-  for(let st=0;st<30*150;st++){ T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; gd.amount=gd.max; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  T.placeBuildingFree("stockpile",-12,0); T.placeBuildingFree("stockpile",12,0);   // a hub by each so crews tend, not walk
+  const gd=T.placeNode("grave",12,0); gd.amount=gd.max;        // a full grave keeps the +12 ground dreadful
+  const fuClean=T.placeBuildingFree("furnace",-12,0), fuDread=T.placeBuildingFree("furnace",12,0);
+  for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-12,2,"worker"),fuClean); T.assignHusk(T.spawnVillager(12,2,"worker"),fuDread); }
+  for(let st=0;st<30*220;st++){ T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; gd.amount=gd.max; T.stepHusks(1/30); T.stepEconomy(1/30); }
   ok("placement matters: a Furnace mired in Dread out-produced by one on clean ground", fuClean.cyc>fuDread.cyc,
-     "clean cyc="+fuClean.cyc+" in-dread cyc="+fuDread.cyc+" dread@furnace="+T.dreadAt(60,3).toFixed(1));
+     "clean cyc="+fuClean.cyc+" in-dread cyc="+fuDread.cyc+" dread@furnace="+T.dreadAt(12,0).toFixed(1));
   T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
 }
