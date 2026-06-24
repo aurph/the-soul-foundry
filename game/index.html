@@ -97,9 +97,12 @@
   .card:hover{border-color:var(--ember-soft)} .card.sel{border-color:var(--ember);box-shadow:0 0 0 1px var(--ember)}
   .card.locked{opacity:.45;filter:grayscale(.7)}
   .card .cat{position:absolute;top:0;left:0;right:0;height:3px}
-  .card .th{width:100%;height:54px;border-radius:4px;background:#0c0a07 center/cover no-repeat;border:1px solid #000}
+  .card .th{width:100%;height:54px;border-radius:4px;background:radial-gradient(circle at 50% 38%,#231a10,#120c06);border:1px solid #000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .card .th img{width:48px;height:48px;object-fit:contain;filter:saturate(.92) brightness(.97)}
   .card .nm{font-size:11px;line-height:1.15;color:var(--ink-bright);height:26px;overflow:hidden}
-  .card .ct{font-size:10px;color:var(--ink-dim)}
+  .card .ct{font-size:10px;color:var(--ink-dim);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .card .ct img{width:12px;height:12px;vertical-align:middle}
+  .card .ct .cn{color:var(--ink)}
   .card .lk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
     font-size:10px;color:#d8cbb0;background:#0a0b0ed8;border-radius:6px;padding:4px}
   .card .hk{position:absolute;top:3px;right:3px;z-index:3;min-width:16px;height:16px;padding:0 3px;border-radius:3px;
@@ -1148,14 +1151,15 @@ function buildDock(){
   const TAB_GLY={dwell:'dwelling',gather:'gathering',refine:'refining',civic:'civic'};
   for(const [k,label] of TABS){ const d=document.createElement('div'); d.className='tab'+(curTab===k?' on':''); d.dataset.tab=k; d.innerHTML=`<img class="tic" src="assets/ui/glyph/${TAB_GLY[k]||'dwelling'}.png">`+label; d.onclick=()=>{curTab=k;buildDock();}; tabs.appendChild(d); }
   const row=$('dockrow'); row.innerHTML='';
+  const CAT_COL={dwell:'#c9772a',gather:'#7d8a5a',refine:'#5f8f9a',civic:'#9a8fb0'};
   for(const k of BLD_ORDER){ const def=BLD[k]; if(bldTab(k)!==curTab) continue;
     const card=document.createElement('div'); card.className='card'+(placeKind===k?' sel':'')+(canAfford(def.cost)?'':' locked'); card.dataset.bld=k;
-    const costStr=Object.keys(def.cost).length? Object.entries(def.cost).map(([r,n])=>n+" "+RES[r].name.split(' ')[0]).join(', ') : 'free';
-    const thumb=BLD_IMG[k]?`background:#0c0d11 center/cover no-repeat url('${BLD_IMG[k]}')`
-      :`background:#${def.kind==='refine'||def.kind==='datacenter'?'2a2d33':def.kind==='gather'?'2b2519':'33312c'}`;
-    const CAT_COL={dwell:'#c9772a',gather:'#7d8a5a',refine:'#5f8f9a',civic:'#9a8fb0'};
-    card.innerHTML=`<div class="cat" style="background:${CAT_COL[bldTab(k)]||'#5f8f9a'}"></div>${BLD_HOTKEY[k]?`<div class="hk">${BLD_HOTKEY[k]}</div>`:''}<div class="th" style="${thumb}"></div>
-      <div class="nm">${def.name}</div><div class="ct">${costStr}</div>`;
+    const costHTML=Object.keys(def.cost).length? Object.entries(def.cost).map(([r,n])=>`${ricon(r,12)}<span class="cn">${n}</span>`).join(' ') : '<span style="color:var(--rot)">free</span>';
+    // woodcut building icon (assets/ui/bld/<k>.png) with a category-glyph fallback — no more white-bg photos
+    const icon=`<img src="assets/ui/bld/${k}.png" onerror="this.onerror=null;this.src='assets/ui/glyph/${TAB_GLY[bldTab(k)]||'refining'}.png'">`;
+    card.innerHTML=`<div class="cat" style="background:${CAT_COL[bldTab(k)]||'#5f8f9a'}"></div>${BLD_HOTKEY[k]?`<div class="hk">${BLD_HOTKEY[k]}</div>`:''}<div class="th">${icon}</div>
+      <div class="nm">${def.name}</div><div class="ct">${costHTML}</div>`;
+    card.title=def.name+". "+def.desc;   // hover (after the browser's delay) shows the full description
     card.onclick=()=>selectBuildKind(k);
     row.appendChild(card); }
 }
