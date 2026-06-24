@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,NODE,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld,getChallengeBest,setChallengeBest,shareURL,shouldAutosave,nodeLockOk:(typeof nodeLockOk!=='undefined'?nodeLockOk:null)};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,NODE,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld,getChallengeBest,setChallengeBest,shareURL,shouldAutosave,nodeLockOk:(typeof nodeLockOk!=='undefined'?nodeLockOk:null),deadDrift:(typeof deadDrift!=='undefined'?deadDrift:null)};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -332,6 +332,27 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   ok("end-to-end: a 30s challenge ends on the clock with a score", (T.G.over==='time') && T.challengeScore()>0,
      "over="+T.G.over+" score="+T.challengeScore()+" time="+T.G.time.toFixed(1));
   T.G.mode=undefined; T.G.graceT=150; T.G.over=null; T.G.time=0; T.resetRunScore();
+}
+
+// --- variable wave of the dead: the world delivers raw dead in irregular pulses (no free husks) ---
+{ let threwD=null;
+  try{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.dread=0; T.G.graceT=0;
+    T.seedWorld(7);
+    ok("deadDrift is exposed", typeof T.deadDrift==='function', "type="+typeof T.deadDrift);
+    // a drained cemetery is topped back up by a drift
+    const n=T.placeNode("grave",20,0); n.amount=n.max*0.2; const before=n.amount;
+    const did=T.deadDrift();
+    ok("deadDrift replenishes the most-drained dead deposit", did===true && n.amount>before, "amount "+before.toFixed(0)+" -> "+n.amount.toFixed(0));
+    // with every deposit healthy and under the cap, a fresh deposit drifts in
+    for(const m of T.nodes) m.amount=m.max; const nn0=T.nodes.length; const did2=T.deadDrift();
+    ok("deadDrift seeds a fresh deposit when all are healthy", did2===true && T.nodes.length===nn0+1, "nodes "+nn0+" -> "+T.nodes.length);
+    // it adds the dead, never a free husk (bound-not-born holds)
+    const pv=T.villagers.filter(v=>!v.dead).length;
+    for(let i=0;i<20;i++) T.deadDrift();
+    ok("deadDrift never spawns a free husk", T.villagers.filter(v=>!v.dead).length===pv, "pop="+pv);
+  }catch(e){ threwD=e; ok("dead-drift block ran", false, String(e.stack||e)); }
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
 }
 
 // --- new craft chain: tree -> ashwood, silica seam -> silica via a node-locked Excavator ---

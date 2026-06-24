@@ -723,7 +723,8 @@ function updateShroud(){ if(!SHROUD.length) return;
     if(t.revealed && t.op>0){ t.op=Math.max(0,t.op-0.06); t.m.material.opacity=t.op; if(t.op<=0.01)t.m.visible=false; }
   }
 }
-function seedWorld(s){ WORLD_SEED=s|0; RNG=mulberry32(WORLD_SEED); genRegions(WORLD_SEED); }
+function seedWorld(s){ WORLD_SEED=s|0; RNG=mulberry32(WORLD_SEED); genRegions(WORLD_SEED);
+  G.eventT=null; G.driftT=null; }   // fresh world -> fresh event/drift timers (keeps same-seed runs identical)
 function bootWorld(seedOverride){
   bootmsg("raising the valley…");
   seedWorld(seedOverride!=null?seedOverride:((Date.now())%1e6)|0);
@@ -1983,6 +1984,21 @@ function nearestNode(type,x,z){ let best=null,bd=1e9; for(const n of nodes){ if(
 // node-locked buildings (the Excavator) may ONLY stand on/beside their seam — nowhere else.
 function nodeLockOk(def,x,z){ if(!def||!def.lockNode) return true;
   const reach=def.foot*0.8+3.2; for(const n of nodes){ if(n.type===def.lockNode && n.amount>0 && Math.hypot(n.x-x,n.z-z)<reach) return true; } return false; }
+// A WAVE OF THE DEAD — instead of citizens trickling in on a fixed timer (the city-builder trope),
+// the world coughs up the raw dead in irregular, seeded pulses. It tops up the most-drained deposit,
+// or, when every deposit is healthy, drifts a fresh one in out near the shroud. You still BIND your
+// own husks from it — nothing joins for free. Deterministic (uses the sim RNG).
+function deadDrift(){
+  const dn=nodes.filter(n=>(n.type==='grave'||n.type==='waste')&&n.amount>0);
+  let target=null,worst=1; for(const n of dn){ const f=n.amount/(n.max||1); if(f<worst){worst=f;target=n;} }
+  if(target && worst<0.6){ target.amount=Math.min(target.max,target.amount+target.max*rr(0.25,0.45));
+    if(typeof toast==="function") toast("A wave of the dead drifts back into the "+(target.type==='grave'?'cemetery':'wastes')+".","good"); return true; }
+  const total=nodes.filter(n=>n.type==='grave'||n.type==='waste').length;
+  if(total<28){ for(let tries=0;tries<8;tries++){ const a=rr(0,6.283), rad=rr(FOG_REVEAL_HOME*0.7,HALF*0.6), x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+      if(terrainHeight(x,z)<-2.8) continue; const n=tryPlaceNode(rnd()<0.6?'grave':'waste',x,z,8);
+      if(n){ if(typeof toast==="function") toast("A fresh wave of the dead drifts in from the wastes.","good"); return true; } } }
+  return false;
+}
 // the stockpile is the physical hub: gatherers deliver raw matter here, refiners fetch from here
 function nearestStockpile(x,z){ let best=null,bd=1e9; for(const b of buildings){ if(b.kind!=="stockpile")continue;
   const d=(b.x-x)*(b.x-x)+(b.z-z)*(b.z-z); if(d<bd){bd=d;best=b;} } return best; }
@@ -2637,6 +2653,10 @@ function stepEconomy(dt){
   } }
   // random events
   G.eventT=(G.eventT==null?60:G.eventT)-dt; if(G.eventT<=0 && G.time>15){ G.eventT=rr(55,95); fireEvent(); }
+  // a WAVE OF THE DEAD on its own irregular cadence — arrives as a fresh/replenished deposit to harvest,
+  // not a steady trickle of bodies. Holds off while you're already drowning in Dread.
+  G.driftT=(G.driftT==null?rr(120,180):G.driftT)-dt;
+  if(G.driftT<=0){ if(G.dread>65 || (G.time||0)<25){ G.driftT=rr(20,40); } else { G.driftT=rr(90,160); deadDrift(); } }
   // lose conditions
   if(!modeCfg().softLoss && villagers.filter(v=>!v.dead).length===0 && G.time>20) endGame(false,"extinct");
   if(!modeCfg().softLoss){ if(G.dread>=100){ G.breach=(G.breach||0)+dt; if(G.breach>=15) endGame(false,"breach"); } else G.breach=0; }
