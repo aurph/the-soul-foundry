@@ -23,12 +23,12 @@ const P = {
   pocketTol: 44,       // global key for background trapped in concavities — color-only, so dark wood FACES (warmer) survive
   desat: 0.85,         // pull toward luminance (drain the cozy brown)
   tint: [0.96, 0.99, 1.07], // cool it (less red, more blue) -> cold bone-grey
-  gain: 1.30,          // lift wood into a visible driftwood range
-  lift: 8,             // flat lift so shadows don't crush to black
+  gain: 1.46,          // lift wood into a visible driftwood range (brighter so the frame isn't black)
+  lift: 13,            // flat lift so shadows don't crush to black
   contrast: 1.06,
   S: 640,              // frame canvas size
   T: 160,              // slice thickness (border inset)
-  woodSquish: 0.86,    // band fill: trunk ~fills the slice band so it reads bold
+  woodSquish: 0.98,    // band fill: trunk nearly fills the slice band so the frame reads as solid wood, not gaps
   trunkThr: 0.26,      // lower = keep more twig stubs around the trunk
   grainAmp: 9,         // per-pixel noise
   posterize: 8,        // color levels per channel (chunky, but less banding)

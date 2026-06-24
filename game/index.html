@@ -92,9 +92,27 @@
   .rbtn.on{border-color:var(--ember);color:var(--ember)}
   .rbtn:hover{border-color:var(--ember-soft)}
 
-  /* bottom build dock */
+  /* bottom build dock — split: building cards on the left, a live economy panel on the right */
   #dock{position:fixed;left:0;right:0;bottom:0;z-index:30;border-top:1px solid var(--line);
-    background:linear-gradient(#15110bf0,#0c0a07f8)}
+    background:linear-gradient(#15110bf0,#0c0a07f8);display:flex;align-items:stretch}
+  #dockmain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+  #dockinfo{flex:0 0 40%;max-width:560px;min-width:300px;border-left:1px solid #2c2418;padding:7px 13px 9px;
+    overflow:auto;display:flex;flex-direction:column;gap:6px;background:linear-gradient(#1b150dd8,#100c07ea)}
+  .dih{display:flex;justify-content:space-between;align-items:baseline;font-family:'Grenze Gotisch','Iowan Old Style',serif;font-size:16px;color:var(--ink-bright);letter-spacing:.5px}
+  .dih .dlink{font-size:11px;color:var(--ember-soft);cursor:pointer;font-family:inherit}
+  .dih .dlink:hover{color:var(--ember)}
+  .egrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px 14px}
+  .erow{display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;border-radius:3px;padding:1px 3px}
+  .erow:hover{background:#ffffff10}
+  .erow img{width:14px;height:14px;object-fit:contain}
+  .erow .en{color:var(--ink-dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .erow .ev{color:var(--ink-bright);font-variant-numeric:tabular-nums}
+  .erow .er{font-variant-numeric:tabular-nums;min-width:32px;text-align:right}
+  .diline{font-size:11px;color:var(--ink-dim)} .diline b{color:var(--ink-bright);font-weight:normal}
+  .dibtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+  .dbtn{font-size:11px;padding:3px 10px;border:1px solid var(--line);border-radius:4px;color:var(--ink);cursor:pointer;background:var(--iron2)}
+  .dbtn:hover{border-color:var(--ember-soft);color:var(--ink-bright)}
+  @media(max-width:680px){ #dockinfo{display:none} }
   #docktabs{display:flex;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
   #docktabs::-webkit-scrollbar{display:none}
   .tab{flex:0 0 auto;padding:7px 16px;font-size:12px;letter-spacing:.5px;color:var(--ink-dim);cursor:pointer;border-right:1px solid var(--line)}
@@ -220,7 +238,7 @@
     border-image:url('assets/ui/frame-branch.png') 160 stretch;
     border-radius:0; backdrop-filter:none;
   }
-  #inspect,#goals{--wood:30px; background:#0a0b0ff5}
+  #inspect,#goals{--wood:36px; background:#160f08f7}   /* dark wood-brown interior + a thicker wood frame (was near-black with a thin border) */
   .modal{--wood:44px; background:#0b0c10f8; box-shadow:0 18px 80px #000e}
   #dock{--wood:26px; border-top:none}
   #inspect.frame::before,#goals.frame::before{display:none}
@@ -289,8 +307,11 @@
 <div id="pausebar" onclick="beginPlay()"><img src="assets/ui/glyph/pause.png" style="width:15px;height:15px;vertical-align:-3px;opacity:.8;margin-right:5px">Paused &middot; press <span class="k">Space</span> or click here to begin</div>
 <div id="dev"></div>
 <div id="dock">
-  <div id="docktabs"></div>
-  <div id="dockrow"></div>
+  <div id="dockmain">
+    <div id="docktabs"></div>
+    <div id="dockrow"></div>
+  </div>
+  <div id="dockinfo"></div>
 </div>
 <div id="ov"><div class="modal" id="modal"></div></div>
 <div id="menu"></div>
@@ -682,10 +703,11 @@ addEventListener('resize',resize); addEventListener('orientationchange',resize);
 let _last=performance.now(), _acc=0, paused=false, simSpeed=1;
 const STEP=1/30;
 let mixers=[];   // animation mixers (villagers)
-let _grainCv=null,_grainCtx=null,_grainT=0,_pauseEl=null;
+let _grainCv=null,_grainCtx=null,_grainT=0,_pauseEl=null,_dockT=0;
 function drawGrain(){ if(!_grainCv){ _grainCv=document.getElementById('grain'); if(!_grainCv)return; _grainCtx=_grainCv.getContext('2d'); _grainCv.width=160; _grainCv.height=100; }
   const id=_grainCtx.createImageData(160,100), d=id.data; for(let i=0;i<d.length;i+=4){ const v=(Math.random()*255)|0; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } _grainCtx.putImageData(id,0,0); }
 function tickRender(dt){ stepAsh(dt); stepBirds(dt); for(const m of mixers) m.update(dt); if(typeof updateStockpiles==="function") updateStockpiles(); _grainT+=dt; if(_grainT>0.055){ _grainT=0; drawGrain(); }
+  _dockT=(_dockT||0)-dt; if(_dockT<=0){ _dockT=0.6; if(typeof renderDockInfo==="function") renderDockInfo(); }   // keep the economy panel live
   if(!_pauseEl)_pauseEl=document.getElementById('pausebar'); if(_pauseEl)_pauseEl.style.display=(paused&&!(typeof G!=="undefined"&&G.over))?'block':'none'; }
 function loop(now){
   requestAnimationFrame(loop);
@@ -1230,13 +1252,33 @@ function buildRail(){
     sb.appendChild(sk('pause',paused,()=>{paused=!paused;buildRail();},'Pause (Space)'));
     sb.appendChild(sk('play',!paused&&simSpeed===1,()=>{paused=false;simSpeed=1;buildRail();},'Normal speed (1)'));
     sb.appendChild(sk('fast',!paused&&simSpeed===3,()=>{paused=false;simSpeed=3;buildRail();},'Fast (3)')); }
-  $('rail').appendChild(mk('blueprint',false,()=>showSupplyChain(),'The Line — supply-chain blueprint'));
-  $('rail').appendChild(mk('economy',false,()=>showEconomy(),'Economy — live rates & deficits'));
-  $('rail').appendChild(mk('rites',false,()=>showRites(),'Rites — spend Bones on upgrades'));
+  // The Line / Economy / Rites / Codex now live in the bottom-right economy panel; the rail keeps help/sound/options.
   $('rail').appendChild(mk('info',false,()=>showHelp(),'How to play'));
-  $('rail').appendChild(mk('codex',false,()=>showCodex(),'Codex — what everything is'));
   $('rail').appendChild(mk(SND.muted?'soundoff':'sound',!SND.muted,()=>{ SND.resume(); SND.toggleMute(); buildRail(); }, SND.muted?'Sound is off — click for sound':'Mute sound'));
   $('rail').appendChild(mk('options',false,()=>showOptions(),'Options'));
+}
+// live economy panel in the bottom-right half of the dock (fills the empty space; deeper views one tap away)
+function renderDockInfo(){ const el=$('dockinfo'); if(!el) return;
+  const rate={}; RES_ORDER.forEach(r=>rate[r]=0); let gw=0;
+  for(const b of buildings){ if(b.def.kind==="gather"&&b.workers.length) gw+=b.workers.length;
+    if(b.active&&b.def.recipe){ const t=b.def.recipe.time; for(const r in b.def.recipe.in)rate[r]-=b.def.recipe.in[r]/t; for(const r in b.def.recipe.out)rate[r]+=b.def.recipe.out[r]/t; } }
+  rate.dead=(rate.dead||0)+gw*0.8;
+  const key=['dead','compute','power','soulash','ashwood','silica'];
+  const chip=(r)=>{ const nr=rate[r]||0, have=Math.floor(G.stock[r]||0);
+    if((r==='ashwood'||r==='silica')&&have<=0&&Math.abs(nr)<0.01) return '';   // hide the new mats until they matter
+    const col=nr>0.01?'#7d8a5a':nr<-0.01?'#9e3b2c':'var(--ink-dim)';
+    return `<div class="erow" title="${RES[r].name} — click for detail" onclick="showResInfo('${r}')">${ricon(r,14)}<span class="en">${RES[r].name.split(' ')[0]}</span><span class="ev">${have}</span><span class="er" style="color:${col}">${nr>0?'+':''}${nr.toFixed(1)}</span></div>`; };
+  let gA=0,gN=0,rA=0,rN=0; for(const b of buildings){ if(b.def.kind==='gather'){gN++;if(b.active)gA++;} else if(b.def.kind==='refine'||b.def.kind==='datacenter'){rN++;if(b.active)rA++;} }
+  const q=G.quota||{level:1};
+  el.innerHTML=`<div class="dih"><span>Foundry economy</span><span class="dlink" onclick="showEconomy()">full ledger →</span></div>
+    <div class="egrid">${key.map(chip).join('')}</div>
+    <div class="diline">Gatherers <b>${gA}/${gN}</b> &middot; Refiners <b>${rA}/${rN}</b>${modeCfg().quota?` &middot; Tithe <b>${q.level}/${WIN_LEVEL}</b>`:''}</div>
+    <div class="dibtns">
+      <span class="dbtn" onclick="showSupplyChain()">The Line</span>
+      <span class="dbtn" onclick="showEconomy()">Rates</span>
+      <span class="dbtn" onclick="showRites()">Rites</span>
+      <span class="dbtn" onclick="showCodex()">Codex</span>
+    </div>`;
 }
 
 /* build menu */
@@ -1267,6 +1309,7 @@ function buildDock(){
     card.title=def.name+". "+def.desc;   // hover (after the browser's delay) shows the full description
     card.onclick=()=>selectBuildKind(k);
     row.appendChild(card); }
+  if(typeof renderDockInfo==="function") renderDockInfo();
 }
 function setHint(t){ const h=$('hint'); if(t){h.textContent=t;h.style.display='block';} else h.style.display='none'; }
 
