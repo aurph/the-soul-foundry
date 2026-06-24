@@ -702,25 +702,29 @@ function makeProcVillager(caste){
     for(let i=0;i<3;i++){ const a=rr(0,6.28); const rt=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.1,rr(0.22,0.38),5),bark); rt.position.set(Math.cos(a)*0.44,0.07,Math.sin(a)*0.44); rt.rotation.set(rr(0.9,1.3),a,0); g.add(rt); }
     g.userData.arms=[aL,aR]; g.userData.carryTop=true; g.scale.setScalar(1.0);
   } else if(caste==="reaper"){
-    // a little grim reaper: a hooded SHROUD draped OVER the body, skull peeking from the hood, bony hands on a scythe-staff
-    const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(0.16,0),pale); skull.position.set(0,1.14,0.04); g.add(skull);
-    const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.07,0.13),pale); jaw.position.set(0,1.04,0.06); g.add(jaw);
-    eye(-0.055,1.16,0.17); eye(0.055,1.16,0.17);
-    const nose=new THREE.Mesh(new THREE.BoxGeometry(0.025,0.045,0.035),dk); nose.position.set(0,1.1,0.18); g.add(nose);
-    // the shroud: a robe that drapes over the shoulders down to the ground (body-centered, covers the skeleton)
-    const robe=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.46,1.18,9),cloth); robe.position.y=0.59; g.add(robe);
-    const shoulders=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.18,0.26,9),cloth); shoulders.position.y=1.0; g.add(shoulders);
-    // hood OVER the skull, opening at the face
-    const hood=new THREE.Mesh(new THREE.ConeGeometry(0.26,0.46,9),cloth); hood.position.set(0,1.2,-0.02); g.add(hood);
-    const hoodBack=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.34,0.16),cloth); hoodBack.position.set(0,1.16,-0.12); g.add(hoodBack);
-    // a scythe-staff with bony hands gripping it
-    const staff=new THREE.Mesh(new THREE.CylinderGeometry(0.026,0.036,1.55,6),bark); staff.position.set(0.34,0.76,0.12); staff.rotation.z=0.12; g.add(staff);
-    const blade=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.34,0.1),pale); blade.position.set(0.45,1.46,0.12); blade.rotation.z=-0.9; g.add(blade);
-    const hand1=new THREE.Mesh(new THREE.IcosahedronGeometry(0.055,0),pale); hand1.position.set(0.31,0.98,0.13); g.add(hand1);
-    const hand2=new THREE.Mesh(new THREE.IcosahedronGeometry(0.05,0),pale); hand2.position.set(0.36,0.66,0.12); g.add(hand2);
-    const lL=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.024,0.26,5),pale); lL.position.set(-0.08,0.13,0.02); g.add(lL);
-    const lR=lL.clone(); lR.position.x=0.08; g.add(lR);
-    g.userData.legs=[lL,lR]; g.userData.robe=robe; g.scale.setScalar(0.98);
+    // a THIN grim-reaper skeleton under a simple hood — a visible skull/spine/ribs, stick limbs, a scythe. NOT a caped vampire.
+    const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(0.15,0),pale); skull.position.set(0,1.18,0.03); g.add(skull);
+    const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.12),pale); jaw.position.set(0,1.09,0.05); g.add(jaw);
+    eye(-0.05,1.2,0.15); eye(0.05,1.2,0.15);
+    const nose=new THREE.Mesh(new THREE.BoxGeometry(0.022,0.04,0.03),dk); nose.position.set(0,1.14,0.16); g.add(nose);
+    // a small hood/cowl over the skull, with a short drape down the back only (not the body)
+    const hood=new THREE.Mesh(new THREE.ConeGeometry(0.2,0.34,8),cloth); hood.position.set(0,1.32,-0.03); g.add(hood);
+    const cowl=new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.19,0.16,8),cloth); cowl.position.set(0,1.15,-0.04); g.add(cowl);
+    const drape=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.42,0.05),cloth); drape.position.set(0,0.92,-0.13); drape.rotation.x=-0.12; g.add(drape);
+    // exposed thin skeleton: spine, ribs, pelvis
+    const spine=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.64,6),pale); spine.position.set(0,0.75,0); g.add(spine);
+    for(let i=0;i<4;i++){ const w=0.22-i*0.04; const rib=new THREE.Mesh(new THREE.BoxGeometry(w,0.025,0.025),pale); rib.position.set(0,0.97-i*0.12,0.04); g.add(rib); }
+    const pelvis=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.08,0.08),pale); pelvis.position.set(0,0.46,0); g.add(pelvis);
+    // a free thin arm + a scythe-staff in a bony hand
+    const aL=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.018,0.5,5),pale); aL.position.set(-0.14,0.8,0.02); aL.rotation.z=0.28; g.add(aL);
+    const staff=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.03,1.5,6),bark); staff.position.set(0.28,0.74,0.1); staff.rotation.z=0.1; g.add(staff);
+    const blade=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.3,0.09),pale); blade.position.set(0.38,1.42,0.1); blade.rotation.z=-0.9; g.add(blade);
+    const armR=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.018,0.42,5),pale); armR.position.set(0.15,0.86,0.06); armR.rotation.z=-0.6; g.add(armR);
+    const hand=new THREE.Mesh(new THREE.IcosahedronGeometry(0.045,0),pale); hand.position.set(0.27,0.96,0.1); g.add(hand);
+    // thin legs
+    const lL=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.018,0.42,5),pale); lL.position.set(-0.07,0.22,0); g.add(lL);
+    const lR=lL.clone(); lR.position.x=0.07; g.add(lR);
+    g.userData.legs=[lL,lR]; g.userData.arms=[aL,armR]; g.scale.setScalar(0.98);
   } else {
     // worker: a small hunched husk, too-big droopy head, dim sad eyes (cute-pathetic) with a hint of exposed bone
     const body=new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.3,0.8,8),bark); body.position.y=0.76; body.rotation.x=0.24; g.add(body);  // hunched forward
@@ -1622,7 +1626,7 @@ const NODE={
 // buildings. kind: gather(harvests nodes of nodeType) | refine(recipe) | hearth | den | ward | market | datacenter | stockpile
 const BLD={
   pyre:{name:"The Binding Pyre",kind:"bind",cost:{},foot:2.4,workers:0,
-    desc:"The engine's fire. Bind a fresh husk here from a corpse and a little Compute. Without husks, nothing moves."},
+    desc:"The engine's old server-altar. It re-reads a dead mind's leftover imprint off the racks and binds it into a husk, for a body and a little Compute. Without husks, nothing moves."},
   den:{name:"Bone Den",kind:"den",cost:{dead:16},foot:1.8,workers:0,houses:4,
     desc:"Shelters bound husks and raises how many the engine can hold at once."},
   exhumer:{name:"Grave-Exhumer",kind:"gather",nodeType:"grave",res:"dead",cost:{dead:6},foot:1.6,workers:3,
@@ -2088,24 +2092,19 @@ function makeDatacenter(def){ const g=new THREE.Group();
   const spire=new THREE.Mesh(new THREE.ConeGeometry(0.2,1.0,5),bone); spire.position.set(0,3.15,0); g.add(spire);
   g.userData.glow=corebox; g.userData.spin=fans;
   return g; }
-// Bone Den — a ramshackle stick hovel: crooked lashed poles, a sagging tattered hide, gaps,
-// a faint ember glow where a husk shelters, and a skull tied on. Poor and dilapidated, not a tidy tomb.
+// Bone Den — a real little shelter: a plank base, a clean A-frame with a patched hide lean-to roof,
+// a doorway with a faint teal data-glow inside (a husk rests on a dim server-cradle), a skull. Lived-in, not a ruin.
 function makeDen(def){ const g=new THREE.Group();
-  const stick=MAT(0x241c12), stick2=MAT(0x2c2317), bone=MAT(0xb3a98f), hide=MAT(0x2e271d), ember=emis(0xc9772a);
-  // crooked leaning poles lashed into a collapsing frame (no solid walls)
-  const poles=[[-0.62,-0.5,0.16,0.08],[0.58,-0.55,-0.18,0.1],[-0.5,0.55,0.1,-0.16],[0.62,0.48,-0.12,-0.1],[0.04,-0.72,0.04,0.14],[-0.72,0.06,0.24,0.0],[0.7,0.12,-0.22,0.04]];
-  for(const [px,pz,rz,rx] of poles){ const h=1.1+Math.abs(px)*0.35+Math.abs(pz)*0.2; const p=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.06,h,5),px<0?stick:stick2); p.position.set(px,h*0.45,pz); p.rotation.set(rx,0.2,rz); g.add(p); }
-  // a leaning ridge pole + a couple of sagging cross-sticks
-  const ridge=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.05,1.5,5),stick); ridge.rotation.set(0.07,0.3,Math.PI/2); ridge.position.set(-0.05,1.15,0); g.add(ridge);
-  for(let i=0;i<2;i++){ const cross=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.028,1.0,4),stick2); cross.rotation.set(0,0.5*i-0.2,1.25+0.15*i); cross.position.set(-0.2+i*0.45,0.82,-0.05+i*0.2); g.add(cross); }
-  // tattered hide draped over part of the frame — sagging, leaving gaps
-  const drape=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.05,0.85),hide); drape.position.set(-0.18,0.96,-0.12); drape.rotation.set(-0.2,0.1,0.14); g.add(drape);
-  const drape2=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.05,0.5),hide); drape2.position.set(0.42,0.66,0.32); drape2.rotation.set(0.22,-0.25,-0.16); g.add(drape2);
-  // a low crooked doorway gap with a faint ember glow (a husk shelters within)
-  const glow=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.4,0.04),ember); glow.material.emissiveIntensity=0.32; glow.position.set(0.05,0.34,0.18); glow.rotation.z=0.07; g.add(glow);
-  // a skull tied to a pole + a couple of cord lashings
-  const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(0.12,0),bone); skull.position.set(-0.56,0.92,0.18); skull.rotation.set(0.2,0.4,0.1); g.add(skull);
-  for(const [lx,ly,lz] of [[-0.6,0.72,-0.46],[0.5,0.66,0.5]]){ const lash=new THREE.Mesh(new THREE.TorusGeometry(0.07,0.014,4,8),bone); lash.position.set(lx,ly,lz); lash.rotation.x=1.2; g.add(lash); }
+  const wood=MAT(0x2b2318), dark=MAT(0x14100a), bone=MAT(0xb3a98f), hide=MAT(0x33291c), teal=emis(0x5fae9b), ember=emis(0xc9772a);
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.6,1.3),wood); wall.position.y=0.3; g.add(wall);
+  for(const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){ const p=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.05,1.2,5),wood); p.position.set(sx*0.62,0.85,sz*0.5); p.rotation.set(sz*0.1,0,-sx*0.28); g.add(p); }
+  const ridge=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,1.5,5),wood); ridge.rotation.set(0,0,Math.PI/2); ridge.position.set(0,1.35,0); g.add(ridge);
+  const roofL=new THREE.Mesh(new THREE.BoxGeometry(0.85,0.05,1.5),hide); roofL.position.set(-0.32,1.05,0); roofL.rotation.z=0.5; g.add(roofL);
+  const roofR=new THREE.Mesh(new THREE.BoxGeometry(0.85,0.05,1.5),hide); roofR.position.set(0.32,1.05,0); roofR.rotation.z=-0.5; g.add(roofR);
+  const door=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.55,0.08),dark); door.position.set(0,0.32,0.66); g.add(door);
+  const glow=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.4,0.04),teal); glow.material.emissiveIntensity=0.4; glow.position.set(0,0.3,0.62); g.add(glow);
+  for(let i=0;i<2;i++){ const ln=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.03,0.02),ember); ln.material.emissiveIntensity=0.4; ln.position.set(-0.3+i*0.6,0.2,0.67); g.add(ln); }
+  const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(0.12,0),bone); skull.position.set(0,1.02,0.55); g.add(skull);
   g.userData.glow=glow;
   return g; }
 // Grave-Exhumer — a winch over an open grave: a dirt mound + pit, an A-frame, a bucket that bobs as it digs, a headstone.
@@ -2169,15 +2168,21 @@ function makeBuildingMesh(kind,def){
   if(bldBank[kind]) return makeBuildingGLB(kind,def);
   const g=new THREE.Group(); const stone=MAT(0x35332e), timber=MAT(0x2b251c), iron=MAT(0x1c1f22,{metalness:0.3}), win=emis(0xe8973a);
   const f=def.foot;
-  if(kind==="pyre"){ const base=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.75,0.5,10),MAT(0x2a2620)); base.position.y=0.25; g.add(base);
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.35,0.3,6,12),MAT(0x1c1914)); ring.rotation.x=Math.PI/2; ring.position.y=0.5; g.add(ring);
-    for(let i=0;i<4;i++){ const lg=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,1.5,5),MAT(0x130e0a)); lg.position.set(Math.cos(i*1.57)*0.4,0.55,Math.sin(i*1.57)*0.4); lg.rotation.set(0,i*1.57,0.95); g.add(lg); }
+  if(kind==="pyre"){
+    // The Binding Pyre is a server-altar: the engine re-reads a dead mind's residual imprint off its old
+    // racks and binds it into a husk. A glowing data-core replaces the campfire (still pulses via ud.flame).
+    const metal=MAT(0x20242a,{metalness:0.5,roughness:0.5}), dark=MAT(0x121419,{metalness:0.4}), bone=MAT(0xb3a98f);
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.7,0.5,10),dark); base.position.y=0.25; g.add(base);
+    for(let i=0;i<8;i++){ const a=i/8*6.28; const rack=new THREE.Mesh(new THREE.BoxGeometry(0.45,1.0,0.25),metal); rack.position.set(Math.cos(a)*1.15,0.6,Math.sin(a)*1.15); rack.rotation.y=-a; g.add(rack);
+      const ln=new THREE.Mesh(new THREE.BoxGeometry(0.36,0.5,0.02),new THREE.MeshBasicMaterial({color:0x6fae9b,fog:false})); ln.position.set(Math.cos(a)*1.27,0.6,Math.sin(a)*1.27); ln.rotation.y=-a; g.add(ln); }
+    for(let i=0;i<4;i++){ const a=i/4*6.28+0.4; const post=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,1.6,6),bone); post.position.set(Math.cos(a)*1.5,0.8,Math.sin(a)*1.5); g.add(post);
+      const sk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.13,0),bone); sk.position.set(Math.cos(a)*1.5,1.7,Math.sin(a)*1.5); g.add(sk); }
     const flame=new THREE.Group(); flame.position.y=0.55; g.add(flame);
-    const f1=new THREE.Mesh(new THREE.ConeGeometry(0.55,1.5,7),new THREE.MeshBasicMaterial({color:0xd9531f,fog:false})); f1.position.y=0.75; flame.add(f1);
-    const f2=new THREE.Mesh(new THREE.ConeGeometry(0.34,1.05,6),new THREE.MeshBasicMaterial({color:0xe8902a,fog:false})); f2.position.y=0.55; flame.add(f2);
-    const f3=new THREE.Mesh(new THREE.ConeGeometry(0.15,0.6,5),new THREE.MeshBasicMaterial({color:0xf4d652,fog:false})); f3.position.y=0.38; flame.add(f3);
-    g.userData.flame=flame; g.userData.tongues=[f1,f2,f3];
-    const L=new THREE.PointLight(0xff7a2a,2.8,42,2); L.position.y=2.2; g.add(L); g.userData.light=L; }
+    const c1=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.34,1.3,8),new THREE.MeshBasicMaterial({color:0x2f6f78,fog:false})); c1.position.y=0.65; flame.add(c1);
+    const c2=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.2,1.5,7),new THREE.MeshBasicMaterial({color:0x6fae9b,fog:false})); c2.position.y=0.75; flame.add(c2);
+    const c3=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.22,0.22),new THREE.MeshBasicMaterial({color:0xe8d24a,fog:false})); c3.position.y=1.55; flame.add(c3);
+    g.userData.flame=flame; g.userData.tongues=[c1,c2,c3];
+    const L=new THREE.PointLight(0x5fae9b,2.4,42,2); L.position.y=2.2; g.add(L); g.userData.light=L; }
   else if(kind==="den"){ const base=new THREE.Mesh(new THREE.BoxGeometry(f,1.3,f),timber); base.position.y=0.65; g.add(base);
     const roof=new THREE.Mesh(new THREE.ConeGeometry(f*0.9,1.0,4),MAT(0x1d1a14)); roof.position.y=1.7; roof.rotation.y=Math.PI/4; g.add(roof);
     const w=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.06),win); w.material.emissiveIntensity=0.5; w.position.set(0,0.8,f/2+0.01); g.add(w); }
