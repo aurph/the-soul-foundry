@@ -1690,7 +1690,7 @@ function optMusic(v){ SND.resume(); SND.setMusicVol(v/100); }
 function optSfx(v){ SND.resume(); SND.setSfxVol(v/100); SND.sfx('click'); }
 function optGrain(v){ setGrain(v/100); }
 function optMute(c){ SND.resume(); if(SND.muted!==c)SND.toggleMute(); buildRail(); }
-function newValley(){ try{ localStorage.removeItem('sf_save'); }catch(e){} location.reload(); }
+function newValley(){ _abandoning=true; try{ localStorage.removeItem('sf_save'); }catch(e){} location.reload(); }
 
 /* staged tutorial: quiet objectives that advance as the player learns the loop */
 function hasB(k){ return buildings.some(b=>b.kind===k); }
@@ -1906,7 +1906,8 @@ function start(){
   });
 }
 function beginPlay(){ paused=false; if(typeof buildRail==="function")buildRail(); }
-addEventListener('beforeunload',()=>{ try{ if(!G.over && shouldAutosave()) saveGame(); }catch(e){} });
+let _abandoning=false;   // set by newValley() so the autosave below can't re-write the save we just cleared
+addEventListener('beforeunload',()=>{ try{ if(!_abandoning && !G.over && shouldAutosave()) saveGame(); }catch(e){} });
 // messages linger on-screen (~9s) and stack, so a notice never flashes past before you can read it.
 // Keep only the last few visible at once so the column stays tidy in the open space.
 function toast(msg,type){ const wrap=$('toasts'); if(!wrap) return;
