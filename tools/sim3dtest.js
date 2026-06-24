@@ -504,7 +504,7 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   const gd=T.placeNode("grave",12,0); gd.amount=gd.max;        // a full grave keeps the +12 ground dreadful
   const fuClean=T.placeBuildingFree("furnace",-12,0), fuDread=T.placeBuildingFree("furnace",12,0);
   for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-12,2,"worker"),fuClean); T.assignHusk(T.spawnVillager(12,2,"worker"),fuDread); }
-  for(let st=0;st<30*220;st++){ T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; gd.amount=gd.max; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  for(let st=0;st<30*220;st++){ T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.power=100000; T.G.stock.ingot=0; gd.amount=gd.max; T.stepHusks(1/30); T.stepEconomy(1/30); }
   ok("placement matters: a Furnace mired in Dread out-produced by one on clean ground", fuClean.cyc>fuDread.cyc,
      "clean cyc="+fuClean.cyc+" in-dread cyc="+fuDread.cyc+" dread@furnace="+T.dreadAt(12,0).toFixed(1));
   T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
@@ -568,7 +568,7 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.placeBuildingFree("stockpile",-9,0); T.placeBuildingFree("stockpile",9,0);   // a hub by each furnace so crews tend (not walk) most of the time
   const fuR=T.placeBuildingFree("furnace",-9,0), fuW=T.placeBuildingFree("furnace",9,0);   // furnace: workers have the affinity edge (1.05 vs 0.95)
   for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-9,2,"reaper"),fuR); T.assignHusk(T.spawnVillager(9,2,"worker"),fuW); }
-  for(let st=0;st<30*220;st++){ T.loadDreadField(full); T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  for(let st=0;st<30*220;st++){ T.loadDreadField(full); T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.power=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
   ok("caste x Dread: a Reaper crew out-works a Worker crew in heavy Dread", fuR.cyc>fuW.cyc, "reaper-crew cyc="+fuR.cyc+" worker-crew cyc="+fuW.cyc);
   T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
@@ -636,7 +636,7 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
     T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0; T.G.tech= salt?{salt:true}:{};
     T.placeBuildingFree("stockpile",0,0); const fu=T.placeBuildingFree("furnace",0,0);
     for(let i=0;i<3;i++) T.assignHusk(T.spawnVillager(0,2,"worker"),fu);
-    for(let st=0;st<30*120;st++){ T.loadDreadField(full); T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+    for(let st=0;st<30*120;st++){ T.loadDreadField(full); T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.power=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
     return fu.cyc; };
   ok("dreadGuard is <1 with the Grave-Salt rite, 1 without", (()=>{ T.G.tech={salt:true}; const a=T.dreadGuard(); T.G.tech={}; const b=T.dreadGuard(); return a<1 && b===1; })(), "guard");
   const noSalt=cyc(false), withSalt=cyc(true);

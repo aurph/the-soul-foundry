@@ -1292,6 +1292,7 @@ function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.clas
   else if((G.stock.soulash||0)<=0.5) msg="Your husks are weakening — they run on soul-ash and you have none. Staff a Crematory to render the dead into soul-ash.";
   else if(!buildings.some(b=>b.def.kind==="gather"&&b.workers.length>0)) msg="Nothing feeds the line. Raise a Grave-Exhumer on a cemetery and staff it to bring in the dead.";
   else if(!buildings.some(b=>b.kind==="crematory"&&b.workers.length>0)) msg="The dead pile up unrendered. Staff a Crematory — rendering them is what holds the backlog (Dread) down.";
+  else if(buildings.some(b=>(b.def.kind==="refine"||b.def.kind==="datacenter")&&b.def.recipe&&b.def.recipe.in.power&&b.workers.length>0) && (G.stock.power||0)<1 && !buildings.some(b=>b.kind==="substation"&&b.workers.length>0)) msg="Your refiners are starved of Power — they need it to run. Raise a Substation and staff it; it burns soul-ash into Power.";
   else if(G.dread>=75) msg="Dread is near breaching. Render the dead faster and raise Ward Obelisks, or the backlog overruns you.";
   else if(hotBld) msg="The unrendered dead pool around your "+hotBld.def.name+" and slow its work. Render the backlog, raise a Ward beside it, or post Reapers — they shrug off the haze.";
   else if(pop>0 && assigned===0) msg="Your husks stand idle. Tap a building and press + assign to put them to work.";
@@ -1665,7 +1666,7 @@ function showHelp(){ showOverlayHTML(`<h1 style="font-size:24px">THE SOUL FOUNDR
   <p><b>How to play:</b><br>
   • <b>Exhume the dead</b> — raise a Grave-Exhumer on a cemetery (or a Waste-Dredge on the wastes) and staff it.<br>
   • <b>Gather build stock</b> — an Ashwood Camp strips ashwood from the dead stands (frames your dens, yards and wards); a Silica Excavator bores silica from a seam (it only stands on a seam) for the Datacenter.<br>
-  • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Etch-Litho → Assembly Ossuary → Datacenter renders the dead into Compute; Substations make the Power the datacenters need. Tap a building, press <b>+ assign</b> to staff it.<br>
+  • <b>Render &amp; refine</b> — Crematory → Furnace → Mill → Etch-Litho → Assembly Ossuary → Datacenter renders the dead into Compute. <b>Power is the lifeblood</b>: every refiner past the Crematory runs on it, so raise <b>Substations</b> early (they burn soul-ash into Power) and add more as you grow. Tap a building, press <b>+ assign</b> to staff it.<br>
   • <b>Bind husks</b> at the Binding Pyre (${BIND_COST.worker.dead} corpses + ${BIND_COST.worker.compute} Compute) to grow your workforce. Soul-ash keeps them from crumbling.<br>
   • The valley lies under a <b>shroud</b> of unrendered dark. Raise buildings to push the engine's reach outward and uncover new ground to work.<br>
   • Deliver the <b>Quota</b> of Compute each tithe; let the dead pile up unrendered and <b>Dread</b> (the backlog) overruns you. Raise <b>Ward Obelisks</b> to hold it back.<br>
@@ -1762,16 +1763,16 @@ const TUT=[
    why:"The Exhumer works the cemetery next to it and hauls the dead to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), mkb:'exhumer', sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Crematory and staff it.",
    why:"It renders corpses into bone-silica, soul-ash and ichor, and rendering the dead is what holds the backlog (Dread) down. The dead you leave lying out pool as a Dread haze (a dark stain on the ground) that slows whatever stands in it — render them, or raise a Ward. Soul-ash is also your husks' upkeep — keep a little flowing or they weaken and crumble.", d:()=>worked("crematory"), sel:bldTarget('crematory')},
-  {t:"Open the REFINING tab and raise a Soul Furnace, then staff it.",
-   why:"Bone-silica + soul-ash → a silicon ingot.", d:()=>worked("furnace"), sel:bldTarget('furnace')},
+  {t:"Open the REFINING tab and raise a SUBSTATION, then staff it. Almost everything runs on Power.",
+   why:"The Substation burns soul-ash into Power — the Furnace, Mill, Etch-Litho, Ossuary and Datacenter all need Power to run. Raise more Substations as your foundry grows hungrier.", d:()=>worked("substation"), sel:bldTarget('substation')},
+  {t:"Raise a Soul Furnace and staff it.",
+   why:"Bone-silica + Power → a silicon ingot.", d:()=>worked("furnace"), sel:bldTarget('furnace')},
   {t:"Raise a Wafer Mill and staff it.",
    why:"The ingot is sliced into wafers.", d:()=>worked("mill"), sel:bldTarget('mill')},
   {t:"Raise an Etch-Litho and staff it.",
    why:"Wafers are etched into dies — the circuits.", d:()=>worked("litho"), sel:bldTarget('litho')},
   {t:"Raise an Assembly Ossuary and staff it.",
-   why:"Dies + soul-ash are packaged into reliquary cores — the chips.", d:()=>worked("ossuary"), sel:bldTarget('ossuary')},
-  {t:"Raise a Substation and staff it — the datacenters need Power.",
-   why:"Soul-ash burns into Power. No power, no Compute.", d:()=>worked("substation"), sel:bldTarget('substation')},
+   why:"Etched dies are packaged into reliquary cores — the chips. (Runs on Power.)", d:()=>worked("ossuary"), sel:bldTarget('ossuary')},
   {t:"Raise a Silica Excavator on a silica seam (the pale crystals the glow marks) and staff it.",
    why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), mkb:'excavator', sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
   {t:"Raise a Spectral Datacenter and staff it.",
@@ -2025,20 +2026,20 @@ const BLD={
   excavator:{name:"Silica Excavator",kind:"gather",nodeType:"silica",res:"silica",lockNode:"silica",cost:{dead:18,ashwood:8},foot:2.0,workers:3,
     desc:"A bore-rig that bites raw silica from a seam for the fab. It can only stand on a silica seam — nowhere else."},
   crematory:{name:"Crematory",kind:"refine",cost:{dead:14},foot:2.0,workers:3,dread:0,render:true,
-    recipe:{in:{dead:2},out:{bonesil:1,soulash:1,ichor:1},time:3.0},
+    recipe:{in:{dead:2},out:{bonesil:1,soulash:2,ichor:1},time:3.0},
     desc:"Renders the dead into bone-silica, soul-ash and ichor. Rendering them is also what holds the backlog down."},
   furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4},foot:2.0,workers:3,dread:0.4,
-    recipe:{in:{bonesil:2,soulash:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica and soul-ash into a silicon ingot."},
+    recipe:{in:{bonesil:2,power:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica into a silicon ingot. Runs on Power."},
   mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6},foot:2.0,workers:3,dread:0.5,
-    recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers."},
+    recipe:{in:{ingot:1,power:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers. Runs on Power."},
   litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
-    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer."},
+    recipe:{in:{wafer:1,power:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer. Runs on Power."},
   ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10},foot:2.2,workers:4,dread:0.8,
-    recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores."},
+    recipe:{in:{die:1,power:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores. Runs on Power."},
   substation:{name:"Substation",kind:"refine",cost:{dead:16,soulash:4},foot:1.8,workers:2,dread:0.5,
-    recipe:{in:{soulash:1},out:{power:2},time:3.0},desc:"Burns soul-ash for Power. The datacenters are starving for it."},
+    recipe:{in:{soulash:1},out:{power:3},time:2.6},desc:"Burns soul-ash into Power — the lifeblood every refiner and datacenter runs on. Raise these early and often."},
   datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:46,soulash:18,silica:8},foot:2.6,workers:5,dread:1.2,
-    recipe:{in:{core:1,power:1,ichor:1},out:{compute:3},time:4.6},desc:"Cores, Power and Ichor render into Compute, the tithe the engine demands."},
+    recipe:{in:{core:1,power:2,ichor:1},out:{compute:3},time:4.6},desc:"Cores, Power and Ichor render into Compute, the tithe the engine demands. Power-hungry."},
   ward:{name:"Ward Obelisk",kind:"ward",cost:{dead:14,soulash:8,ashwood:6},foot:1.4,workers:0,ward:14,
     desc:"Burns back the Dread haze in a circle around it (14u). Buildings and husks inside the ring work and hold up as if the dead weren't piled there. Place it where the haze is worst, or to shield a refiner you can't move."},
   market:{name:"Black Market",kind:"market",cost:{dead:16,ashwood:8},foot:1.8,workers:1,
