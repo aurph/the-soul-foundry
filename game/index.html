@@ -980,7 +980,7 @@ function showGrid(on){ ensureGrid(); if(gridHelper)gridHelper.visible=on; if(!on
 function updateGhost(sx,sy){ if(sx!=null){ lastPtr.x=sx; lastPtr.y=sy; }
   if(!placeKind||!BLD[placeKind]||BLD[placeKind].kind==='path'){ if(ghostMesh)ghostMesh.visible=false; clearGhostModel(); return; }
   ensureGrid(); const p=groundPoint(lastPtr.x,lastPtr.y); if(!p){ if(ghostMesh)ghostMesh.visible=false; if(ghostModel)ghostModel.visible=false; return; }
-  const gx=snapG(p.x), gz=snapG(p.z), def=BLD[placeKind], okPlace=buildingFits(gx,gz,def.foot)&&canAfford(def.cost);
+  const gx=snapG(p.x), gz=snapG(p.z), def=BLD[placeKind], okPlace=buildingFits(gx,gz,def.foot)&&nodeLockOk(def,gx,gz)&&canAfford(def.cost);
   const f=def.foot*1.8; ghostMesh.scale.set(f,1,f); ghostMesh.position.set(gx,terrainHeight(gx,gz)+0.04,gz);
   if(ghostMesh.material&&ghostMesh.material.color&&ghostMesh.material.color.setHex) ghostMesh.material.color.setHex(okPlace?0x6f8a4a:0x9e3b2c);
   ghostMesh.visible=true;
@@ -990,8 +990,10 @@ function pickAt(sx,sy){
   ndc.x=(sx/innerWidth)*2-1; ndc.y=-(sy/innerHeight)*2+1; ray.setFromCamera(ndc,camera);
   if(placeKind){ const p=groundPoint(sx,sy); if(!p) return;
     if(BLD[placeKind].kind==='path'){ addPath(p.x,p.z); renderLedger(); return; }
-    const b=placeBuilding(placeKind,snapG(p.x),snapG(p.z));   // snap buildings to the grid
+    const gx=snapG(p.x), gz=snapG(p.z), pdef=BLD[placeKind];
+    const b=placeBuilding(placeKind,gx,gz);   // snap buildings to the grid
     if(b){ b.mesh.rotation.y=placeRot; SND.sfx('place'); renderLedger(); buildDock(); toast("Raising the "+BLD[placeKind].name+"…"); if(!canAfford(BLD[placeKind].cost)){ placeKind=null; setHint(''); buildDock(); showGrid(false); } }
+    else if(pdef.lockNode && buildingFits(gx,gz,pdef.foot) && !nodeLockOk(pdef,gx,gz)){ SND.sfx('deny'); toast("The "+pdef.name+" can only stand on a "+(NODE[pdef.lockNode]?NODE[pdef.lockNode].name:pdef.lockNode)+".","bad"); }
     else { SND.sfx('deny'); toast("Can't build there — too close to something, or off the valley.","bad"); }
     return; }
   const vh=ray.intersectObjects(villagers.filter(v=>!v.dead).map(v=>v.obj),true);
@@ -1050,13 +1052,16 @@ const STAT_HELP={
   husks:"The bound dead who work the foundry. Also your population cap. Bind more at the Pyre. If they all crumble, the run ends.",
   dread:"The backlog of unrendered dead. It rises as bodies pile up. Render them at the Crematory and raise Wards to hold it down. Sustained 100% loses the run.",
   writ:"Bones. Your currency. Earned from tithes and the market, spent on Rites and trade." };
-const RES_HELP={ dead:"The remains of the extinct. Exhume them from graves and the wastes. Everything the foundry makes starts here.", bonesil:"Bone-silica. Smelted into ingots.",
+const RES_HELP={ dead:"The remains of the extinct. Exhume them from graves and the wastes. Everything the foundry makes starts here.",
+  ashwood:"Ashwood. Stripped from the dead stands by an Ashwood Camp. The crude early stock your dens, yards and wards are framed from.",
+  silica:"Raw silica. Bored from a seam by an Excavator, which can only stand on a seam. The fab buildings — mill, litho, datacenter — are cut from it.",
+  bonesil:"Bone-silica. Smelted into ingots.",
   soulash:"Soul-ash. Flux for the Furnace and Ossuary, and the upkeep your husks run on. Keep a little flowing or they weaken.", ichor:"Coolant for the datacenters.",
   ingot:"A silicon ingot. Sliced into wafers.", wafer:"A wafer. Etched into dies.",
   die:"An etched die. Packaged into cores.", core:"A reliquary core, the chip itself. Rendered into Compute.",
   power:"The datacenters run on it.", compute:"What the engine demands each tithe. Deliver it, or the backlog drowns you." };
 // ---- custom icon helpers + resource codex (no emoji, everything explainable) ----
-function ricon(r,s){ s=s||18; return `<img class="ic" src="assets/ui/res/${r}.png" style="width:${s}px;height:${s}px">`; }
+function ricon(r,s){ s=s||18; return `<img class="ic" src="assets/ui/res/${r}.png" onerror="this.onerror=null;this.src='assets/ui/glyph/gathering.png'" style="width:${s}px;height:${s}px">`; }
 function gicon(n,s){ s=s||24; return `<img src="assets/ui/glyph/${n}.png" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle">`; }
 function resMadeBy(r){ const m=[]; for(const k of BLD_ORDER){ const d=BLD[k]; if(d.recipe&&d.recipe.out&&d.recipe.out[r])m.push(d.name); if(d.kind==='gather'&&d.res===r)m.push(d.name); } return m; }
 function resUsedBy(r){ const u=[]; for(const k of BLD_ORDER){ const d=BLD[k]; if(d.recipe&&d.recipe.in&&d.recipe.in[r])u.push(d.name); if(d.kind==='bind'&&r==='dead')u.push(d.name); } return u; }
@@ -1093,7 +1098,7 @@ function renderLedger(){
     +chip(Math.round(G.dread)+"%","Dread",G.dread>55?'#9e3b2c':'#7d8a5a',STAT_HELP.dread,"showStatInfo('dread')")
     +`<div class="stat resstat" title="Bones — your currency. Click to trade." onclick="showShop()">${ricon('bones',17)}<span class="v" style="color:#e8c24a">${Math.floor(G.writ)}</span></div>`
     +`<div class="sep"></div>`;
-  const hideWhenEmpty=["bonesil","ingot","wafer","die","core"];
+  const hideWhenEmpty=["silica","bonesil","ingot","wafer","die","core"];
   for(const r of RES_ORDER){ const n=Math.floor(G.stock[r]||0); if(n<=0 && hideWhenEmpty.indexOf(r)>=0) continue;
     h+=`<div class="stat resstat" title="${RES[r].name} — click for details" onclick="showResInfo('${r}')">${ricon(r,17)}<span class="v">${n}</span></div>`; }
   $('ledger').innerHTML=h;
@@ -1215,7 +1220,7 @@ function buildRail(){
 /* build menu */
 // Age-of-Empires-style build hotkeys. Avoid the reserved keys: WASD/arrows pan, Q/E rotate
 // the camera, R rotates placement, Space/Esc/1-3 are taken.
-const BLD_HOTKEY={ exhumer:'X', dredge:'G', crematory:'C', furnace:'F', mill:'M', litho:'L', ossuary:'O',
+const BLD_HOTKEY={ exhumer:'X', dredge:'G', ashcamp:'H', excavator:'Z', crematory:'C', furnace:'F', mill:'M', litho:'L', ossuary:'O',
   substation:'U', datacenter:'T', den:'N', stockpile:'Y', ward:'V', market:'K', path:'B', pyre:'P' };
 const BUILD_HOTKEYS={}; for(const k in BLD_HOTKEY) BUILD_HOTKEYS['Key'+BLD_HOTKEY[k]]=k;
 // select a building for placement (shared by the dock cards and the keyboard hotkeys)
@@ -1617,7 +1622,7 @@ function placeBuildingFree(k,x,z){ const def=BLD[k]; ensureBuildingGLB(k); const
   scene.add(mesh); const b={kind:k,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0}; buildings.push(b); groundBuilding(b); return b; }
 function seedSettlement(){
   resetRunScore();
-  G.stock.dead=70; G.stock.soulash=16; G.stock.bonesil=8; G.stock.ichor=6; G.stock.compute=10;
+  G.stock.dead=70; G.stock.ashwood=14; G.stock.soulash=16; G.stock.bonesil=8; G.stock.ichor=6; G.stock.compute=10;
   placeBuildingFree("pyre",0,0);
   placeBuildingFree("den",7,4); placeBuildingFree("den",-7,4);
   placeBuildingFree("stockpile",0,-7);   // the hub — visible from the first moment
@@ -1702,53 +1707,61 @@ start();
    === CONFIG: resources, resource-node types, buildings ===
    ===================================================================== */
 const RES={
-  dead:{name:"Remains",col:0x8a8170}, bonesil:{name:"Bone-Silica",col:0xb9b0a0},
+  dead:{name:"Remains",col:0x8a8170}, ashwood:{name:"Ashwood",col:0x6b5436}, silica:{name:"Silica",col:0xcfd2d6},
+  bonesil:{name:"Bone-Silica",col:0xb9b0a0},
   soulash:{name:"Soul-Ash",col:0x8d8aa0}, ichor:{name:"Ichor",col:0x5fa0b0},
   ingot:{name:"Silicon Ingot",col:0x9aa0a8}, wafer:{name:"Wafer",col:0x6fae9b},
   die:{name:"Etched Die",col:0xb6c24a}, core:{name:"Reliquary Core",col:0xb25fae},
   power:{name:"Power",col:0xe8a23a}, compute:{name:"Compute",col:0xe8d24a},
 };
-const RES_ORDER=["dead","bonesil","soulash","ichor","ingot","wafer","die","core","power","compute"];
-// the dead are harvested from cemeteries and the corpse-wastes; everything else is rendered from them
+const RES_ORDER=["dead","ashwood","silica","bonesil","soulash","ichor","ingot","wafer","die","core","power","compute"];
+// the dead are harvested from cemeteries and the corpse-wastes; ashwood + silica are the early/fab
+// build stock pulled from tree stands and silica seams; everything else is rendered from the dead
 const NODE={
   grave:{name:"Cemetery",gives:["dead"],amount:[160],col:0x8a8170,renew:0.6},
   waste:{name:"Corpse-Waste",gives:["dead"],amount:[420],col:0x6b6256},
+  tree:{name:"Ashwood Stand",gives:["ashwood"],amount:[120],col:0x6b5436,renew:0.5},
+  silica:{name:"Silica Seam",gives:["silica"],amount:[260],col:0xcfd2d6},
 };
 // buildings. kind: gather(harvests nodes of nodeType) | refine(recipe) | hearth | den | ward | market | datacenter | stockpile
 const BLD={
   pyre:{name:"The Binding Pyre",kind:"bind",cost:{},foot:2.4,workers:0,
     desc:"The engine's old server-altar. It re-reads a dead mind's leftover imprint off the racks and binds it into a husk, for a body and a little Compute. Without husks, nothing moves."},
-  den:{name:"Bone Den",kind:"den",cost:{dead:16},foot:1.8,workers:0,houses:4,
-    desc:"Shelters bound husks and raises how many the engine can hold at once."},
+  den:{name:"Bone Den",kind:"den",cost:{dead:12,ashwood:4},foot:1.8,workers:0,houses:4,
+    desc:"Shelters bound husks and raises how many the engine can hold at once. Framed from ashwood."},
   exhumer:{name:"Grave-Exhumer",kind:"gather",nodeType:"grave",res:"dead",cost:{dead:6},foot:1.6,workers:3,
     desc:"Husks dig the cemeteries and drag up the dead."},
   dredge:{name:"Waste-Dredge",kind:"gather",nodeType:"waste",res:"dead",cost:{dead:12},foot:1.8,workers:3,
     desc:"Drags bodies in from the wastes. Farther out, but they run deep."},
+  ashcamp:{name:"Ashwood Camp",kind:"gather",nodeType:"tree",res:"ashwood",cost:{dead:6},foot:1.6,workers:2,
+    desc:"Husks strip ashwood from the dead stands — the foundry's first crude build stock. Sit it beside a stand."},
+  excavator:{name:"Silica Excavator",kind:"gather",nodeType:"silica",res:"silica",lockNode:"silica",cost:{dead:18,ashwood:8},foot:2.0,workers:3,
+    desc:"A bore-rig that bites raw silica from a seam for the fab. It can only stand on a silica seam — nowhere else."},
   crematory:{name:"Crematory",kind:"refine",cost:{dead:14},foot:2.0,workers:3,dread:0,render:true,
     recipe:{in:{dead:2},out:{bonesil:1,soulash:1,ichor:1},time:3.0},
     desc:"Renders the dead into bone-silica, soul-ash and ichor. Rendering them is also what holds the backlog down."},
   furnace:{name:"Soul Furnace",kind:"refine",cost:{dead:16,soulash:4},foot:2.0,workers:3,dread:0.4,
     recipe:{in:{bonesil:2,soulash:1},out:{ingot:1},time:3.4},desc:"Smelts bone-silica and soul-ash into a silicon ingot."},
-  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:20,soulash:6},foot:2.0,workers:3,dread:0.5,
-    recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers."},
-  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:22,bonesil:6},foot:2.0,workers:3,dread:0.6,
-    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer."},
-  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:30,soulash:10},foot:2.2,workers:4,dread:0.8,
+  mill:{name:"Wafer Mill",kind:"refine",cost:{dead:16,soulash:6,silica:4},foot:2.0,workers:3,dread:0.5,
+    recipe:{in:{ingot:1},out:{wafer:2},time:3.4},desc:"Slices the ingot into wafers. Its beds are cut from raw silica."},
+  litho:{name:"Etch-Litho",kind:"refine",cost:{dead:16,bonesil:6,silica:6},foot:2.0,workers:3,dread:0.6,
+    recipe:{in:{wafer:1},out:{die:1},time:3.8},desc:"Etches the circuit traces into each wafer. Needs clean silica to mask."},
+  ossuary:{name:"Assembly Ossuary",kind:"refine",cost:{dead:26,soulash:10,silica:6},foot:2.2,workers:4,dread:0.8,
     recipe:{in:{die:1,soulash:1},out:{core:1},time:4.2},desc:"Packages etched dies into reliquary cores."},
   substation:{name:"Substation",kind:"refine",cost:{dead:16,soulash:4},foot:1.8,workers:2,dread:0.5,
     recipe:{in:{soulash:1},out:{power:2},time:3.0},desc:"Burns soul-ash for Power. The datacenters are starving for it."},
-  datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:50,soulash:18},foot:2.6,workers:5,dread:1.2,
+  datacenter:{name:"Spectral Datacenter",kind:"datacenter",cost:{dead:46,soulash:18,silica:8},foot:2.6,workers:5,dread:1.2,
     recipe:{in:{core:1,power:1,ichor:1},out:{compute:3},time:4.6},desc:"Cores, Power and Ichor render into Compute, the tithe the engine demands."},
-  ward:{name:"Ward Obelisk",kind:"ward",cost:{dead:20,soulash:8},foot:1.4,workers:0,ward:14,
+  ward:{name:"Ward Obelisk",kind:"ward",cost:{dead:14,soulash:8,ashwood:6},foot:1.4,workers:0,ward:14,
     desc:"Holds the backlog of unrendered dead back across a wide radius."},
-  market:{name:"Black Market",kind:"market",cost:{dead:24},foot:1.8,workers:1,
+  market:{name:"Black Market",kind:"market",cost:{dead:16,ashwood:8},foot:1.8,workers:1,
     desc:"Trades surplus goods for Bones, and Bones for what you lack."},
-  stockpile:{name:"Reliquary Yard",kind:"stockpile",cost:{dead:18},foot:2.4,workers:0,store:140,
+  stockpile:{name:"Reliquary Yard",kind:"stockpile",cost:{dead:12,ashwood:6},foot:2.4,workers:0,store:140,
     desc:"The foundry's hub: gatherers deliver the dead here and refiners draw from it. Its piles rise and fall with your stores."},
   path:{name:"Bone Path",kind:"path",cost:{dead:1},foot:1,workers:0,
     desc:"Lay a path; click-drag to extend it. Husks move ~35% faster over paths."},
 };
-const BLD_ORDER=["pyre","den","path","exhumer","dredge","crematory","furnace","mill","litho","ossuary","substation","datacenter","stockpile","ward","market"];
+const BLD_ORDER=["pyre","den","path","exhumer","dredge","ashcamp","excavator","crematory","furnace","mill","litho","ossuary","substation","datacenter","stockpile","ward","market"];
 const TABS=[["dwell","Dwelling"],["gather","Gathering"],["refine","Refining"],["civic","Civic"]];
 function bldTab(k){ const d=BLD[k]; if(d.kind==="bind"||d.kind==="den")return"dwell"; if(d.kind==="gather")return"gather";
   if(d.kind==="refine"||d.kind==="datacenter")return"refine"; return"civic"; }
@@ -1796,6 +1809,22 @@ function makeNode(type){
         const bar=new THREE.Mesh(new THREE.BoxGeometry(rr(0.34,0.5),0.12,0.12),white); bar.position.set(x,ph*0.72,z); bar.rotation.y=ry; g.add(bar); }
       const mound=new THREE.Mesh(new THREE.SphereGeometry(rr(0.3,0.5),6,4,0,6.283,0,1.3),dirt); mound.scale.y=0.4; mound.position.set(x*0.6,0.16,z*0.6); g.add(mound); }
   }
+  else if(type==="tree"){ // ashwood stand: a tight grove of pale ash-barked snags + a couple of felled logs
+    const bark=MAT(0x7a6a52), wood=MAT(0x6b5436), dark=MAT(0x4a3d29), dirt=MAT(0x342c22);
+    const pad=new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.5,0.2,9),dirt); pad.position.y=0.1; g.add(pad);
+    for(let i=0;i<4+rint(3);i++){ const a=rr(0,6.28), d=rr(0.4,1.7), x=Math.cos(a)*d, z=Math.sin(a)*d, th=rr(1.8,3.6);
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.22,th,6),bark); trunk.position.set(x,th/2,z); trunk.rotation.set(rr(-0.12,0.12),rr(0,6),rr(-0.12,0.12)); g.add(trunk);
+      for(let b2=0;b2<2+rint(3);b2++){ const bl=rr(0.5,1.4); const br=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.08,bl,4),bark);
+        br.position.set(x,th*rr(0.55,0.95),z); br.rotation.set(rr(-1.2,1.2),rr(0,6),rr(-1.2,1.2)); g.add(br); } }
+    for(let i=0;i<2+rint(2);i++){ const log=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.2,rr(1.2,2.0),6),wood);
+      log.rotation.z=Math.PI/2; log.rotation.y=rr(0,6); log.position.set(rr(-1.3,1.3),0.2,rr(-1.3,1.3)); g.add(log);
+      const cut=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.05,6),dark); cut.rotation.z=Math.PI/2; cut.position.copy(log.position); cut.position.x+=0.5; g.add(cut); } }
+  else if(type==="silica"){ // silica seam: a low bedrock outcrop spiked with pale, faintly-lit crystal shards
+    const rock=MAT(0x5a5d63,{metalness:0.2}), sil=MAT(0xcfd2d6), glow=emis(0x9fb6c2);
+    const out=new THREE.Mesh(new THREE.DodecahedronGeometry(1.5,0),rock); out.scale.set(1.4,0.55,1.4); out.position.y=0.4; out.rotation.y=rr(0,6); g.add(out);
+    for(let i=0;i<6+rint(5);i++){ const a=rr(0,6.28), d=rr(0.2,1.7), x=Math.cos(a)*d, z=Math.sin(a)*d, sh=rr(0.5,1.5);
+      const cr=new THREE.Mesh(new THREE.ConeGeometry(rr(0.16,0.32),sh,5),rnd()<0.25?glow:sil);
+      if(rnd()<0.25)cr.material.emissiveIntensity=0.35; cr.position.set(x,0.3+sh*0.4,z); cr.rotation.set(rr(-0.3,0.3),rr(0,6),rr(-0.3,0.3)); g.add(cr); } }
   else { // corpse-waste: a low heap of shrouded bodies dragged in from the desolation
     const dirt=MAT(0x2a2620);
     const base=new THREE.Mesh(new THREE.SphereGeometry(2.2,8,6,0,6.283,0,1.4),dirt); base.scale.y=0.4; base.position.y=0.1; g.add(base);
@@ -1840,20 +1869,27 @@ function scatterWorld(){
     const nNodes=2+(rg()*2|0);
     const addNodes=(type,n)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(0.7); if(terrainHeight(x,z)<-3.2)continue; tryPlaceNode(type,x,z,7); } };
     const addProps=(maker,n,rot)=>{ for(let k=0;k<n;k++){ const [x,z]=inReg(1.0); if(terrainHeight(x,z)<-3.2||Math.hypot(x,z)<13)continue; dropProp(maker(),x,z,rot); } };  // keep region decoration out of the spawn pad
-    if(g.type==='forest'){ addNodes('grave',nNodes+1); addProps(()=>makeDeadTree2(rr(0.7,1.5)),20,true); addProps(()=>makeBonePile(),3); }
-    else if(g.type==='silica'){ addNodes('waste',3); addProps(()=>makeShard(),16,true); addProps(()=>makeRock(),5); }
-    else if(g.type==='ash'){ addNodes('waste',3); addProps(()=>makeAshMound(),16); addProps(()=>makeDeadTree2(rr(0.6,1.0)),4,true); }
+    if(g.type==='forest'){ addNodes('grave',nNodes); addNodes('tree',2); addProps(()=>makeDeadTree2(rr(0.7,1.5)),20,true); addProps(()=>makeBonePile(),3); }
+    else if(g.type==='silica'){ addNodes('silica',2); addNodes('waste',1); addProps(()=>makeShard(),16,true); addProps(()=>makeRock(),5); }
+    else if(g.type==='ash'){ addNodes('tree',2); addNodes('waste',1); addProps(()=>makeAshMound(),16); addProps(()=>makeDeadTree2(rr(0.6,1.0)),4,true); }
     else if(g.type==='ruins'){ addNodes('waste',2); addProps(()=>makeWreck(),8,true); addProps(()=>makeMonolith(),3); addProps(()=>makeServerTower(),6,true); }
     else if(g.type==='graves'){ addNodes('grave',3); addProps(()=>makeBonePile(),16); addProps(()=>makeRock(),4); }
     else { addNodes('grave',2); addProps(()=>makeAshMound(),9); addProps(()=>makeDeadTree2(rr(0.6,1.1)),9,true); }
   }
   // SPAWN GRAVEYARD — a dense ring of harvestable deposits (real models) right around the
   // settlement, close and reachable, so the dead are at hand from the first minute
-  for(let k=0;k<13;k++){ const a=rr(0,6.28), rad=rr(13,31); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+  for(let k=0;k<16;k++){ const a=rr(0,6.28), rad=rr(13,31); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode(k%5===4?'waste':'grave', x, z, 7); }
-  // MATERIAL FIELD — clickable, harvestable deposits spread across the dry valley, well spaced (no clumping/clipping)
-  for(let k=0;k<56;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
-    if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<13||regionAt(x,z)) continue; tryPlaceNode(rnd()<0.6?'grave':'waste', x, z, 8); }
+  // a couple of ashwood stands within easy reach so the first crafts are buildable early
+  for(let k=0;k<3;k++){ const a=rr(0,6.28), rad=rr(15,28); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('tree', x, z, 7); }
+  // a silica seam set a little further out — the reach the Excavator earns
+  for(let k=0;k<2;k++){ const a=rr(0,6.28), rad=rr(30,46); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+    if(terrainHeight(x,z)<-2.8) continue; tryPlaceNode('silica', x, z, 8); }
+  // MATERIAL FIELD — many more clickable, harvestable deposits spread across the dry valley, well spaced
+  for(let k=0;k<78;k++){ const x=rr(-HALF+6,HALF-6), z=rr(-HALF+6,HALF-6);
+    if(terrainHeight(x,z)<-2.6||Math.hypot(x,z)<13||regionAt(x,z)) continue;
+    const r=rnd(); tryPlaceNode(r<0.46?'grave':r<0.74?'waste':r<0.89?'tree':'silica', x, z, 8); }
   // dense trees, rocks and bone heaps hugging the spawn so the start never reads barren
   for(let k=0;k<35;k++){ const a=rr(0,6.28), rad=rr(7,32); const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
     if(terrainHeight(x,z)<-3.0||Math.hypot(x,z)<13) continue; const r=rnd();
@@ -1922,6 +1958,9 @@ function scatterGroundDetail(){
 }
 function nearestNode(type,x,z){ let best=null,bd=1e9; for(const n of nodes){ if(n.type!==type||n.amount<=0)continue;
   const d=(n.x-x)*(n.x-x)+(n.z-z)*(n.z-z); if(d<bd){bd=d;best=n;} } return best?{node:best,dist:Math.sqrt(bd)}:null; }
+// node-locked buildings (the Excavator) may ONLY stand on/beside their seam — nowhere else.
+function nodeLockOk(def,x,z){ if(!def||!def.lockNode) return true;
+  const reach=def.foot*0.8+3.2; for(const n of nodes){ if(n.type===def.lockNode && n.amount>0 && Math.hypot(n.x-x,n.z-z)<reach) return true; } return false; }
 // the stockpile is the physical hub: gatherers deliver raw matter here, refiners fetch from here
 function nearestStockpile(x,z){ let best=null,bd=1e9; for(const b of buildings){ if(b.kind!=="stockpile")continue;
   const d=(b.x-x)*(b.x-x)+(b.z-z)*(b.z-z); if(d<bd){bd=d;best=b;} } return best; }
@@ -2220,6 +2259,43 @@ function makeDredge(def){ const g=new THREE.Group();
   for(let i=0;i<3;i++){ const sl=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.04,0.5),bone); sl.position.set(-0.45,0.5+i*0.4,0); g.add(sl); }
   g.userData.bob=[{m:claw,y0:0.95,amp:0.32,sp:1.2,ph:0}];
   return g; }
+// Ashwood Camp — a felling camp: a sawbuck with a log, a stacked woodpile, an axe in a stump, lean-to poles.
+function makeAshCamp(def){ const g=new THREE.Group();
+  const wood=MAT(0x6b5436), bark=MAT(0x4a3d29), dark=MAT(0x241b12), bone=MAT(0xb3a98f);
+  const pad=new THREE.Mesh(new THREE.CylinderGeometry(0.85,0.95,0.16,9),MAT(0x352c20)); pad.position.y=0.08; g.add(pad);
+  // sawbuck X-frame with a log resting in it
+  for(const sx of[-1,1]){ const x1=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.0,5),bark); x1.position.set(sx*0.4,0.45,0.18); x1.rotation.z=sx*0.6; g.add(x1);
+    const x2=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.0,5),bark); x2.position.set(sx*0.4,0.45,-0.18); x2.rotation.z=-sx*0.6; g.add(x2); }
+  const log=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.18,1.3,6),wood); log.rotation.z=Math.PI/2; log.position.set(0,0.78,0); g.add(log);
+  // stacked woodpile
+  for(let r=0;r<3;r++)for(let c=0;c<3-r;c++){ const lg=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.7,6),wood);
+    lg.rotation.z=Math.PI/2; lg.position.set(0.85,0.12+r*0.2,-0.5+c*0.22+r*0.11); g.add(lg); }
+  // axe in a chopping stump
+  const stump=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.26,0.4,7),bark); stump.position.set(-0.8,0.2,0.3); g.add(stump);
+  const haft=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.7,4),MAT(0x2a2018)); haft.position.set(-0.8,0.62,0.3); haft.rotation.z=0.5; g.add(haft);
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.14,0.05),bone); head.position.set(-0.62,0.86,0.3); head.rotation.z=0.5; g.add(head);
+  g.userData.bob=[{m:log,y0:0.78,amp:0.05,sp:1.2,ph:0}];
+  return g; }
+// Silica Excavator — a bore-rig: an iron derrick over a pit, a spinning auger bit biting the seam, a pale silica glow.
+function makeExcavator(def){ const g=new THREE.Group();
+  const iron=MAT(0x23262c,{metalness:0.45,roughness:0.55}), dark=MAT(0x101216), steel=MAT(0x4a4e55,{metalness:0.5}), sil=emis(0x9fb6c2);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.36,1.5),iron); base.position.y=0.18; g.add(base);
+  const pit=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.32,0.3,8),dark); pit.position.y=0.16; g.add(pit);
+  // four-legged derrick tapering to a head
+  for(const sx of[-1,1])for(const sz of[-1,1]){ const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.06,2.0,4),iron);
+    leg.position.set(sx*0.52,1.1,sz*0.52); leg.rotation.x=-sz*0.18; leg.rotation.z=-sx*0.18; g.add(leg); }
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.2,0.5),iron); head.position.y=2.05; g.add(head);
+  const motor=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.34,0.4),steel); motor.position.set(0,1.78,0); g.add(motor);
+  // the drill: a shaft + a spiral auger + a biting cone, all spinning down into the pit
+  const drill=new THREE.Group(); drill.position.y=0;
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,1.7,6),steel); shaft.position.y=0.95; drill.add(shaft);
+  for(let i=0;i<6;i++){ const fl=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.04,0.1),steel); fl.position.y=0.3+i*0.22; fl.rotation.y=i*0.9; drill.add(fl); }
+  const bit=new THREE.Mesh(new THREE.ConeGeometry(0.2,0.5,6),sil); bit.material.emissiveIntensity=0.3; bit.rotation.x=Math.PI; bit.position.y=0.12; drill.add(bit);
+  g.add(drill);
+  // a small spoil ring of pale silica around the pit
+  for(let i=0;i<5;i++){ const a=i/5*6.28; const sp=new THREE.Mesh(new THREE.ConeGeometry(0.1,0.28,4),MAT(0xbfc4ca)); sp.position.set(Math.cos(a)*0.6,0.22,Math.sin(a)*0.6); sp.rotation.set(rr(-0.3,0.3),a,rr(-0.3,0.3)); g.add(sp); }
+  g.userData.glow=bit; g.userData.spin=[{m:drill,ax:'y',sp:7.0}]; g.userData.bob=[{m:drill,y0:0,amp:0.16,sp:2.4,ph:0}];
+  return g; }
 // Ward Obelisk — a standing stone with bone sigil-bands, a crowning cap, and a glowing ward rune that pulses.
 function makeWard(def){ const g=new THREE.Group();
   const stone=MAT(0x4a473f), bone=MAT(0xd8d2c0), ember=emis(0xc9772a);
@@ -2254,6 +2330,8 @@ function makeBuildingMesh(kind,def){
   if(kind==="den") return makeDen(def);
   if(kind==="exhumer") return makeExhumer(def);
   if(kind==="dredge") return makeDredge(def);
+  if(kind==="ashcamp") return makeAshCamp(def);
+  if(kind==="excavator") return makeExcavator(def);
   if(kind==="ward") return makeWard(def);
   if(kind==="market") return makeMarket(def);
   if(bldBank[kind]) return makeBuildingGLB(kind,def);
@@ -2336,7 +2414,7 @@ function makeScaffold(def){ const g=new THREE.Group(); const r=(def.foot||1.6)*0
   for(let i=0;i<2;i++){ const pk=new THREE.Mesh(new THREE.BoxGeometry(0.06,h*1.15,0.06),m); pk.position.set((i?r:-r)*0.55,h*0.5,(i?-r:r)*0.55); pk.rotation.z=i?0.28:-0.28; g.add(pk); }
   return g; }
 function placeBuilding(kind,x,z){
-  const def=BLD[kind]; if(!buildingFits(x,z,def.foot)) return null; if(!canAfford(def.cost)) return null;
+  const def=BLD[kind]; if(!buildingFits(x,z,def.foot)) return null; if(!nodeLockOk(def,x,z)) return null; if(!canAfford(def.cost)) return null;
   payCost(def.cost); ensureBuildingGLB(kind);
   const mesh=makeBuildingMesh(kind,def); mesh.position.set(x,terrainHeight(x,z),z); scene.add(mesh);
   const b={kind,def,x,z,mesh,workers:[],prog:0,active:false,cyc:0};

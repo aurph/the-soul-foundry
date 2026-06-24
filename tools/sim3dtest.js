@@ -5,7 +5,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld,getChallengeBest,setChallengeBest,shareURL,shouldAutosave};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,NODE,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld,getChallengeBest,setChallengeBest,shareURL,shouldAutosave,nodeLockOk:(typeof nodeLockOk!=='undefined'?nodeLockOk:null)};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -50,7 +50,8 @@ const T=sandbox.__T;
 
 let pass=0,fail=0; const ok=(n,c,x="")=>{(c?pass++:fail++);console.log((c?"  PASS ":"  FAIL ")+n+(x?"  "+x:""));};
 ok("internals exposed",!!T); if(!T){console.log("aborting");process.exit(1);}
-ok("economy re-themed to the dead + chip chain", !!(T.RES.dead&&T.RES.bonesil&&T.RES.core&&T.RES.power)&&!T.RES.silica, "");
+ok("economy re-themed to the dead + chip chain", !!(T.RES.dead&&T.RES.bonesil&&T.RES.core&&T.RES.power), "");
+ok("early craft + fab materials exist (ashwood, silica)", !!(T.RES.ashwood&&T.RES.silica), "ashwood="+!!T.RES.ashwood+" silica="+!!T.RES.silica);
 
 // --- build a full, well-fed settlement ---
 let threw=null;
@@ -333,9 +334,58 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   T.G.mode=undefined; T.G.graceT=150; T.G.over=null; T.G.time=0; T.resetRunScore();
 }
 
+// --- new craft chain: tree -> ashwood, silica seam -> silica via a node-locked Excavator ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.G.time=999;
+  ok("tree + silica node types exist", !!(T.NODE.tree&&T.NODE.silica), "tree="+!!T.NODE.tree+" silica="+!!T.NODE.silica);
+  ok("tree gives ashwood, silica seam gives silica",
+     !!(T.NODE.tree&&T.NODE.tree.gives[0]==='ashwood') && !!(T.NODE.silica&&T.NODE.silica.gives[0]==='silica'),
+     "tree="+(T.NODE.tree&&T.NODE.tree.gives)+" silica="+(T.NODE.silica&&T.NODE.silica.gives));
+  ok("Ashwood Camp gathers ashwood from tree stands",
+     !!(T.BLD.ashcamp&&T.BLD.ashcamp.nodeType==='tree'&&T.BLD.ashcamp.res==='ashwood'), "ashcamp="+JSON.stringify(T.BLD.ashcamp&&{n:T.BLD.ashcamp.nodeType,r:T.BLD.ashcamp.res}));
+  ok("Excavator gathers silica and is locked to a silica seam",
+     !!(T.BLD.excavator&&T.BLD.excavator.nodeType==='silica'&&T.BLD.excavator.res==='silica'&&T.BLD.excavator.lockNode==='silica'),
+     "excavator="+JSON.stringify(T.BLD.excavator&&{n:T.BLD.excavator.nodeType,r:T.BLD.excavator.res,l:T.BLD.excavator.lockNode}));
+  // an Ashwood Camp on a tree stand accumulates ashwood
+  let threwG=null;
+  try{ T.G.stock.ashwood=0; T.placeNode("tree",-10,0); T.placeBuildingFree("stockpile",0,0);
+    const ac=T.placeBuildingFree("ashcamp",-10,3);
+    for(let i=0;i<2;i++) T.assignHusk(T.spawnVillager(-10,2,"stump"),ac);
+    for(let st=0;st<30*90;st++){ T.stepHusks(1/30); T.stepEconomy(1/30); }
+  }catch(e){ threwG=e; }
+  ok("Ashwood Camp harvests ashwood from a tree stand", !threwG && T.G.stock.ashwood>0, threwG?String(threwG.stack||threwG):"ashwood="+Math.floor(T.G.stock.ashwood||0));
+  // an Excavator on a silica seam accumulates silica
+  let threwX=null;
+  try{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.stock.silica=0;
+    T.placeNode("silica",14,0); T.placeBuildingFree("stockpile",0,0);
+    const xc=T.placeBuildingFree("excavator",14,3);
+    for(let i=0;i<3;i++) T.assignHusk(T.spawnVillager(14,2,"stump"),xc);
+    for(let st=0;st<30*90;st++){ T.stepHusks(1/30); T.stepEconomy(1/30); }
+  }catch(e){ threwX=e; }
+  ok("Excavator bores silica from a seam", !threwX && T.G.stock.silica>0, threwX?String(threwX.stack||threwX):"silica="+Math.floor(T.G.stock.silica||0));
+}
+
+// --- Excavator placement is node-locked to silica seams (nowhere else) ---
+{ let threwL=null;
+  try{ T.buildings.length=0; T.nodes.length=0; T.villagers.length=0; T.G.over=null;
+    Object.assign(T.G.stock,{dead:9999,ashwood:9999,silica:9999});
+    ok("nodeLockOk: a normal building is never node-locked", T.nodeLockOk(T.BLD.crematory,0,0)===true, "");
+    ok("nodeLockOk: Excavator rejected with no silica seam nearby", T.nodeLockOk(T.BLD.excavator,0,0)===false, "");
+    T.placeNode("silica",30,0);
+    ok("nodeLockOk: Excavator accepted right on a silica seam", T.nodeLockOk(T.BLD.excavator,30,2)===true, "");
+    const off=T.placeBuilding("excavator",0,0);
+    ok("placeBuilding refuses an Excavator off a silica seam", off===null, "off="+(off?"placed":"null"));
+    const on=T.placeBuilding("excavator",30,3);
+    ok("placeBuilding raises an Excavator on a silica seam", !!on, "on="+(on?"placed":"null"));
+  }catch(e){ threwL=e; ok("node-lock placement block ran", false, String(e.stack||e)); }
+  T.buildings.length=0; T.nodes.length=0; T.villagers.length=0;
+  // restore clean campaign state so the leftover G.time/stock can't pollute later sim tests
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+  Object.assign(T.G.stock,{ashwood:0,silica:0});
+}
+
 // --- every building kind builds a procedural mesh without throwing ---
 { let threwC=null; T.buildings.length=0;
-  try{ for(const k of ["pyre","den","path","exhumer","dredge","crematory","furnace","mill","litho","ossuary","substation","datacenter","stockpile","ward","market"])
+  try{ for(const k of ["pyre","den","path","exhumer","dredge","ashcamp","excavator","crematory","furnace","mill","litho","ossuary","substation","datacenter","stockpile","ward","market"])
         if(k!=="path") T.placeBuildingFree(k, ((Math.random()*40-20)|0), ((Math.random()*40-20)|0)); }catch(e){ threwC=e; }
   ok("every building kind builds a procedural mesh without throwing", !threwC, threwC?String(threwC.stack||threwC):"ok");
   T.buildings.length=0;
