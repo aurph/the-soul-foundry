@@ -22,10 +22,19 @@ chip-foundry: Crematory to Soul Furnace to Wafer Mill to Etch-Litho to Assembly
 Ossuary to Spectral Datacenter turns corpses into Compute, the quota the engine
 demands. Substations burn soul-ash into the Power the datacenters need. Bind your
 workforce at the Binding Pyre (1 corpse + 2 Compute): husks are bound, never born,
-and crumble without soul-ash upkeep. Let the dead pile up unrendered and the
-backlog becomes Dread; raise Ward Obelisks to hold it back, Reliquary Yards to
-stockpile, and Bone Paths to move husks faster. Deliver the rising tithe of
-Compute through eight levels to break the engine's hold.
+and crumble without soul-ash upkeep.
+
+The dead you leave unrendered are not just a number. They **pool as Dread** — a
+violet haze that spreads across the ground around the cemeteries and pits where
+the bodies lie. The stain creeps, and any building or husk standing in it works
+and holds up worse, so **where you build matters**. Pull it back three ways:
+harvest a deposit down (the fill is the source — tap the dead to still them),
+render the backlog at a Crematory, or raise a **Ward Obelisk**, which holds Dread
+back within a fixed radius. Raise Reliquary Yards to stockpile and Bone Paths to
+move husks faster, and deliver the rising tithe of Compute through eight levels to
+break the engine's hold. As the tithes climb the dead come heavier and faster, so
+the backlog — and the Dread it pools — mounts with them. Reapers shrug off the
+haze, so they're the caste to deploy into the worst of it.
 
 The three husk castes are hand-built low-poly: Workers (balanced, hunched, dim
 ember eyes), Stump-folk (haul far more, slow, a scary face carved into the wood
@@ -39,6 +48,7 @@ hooded skeleton on a crooked staff).
 - Hover anything for a quick label. Click any resource or the Codex for detail.
 - Build from the dock at the bottom, then click the ground to place; R rotates.
 - Space pauses, 1 / 3 set game speed, Esc or right-click cancels placement.
+- V shows or hides the Dread haze. Select a Ward to see the radius it protects.
 
 ## Interface
 
@@ -59,6 +69,16 @@ Two rules keep it sane:
 - **Deterministic sim.** Fixed 1/30s timestep plus a seeded `mulberry32` RNG.
 - **Sim and rendering are separate.** The economy (`stepEconomy`, `stepHusks`)
   never touches WebGL, so the logic stands on its own.
+
+The backlog of the dead is a real spatial field. `stepDread` (called from
+`stepEconomy`) keeps a coarse grid of Dread over the valley: deposits emit it by
+how full they sit, active Crematories and Ward Obelisks suppress it within a
+radius, and it diffuses and decays. It bites production and husk resolve where it
+pools (`dreadBite`/`dreadAt`), and the existing global Dread meter is the old
+formula plus a push from how hard the field presses on your settlement — so the
+field is additive and every prior system and save still works. The visible haze
+(`updateDreadViz`) reads the field but never writes it: pure rendering. See
+`design/v3-spatial-dread.md`.
 
 ## Assets
 

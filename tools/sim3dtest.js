@@ -5,7 +5,17 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 let code=fs.readFileSync(path.join(__dirname,'..','game','index.html'),'utf8')
   .match(/<script>([\s\S]*?)<\/script>/g).map(s=>s.replace(/<\/?script>/g,'')).find(s=>s.includes('use strict'));
 code=code.replace(/\nstart\(\);/,'\n/*no start*/');
-code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,NODE,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld,getChallengeBest,setChallengeBest,shareURL,shouldAutosave,nodeLockOk:(typeof nodeLockOk!=='undefined'?nodeLockOk:null),deadDrift:(typeof deadDrift!=='undefined'?deadDrift:null)};`;
+code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,NODE,placeBuildingFree,placeBuilding,spawnVillager,assignHusk,stepEconomy,stepHusks,placeNode,seedSettlement,terrainHeight,canAfford,buildingWorkSpot,buildingFits,genRegions,storageCap,addStock,pileFill,updateStockpiles,serializeState,applySave,SND,techMul,RES,bindHusk,affinity,casteRole,CARRY,GRATE,MODES,modeCfg,resetRunScore,dreadThrottle,computeScore,challengeScore,parseParams,seedWorld,getChallengeBest,setChallengeBest,shareURL,shouldAutosave,nodeLockOk:(typeof nodeLockOk!=='undefined'?nodeLockOk:null),deadDrift:(typeof deadDrift!=='undefined'?deadDrift:null),
+  stepDread:(typeof stepDread!=='undefined'?stepDread:null), dreadAt:(typeof dreadAt!=='undefined'?dreadAt:null),
+  dreadBite:(typeof dreadBite!=='undefined'?dreadBite:null), dreadSnapshot:(typeof dreadSnapshot!=='undefined'?dreadSnapshot:null),
+  resetDreadField:(typeof resetDreadField!=='undefined'?resetDreadField:null), dreadFieldPressure:(typeof dreadFieldPressure!=='undefined'?dreadFieldPressure:null),
+  DGRID:(typeof DGRID!=='undefined'?DGRID:null), DCELL:(typeof DCELL!=='undefined'?DCELL:null), DREAD_BITE_MIN:(typeof DREAD_BITE_MIN!=='undefined'?DREAD_BITE_MIN:null),
+  loadDreadField:(typeof loadDreadField!=='undefined'?loadDreadField:null),
+  toggleDreadViz:(typeof toggleDreadViz!=='undefined'?toggleDreadViz:null), dreadResist:(typeof dreadResist!=='undefined'?dreadResist:null),
+  driftPeriod:(typeof driftPeriod!=='undefined'?driftPeriod:null), driftLevel:(typeof driftLevel!=='undefined'?driftLevel:null),
+  dreadGuard:(typeof dreadGuard!=='undefined'?dreadGuard:null),
+  DREAD_RESIST:(typeof DREAD_RESIST!=='undefined'?DREAD_RESIST:null), DREAD_GLOBAL_PUSH:(typeof DREAD_GLOBAL_PUSH!=='undefined'?DREAD_GLOBAL_PUSH:null),
+  get _dreadVizOn(){ return typeof _dreadVizOn!=='undefined'?_dreadVizOn:null; }};`;
 
 // ---- THREE + DOM stubs ----
 function Vec3(x=0,y=0,z=0){return{x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;return this;},copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;},
@@ -448,6 +458,204 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   const tmp=require('path').join(require('os').tmpdir(),'sf_preview_test.png'); let rendered=false;
   try{ WP.render(42,tmp,64); rendered=require('fs').existsSync(tmp); require('fs').unlinkSync(tmp); }catch(e){ rendered=false; }
   ok("world-preview renders a PNG without throwing", rendered);
+}
+
+// --- SPATIAL DREAD: the unrendered dead pool Dread on the ground; rendering + WARD RADIUS pull it back ---
+{ ok("spatial dread field is exposed", typeof T.stepDread==='function' && typeof T.dreadAt==='function' && typeof T.dreadBite==='function', "stepDread="+typeof T.stepDread);
+  ok("dreadBite is 1 at zero Dread and bottoms at the floor at max", Math.abs(T.dreadBite(0)-1)<1e-9 && Math.abs(T.dreadBite(100)-T.DREAD_BITE_MIN)<1e-9 && T.dreadBite(100)<1, "bite0="+T.dreadBite(0)+" bite100="+T.dreadBite(100));
+  // a full, untapped cemetery radiates Dread onto its own ground
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  const g=T.placeNode("grave",40,0); g.amount=g.max;
+  for(let s=0;s<30*40;s++) T.stepDread(1/30);
+  const dHot=T.dreadAt(40,0);
+  ok("an untapped cemetery pools Dread on its ground", dHot>20, "dread@grave="+dHot.toFixed(1));
+  // the stain creeps outward to neighbouring ground, weaker than the core
+  const dNear=T.dreadAt(40+T.DCELL,0);
+  ok("Dread creeps to neighbouring ground, weaker than the core", dNear>1 && dNear<dHot, "core="+dHot.toFixed(1)+" near="+dNear.toFixed(1));
+  // harvesting the deposit down lets its ground quiet (the fill IS the source — tap the dead to still them)
+  g.amount=g.max*0.04; for(let s=0;s<30*90;s++) T.stepDread(1/30);
+  ok("draining a deposit lets the ground it poisons quiet", T.dreadAt(40,0)<dHot*0.6, "hot="+dHot.toFixed(1)+" drained="+T.dreadAt(40,0).toFixed(1));
+  // a WARD within its radius crushes the local Dread (the ward:14 radius finally matters)
+  T.buildings.length=0; T.resetDreadField(); g.amount=g.max;
+  for(let s=0;s<30*40;s++) T.stepDread(1/30); const dNoWard=T.dreadAt(40,0);
+  T.placeBuildingFree("ward",43,0);                 // 3u from the grave — inside ward:14
+  for(let s=0;s<30*40;s++) T.stepDread(1/30); const dWarded=T.dreadAt(40,0);
+  ok("a Ward within radius crushes local Dread", dWarded<dNoWard*0.5, "noWard="+dNoWard.toFixed(1)+" warded="+dWarded.toFixed(1));
+  // a Ward placed FAR away does NOT suppress this deposit — proves it's RADIUS, not a global count
+  T.buildings.length=0; T.resetDreadField(); g.amount=g.max;
+  for(let s=0;s<30*40;s++) T.stepDread(1/30); const dPre=T.dreadAt(40,0);
+  T.placeBuildingFree("ward",-60,0);                // ~100u from the grave — far outside ward:14
+  for(let s=0;s<30*40;s++) T.stepDread(1/30);
+  ok("a Ward outside its radius does NOT suppress a distant deposit", T.dreadAt(40,0)>dPre*0.75, "pre="+dPre.toFixed(1)+" post-farward="+T.dreadAt(40,0).toFixed(1));
+  T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
+}
+// --- spatial dread is DETERMINISTIC + makes PLACEMENT matter (a building mired in the dead works slower) ---
+{ const run=()=>{ T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
+    T.placeNode("grave",30,0); T.placeNode("waste",-20,10);
+    for(let s=0;s<30*30;s++) T.stepDread(1/30); return T.dreadSnapshot(); };
+  const a=run(), b=run(); let same=a.length===b.length; for(let i=0;i<a.length&&same;i++) if(Math.abs(a[i]-b[i])>1e-9) same=false;
+  ok("spatial dread field is deterministic (identical across runs)", same && a.length>0, "len="+a.length);
+  // placement matters: a Furnace on clean ground out-produces an identical one mired in a cemetery's Dread.
+  // (Furnaces don't render, so they don't self-clean the ground — the bite is visible. graceT high so no breach.)
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0;
+  T.placeBuildingFree("stockpile",0,0);
+  const gd=T.placeNode("grave",60,0); gd.amount=gd.max;        // a full grave keeps the south-east ground dreadful
+  const fuClean=T.placeBuildingFree("furnace",-60,0), fuDread=T.placeBuildingFree("furnace",60,3);
+  for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-60,2,"worker"),fuClean); T.assignHusk(T.spawnVillager(60,5,"worker"),fuDread); }
+  for(let st=0;st<30*150;st++){ T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; gd.amount=gd.max; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  ok("placement matters: a Furnace mired in Dread out-produced by one on clean ground", fuClean.cyc>fuDread.cyc,
+     "clean cyc="+fuClean.cyc+" in-dread cyc="+fuDread.cyc+" dread@furnace="+T.dreadAt(60,3).toFixed(1));
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+}
+// --- save/load round-trips the Dread field ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.resetDreadField();
+  T.seedSettlement(); T.placeNode("grave",-18,0); for(let s=0;s<30*30;s++) T.stepDread(1/30);
+  const dBefore=T.dreadAt(-18,0); const snap=T.serializeState();
+  ok("serializeState captures the Dread field", Array.isArray(snap.dread) && snap.dread.length===T.DGRID*T.DGRID, "len="+(snap.dread?snap.dread.length:"none"));
+  T.resetDreadField();
+  ok("field is cleared before reload", T.dreadAt(-18,0)<0.001, "after-reset="+T.dreadAt(-18,0).toFixed(3));
+  T.applySave(snap);
+  ok("save/load restores the Dread field", Math.abs(T.dreadAt(-18,0)-dBefore)<1e-6, "before="+dBefore.toFixed(2)+" restored="+T.dreadAt(-18,0).toFixed(2));
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+}
+
+// --- the spatial field PUSHES the global Dread meter in live quota play — and ONLY then ---
+{ const full=new Array(T.DGRID*T.DGRID).fill(80);
+  const runField=(loadField)=>{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+    T.G.mode='campaign'; T.G.over=null; T.G.time=999; T.G.graceT=0; T.G.dread=0; T.G.basePressure=0.6;
+    T.G.quota={need:5,period:1e9,t:1e9,level:1};   // park the tithe so it can't fire during the window
+    T.spawnVillager(0,0,"reaper");                 // one idle husk so the extinction-loss doesn't halt the sim
+    for(let s=0;s<30*20;s++){ if(loadField)T.loadDreadField(full); T.stepEconomy(1/30); } return T.G.dread; };
+  const dWithField=runField(true), dClean=runField(false);
+  ok("the Dread field pushes the global meter up in live quota play", dWithField>dClean+1, "withField="+dWithField.toFixed(1)+" clean="+dClean.toFixed(1));
+  T.buildings.length=0; T.nodes.length=0; T.resetDreadField(); T.loadDreadField(full);
+  ok("dreadFieldPressure reads the settlement-area field", T.dreadFieldPressure()>50, "pressure="+T.dreadFieldPressure().toFixed(0));
+  { T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+    T.G.mode='campaign'; T.G.over=null; T.G.time=0; T.G.graceT=1e9; T.G.dread=0; T.G.quota={need:5,period:1e9,t:1e9,level:1};
+    for(let s=0;s<30*15;s++){ T.loadDreadField(full); T.stepEconomy(1/30); }
+    ok("during grace the field does NOT push the global meter", T.G.dread<0.5, "dread="+T.G.dread.toFixed(2)); }
+  { T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+    T.G.mode='challenge'; T.G.challengeDur=600; T.G.over=null; T.G.endedChallenge=false; T.G.time=100; T.G.graceT=0; T.G.dread=0;
+    for(let s=0;s<30*15;s++){ T.loadDreadField(full); T.stepEconomy(1/30); }
+    ok("in challenge the field does NOT push the global meter", T.G.dread<0.5, "dread="+T.G.dread.toFixed(2)); }
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.G.quota={need:5,period:150,t:150,level:1};
+}
+// --- the haze bites a DEPLOYED husk's resolve; Reapers resist it; idle husks aren't out in it (caste x Dread) ---
+{ const full=new Array(T.DGRID*T.DGRID).fill(100);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode='campaign'; T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0;   // grace -> no global hauntings to add noise
+  const bld=T.placeBuildingFree("crematory",0,0);   // inactive (no atWork crew) so it doesn't self-suppress the field
+  const wk=T.spawnVillager(0,0,"worker"), rp=T.spawnVillager(0,0,"reaper");
+  T.assignHusk(wk,bld); T.assignHusk(rp,bld); wk.resolve=rp.resolve=0.8;
+  for(let s=0;s<30*60;s++){ T.loadDreadField(full); T.G.stock.soulash=0; T.stepEconomy(1/30); }
+  ok("a Worker deployed in full Dread is worn down by the haze", wk.resolve<0.4, "worker 0.8->"+wk.resolve.toFixed(2));
+  ok("a Reaper resists the Dread haze and holds (caste x Dread interlock)", rp.resolve>0.7, "reaper 0.8->"+rp.resolve.toFixed(2));
+  T.buildings.length=0; T.villagers.length=0; T.resetDreadField();
+  const idle=T.spawnVillager(0,0,"worker"); idle.resolve=0.8;   // unassigned -> not "out in it"
+  for(let s=0;s<30*60;s++){ T.loadDreadField(full); T.G.stock.soulash=100; T.stepEconomy(1/30); }
+  ok("an idle husk is not bitten by the Dread it stands in (only deployed ones are)", idle.resolve>0.78, "idle 0.8->"+idle.resolve.toFixed(2));
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+}
+// --- caste x Dread interlock on PRODUCTION: a Reaper crew out-works a Worker crew in heavy Dread (despite worse affinity) ---
+{ const full=new Array(T.DGRID*T.DGRID).fill(100);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField(); T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0;
+  T.placeBuildingFree("stockpile",0,0);
+  const fuR=T.placeBuildingFree("furnace",-30,0), fuW=T.placeBuildingFree("furnace",30,0);   // furnace: workers have the affinity edge (1.05 vs 0.95)
+  for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-30,2,"reaper"),fuR); T.assignHusk(T.spawnVillager(30,2,"worker"),fuW); }
+  for(let st=0;st<30*150;st++){ T.loadDreadField(full); T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  ok("caste x Dread: a Reaper crew out-works a Worker crew in heavy Dread", fuR.cyc>fuW.cyc, "reaper-crew cyc="+fuR.cyc+" worker-crew cyc="+fuW.cyc);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+}
+// --- the FULL sim path (dread field + production bite + resolve bite + hauntings) is deterministic ---
+{ const runSim=()=>{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField(); T.G.over=null;
+    T.G.mode='campaign'; T.G.time=999; T.G.graceT=0; T.G.dread=60; T.G.basePressure=0.6; T.G.quota={need:5,period:1e9,t:1e9,level:1};
+    T.seedWorld(4242);
+    T.placeNode("grave",10,0); T.placeNode("waste",-12,6);
+    const cr=T.placeBuildingFree("crematory",-4,0), ex=T.placeBuildingFree("exhumer",10,3);
+    for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-4,2,"worker"),cr); T.assignHusk(T.spawnVillager(10,2,"stump"),ex); }
+    for(let s=0;s<30*45;s++){ T.G.stock.dead=200; T.G.stock.soulash=50; T.stepHusks(1/30); T.stepEconomy(1/30); }
+    return { field:T.dreadSnapshot(), dread:+T.G.dread.toFixed(6), res:T.villagers.filter(v=>!v.dead).map(v=>+v.resolve.toFixed(6)) }; };
+  const A=runSim(), B=runSim();
+  let same=A.field.length===B.field.length && A.dread===B.dread && A.res.length===B.res.length;
+  for(let i=0;same&&i<A.field.length;i++) if(Math.abs(A.field[i]-B.field[i])>1e-9) same=false;
+  for(let i=0;same&&i<A.res.length;i++) if(A.res[i]!==B.res[i]) same=false;
+  ok("the full sim (field + bites + hauntings) is deterministic across runs", same, "dreadA="+A.dread+" dreadB="+B.dread+" nResA="+A.res.length+" nResB="+B.res.length);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.G.quota={need:5,period:150,t:150,level:1};
+}
+// --- a legacy save with no Dread field still loads (the field comes back clean), + bad-length guard ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.resetDreadField();
+  T.seedSettlement(); T.placeNode("grave",-14,0); for(let s=0;s<30*20;s++) T.stepDread(1/30);
+  const snap=T.serializeState(); delete snap.dread;   // simulate a pre-feature save
+  let threw=null, ret=null; try{ ret=T.applySave(snap); }catch(e){ threw=e; }
+  ok("a legacy save with no Dread field loads without throwing", !threw && ret===true, threw?String(threw):"ret="+ret);
+  ok("legacy load leaves the field clean (it rebuilds from play)", T.dreadAt(-14,0)<0.001 && T.dreadAt(0,0)<0.001, "field@grave="+T.dreadAt(-14,0).toFixed(3));
+  ok("loadDreadField rejects a wrong-length array", T.loadDreadField([1,2,3])===false, "ret="+T.loadDreadField([1,2,3]));
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+}
+// --- ward suppression falls off with distance, overlapping wards go deeper, and the V toggle flips ---
+{ const dProbe=(setup)=>{ T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
+    const g=T.placeNode("grave",40,0); g.amount=g.max; setup(g); for(let s=0;s<30*40;s++){ g.amount=g.max; T.stepDread(1/30); } return T.dreadAt(40,0); };
+  const none=dProbe(()=>{});
+  const near=dProbe(()=>{ T.placeBuildingFree("ward",44,0); });   // 4u from the grave -> strong
+  const far =dProbe(()=>{ T.placeBuildingFree("ward",52,0); });   // 12u from the grave, near the 14u edge -> weak
+  const two =dProbe(()=>{ T.placeBuildingFree("ward",52,0); T.placeBuildingFree("ward",40,12); });   // two each ~12u -> deeper
+  ok("ward suppression falls off with distance (graded by radius)", near<far && far<none, "none="+none.toFixed(1)+" far(12u)="+far.toFixed(1)+" near(4u)="+near.toFixed(1));
+  ok("two overlapping wards suppress deeper than one at the same distance", two<far, "far(one)="+far.toFixed(1)+" two="+two.toFixed(1));
+  if(typeof T.toggleDreadViz==='function'){ const a=T._dreadVizOn; let t=null; try{ T.toggleDreadViz(); }catch(e){ t=e; } const b=T._dreadVizOn; try{ T.toggleDreadViz(); }catch(e){ t=e; } const c=T._dreadVizOn;
+    ok("toggleDreadViz flips the haze flag without throwing", !t && b===!a && c===a, t?String(t):"a="+a+" b="+b+" c="+c); }
+  else ok("toggleDreadViz is exposed", false, "missing");
+  T.buildings.length=0; T.nodes.length=0; T.resetDreadField();
+}
+
+// --- the rising tide: as the engine's tithes climb, the dead come faster (the arc tied to the spatial system) ---
+{ const avg=a=>a.reduce((s,x)=>s+x,0)/a.length;
+  T.G.quota={need:5,period:150,t:150,level:1}; const lo=[]; for(let i=0;i<300;i++) lo.push(T.driftPeriod());
+  T.G.quota={need:5,period:150,t:150,level:8}; const hi=[]; for(let i=0;i<300;i++) hi.push(T.driftPeriod());
+  ok("the rising tide: later tithes shorten the wave cadence", avg(hi)<avg(lo)*0.72 && avg(hi)>0, "lvl1~"+avg(lo).toFixed(0)+"s lvl8~"+avg(hi).toFixed(0)+"s");
+  // a bigger wave replenishes a drained deposit more at a high tithe than at the first (averaged over the rr noise)
+  const replenishAvg=(lvl,trials)=>{ let tot=0; for(let k=0;k<trials;k++){ T.nodes.length=0; const n=T.placeNode("grave",70,0); n.amount=n.max*0.2;
+      T.G.quota={need:5,period:150,t:150,level:lvl}; const before=n.amount; T.deadDrift(); tot+=(n.amount-before); } return tot/trials; };
+  const r1=replenishAvg(1,40), r8=replenishAvg(8,40);
+  ok("the rising tide: a high-tithe wave washes in more dead than the first", r8>r1*1.2, "lvl1 wave=+"+r1.toFixed(0)+" lvl8 wave=+"+r8.toFixed(0));
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.quota={need:5,period:150,t:150,level:1};
+}
+
+// --- the Grave-Salt rite eases the Dread bite on production (research interlocks with Spatial Dread) ---
+{ const full=new Array(T.DGRID*T.DGRID).fill(100);
+  const cyc=(salt)=>{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+    T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0; T.G.tech= salt?{salt:true}:{};
+    T.placeBuildingFree("stockpile",0,0); const fu=T.placeBuildingFree("furnace",0,0);
+    for(let i=0;i<3;i++) T.assignHusk(T.spawnVillager(0,2,"worker"),fu);
+    for(let st=0;st<30*120;st++){ T.loadDreadField(full); T.G.stock.bonesil=100000; T.G.stock.soulash=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+    return fu.cyc; };
+  ok("dreadGuard is <1 with the Grave-Salt rite, 1 without", (()=>{ T.G.tech={salt:true}; const a=T.dreadGuard(); T.G.tech={}; const b=T.dreadGuard(); return a<1 && b===1; })(), "guard");
+  const noSalt=cyc(false), withSalt=cyc(true);
+  ok("the Grave-Salt rite eases the Dread work-bite (more output in the same haze)", withSalt>noSalt, "noSalt cyc="+noSalt+" withSalt cyc="+withSalt);
+  T.G.tech={}; T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+}
+
+// --- review fixes: campaign run tallies persist across save/load; the retired 'embers' rite migrates to salt ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.G.over=null; T.resetDreadField();
+  T.seedSettlement();
+  T.G.computeRendered=120; T.G.deadRendered=437; T.G.husksBoundRun=22; T.G.peakRate=64.3; T.G.tech={embers:true};
+  const snap=T.serializeState();
+  ok("serializeState persists the run tallies", snap.G.deadRendered===437 && snap.G.husksBoundRun===22 && Math.abs(snap.G.peakRate-64.3)<1e-6, "dr="+snap.G.deadRendered+" hb="+snap.G.husksBoundRun);
+  T.G.computeRendered=0; T.G.deadRendered=0; T.G.husksBoundRun=0; T.G.peakRate=0; T.G.tech={};
+  T.applySave(snap);
+  ok("save/load restores the run tallies (so a multi-session campaign win stays honest)", T.G.deadRendered===437 && T.G.husksBoundRun===22 && Math.abs(T.G.peakRate-64.3)<1e-6, "dr="+T.G.deadRendered+" hb="+T.G.husksBoundRun+" pk="+T.G.peakRate.toFixed(1));
+  ok("a retired-'embers' save migrates to the Grave-Salt rite (the paid upgrade stays effective)", T.G.tech.salt===true && !T.G.tech.embers, "tech="+JSON.stringify(T.G.tech));
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.G.tech={}; if(T.resetRunScore)T.resetRunScore();
 }
 
 console.log("\n=== "+pass+" passed, "+fail+" failed ===");
