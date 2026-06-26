@@ -15,6 +15,8 @@ code+=`\n;this.__T={G,buildings,villagers,nodes,BLD,NODE,placeBuildingFree,place
   driftPeriod:(typeof driftPeriod!=='undefined'?driftPeriod:null), driftLevel:(typeof driftLevel!=='undefined'?driftLevel:null),
   dreadGuard:(typeof dreadGuard!=='undefined'?dreadGuard:null),
   depleteNode:(typeof depleteNode!=='undefined'?depleteNode:null), regrowNode:(typeof regrowNode!=='undefined'?regrowNode:null),
+  QUOTA_MULT:(typeof QUOTA_MULT!=='undefined'?QUOTA_MULT:null), QUOTA_FLOOR_FRAC:(typeof QUOTA_FLOOR_FRAC!=='undefined'?QUOTA_FLOOR_FRAC:null),
+  tierPrio:(typeof tierPrio!=='undefined'?tierPrio:null), bldPrio:(typeof bldPrio!=='undefined'?bldPrio:null), computeRate:(typeof computeRate!=='undefined'?computeRate:null),
   DREAD_RESIST:(typeof DREAD_RESIST!=='undefined'?DREAD_RESIST:null), DREAD_GLOBAL_PUSH:(typeof DREAD_GLOBAL_PUSH!=='undefined'?DREAD_GLOBAL_PUSH:null),
   get _dreadVizOn(){ return typeof _dreadVizOn!=='undefined'?_dreadVizOn:null; }};`;
 
@@ -673,6 +675,55 @@ try{ T.G.over=null; T.G.dread=0; for(const v of T.villagers) if(!v.dead) T.assig
   for(let s=0;s<30*6;s++) T.stepEconomy(1/30);
   ok("a depleted non-renewable stays depleted", w.amount===0 && w.mesh.userData.depleted===true, "amt="+w.amount+" empty="+w.mesh.userData.depleted);
   T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+}
+
+// --- QUOTA WITH TEETH: each paid tithe floors the next need to your own peak throughput, else grows by the mult ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
+  T.spawnVillager(0,0,"reaper");   // a living husk so the extinction-loss doesn't halt the sim between tithes
+  T.G.mode='campaign'; T.G.over=null; T.G.time=999; T.G.graceT=0; T.G.dread=0; T.G.tempo='standard';
+  T.G.quota={need:5,period:200,t:0.001,level:3}; T.G.peakRate=100; T.G.stock.compute=300;
+  T.stepEconomy(1/30);   // fires the tithe (compute>=need)
+  const period=T.G.quota.period, floor=Math.ceil(100*(period/60)*T.QUOTA_FLOOR_FRAC);
+  ok("a paid tithe floors the next need to your peak throughput", T.G.quota.need===Math.max(Math.ceil(5*T.QUOTA_MULT),floor) && T.G.quota.need>=floor, "need="+T.G.quota.need+" floor="+floor+" period="+period);
+  ok("the tithe period tightens as levels climb", period<200 && period>=120, "period="+period);
+  T.G.quota={need:20,period:200,t:0.001,level:3}; T.G.peakRate=1; T.G.stock.compute=300; T.stepEconomy(1/30);
+  ok("with low throughput the need still grows by the scripted mult", T.G.quota.need===Math.ceil(20*T.QUOTA_MULT), "need="+T.G.quota.need);
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0; T.G.quota={need:5,period:150,t:150,level:1}; T.G.peakRate=0; T.G.stock.compute=0;
+}
+// --- MATERIAL RESERVATION: refiners respect G.reserve; building + binding can spend below it ---
+{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField(); T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0; T.G.reserve={};
+  T.placeBuildingFree("stockpile",0,0); const fu=T.placeBuildingFree("furnace",0,0);
+  for(let i=0;i<3;i++) T.assignHusk(T.spawnVillager(0,2,"worker"),fu);
+  T.G.reserve={bonesil:6,power:6};
+  for(let st=0;st<30*40;st++){ T.G.stock.bonesil=6; T.G.stock.power=6; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  ok("a refiner will NOT consume an input below its reserved floor", fu.cyc===0, "furnace cyc="+fu.cyc);
+  T.G.reserve={}; const c0=fu.cyc;
+  for(let st=0;st<30*40;st++){ T.G.stock.bonesil=100000; T.G.stock.power=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }
+  ok("dropping the reserve lets the refiner consume again", fu.cyc>c0, "furnace cyc="+fu.cyc);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0;
+  T.placeBuildingFree("den",6,6); T.placeBuildingFree("pyre",0,0); T.G.reserve={dead:50}; T.G.stock.dead=10; T.G.stock.compute=20;
+  const pop0=T.villagers.filter(v=>!v.dead).length; T.bindHusk("worker");
+  ok("building/binding can still spend BELOW an active reserve", T.villagers.filter(v=>!v.dead).length===pop0+1 && T.G.stock.dead<10, "pop "+pop0+"->"+T.villagers.filter(v=>!v.dead).length+" dead="+T.G.stock.dead);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField(); T.G.reserve={};
+  T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
+}
+// --- BUILD PRIORITY: a scarce input feeds the high-tier end of the chain first; a raised prio overrides tier ---
+{ ok("tierPrio ranks the chain (datacenter highest, crematory lowest)", T.tierPrio('datacenter')>T.tierPrio('furnace') && T.tierPrio('furnace')>T.tierPrio('crematory'), "dc="+T.tierPrio('datacenter')+" fu="+T.tierPrio('furnace')+" cr="+T.tierPrio('crematory'));
+  // two furnaces both at the brink of a cycle, but only ONE cycle's worth of input — the higher-priority one consumes it
+  const arbitrate=(hiPrio,loPrio)=>{ T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField(); T.G.over=null; T.G.time=999; T.G.graceT=1e9; T.G.dread=0; T.G.reserve={};
+    T.placeBuildingFree("stockpile",0,0); const A=T.placeBuildingFree("furnace",-4,0), B=T.placeBuildingFree("furnace",4,0);
+    for(let i=0;i<3;i++){ T.assignHusk(T.spawnVillager(-4,2,"worker"),A); T.assignHusk(T.spawnVillager(4,2,"worker"),B); }
+    for(let st=0;st<30*18;st++){ T.G.stock.bonesil=100000; T.G.stock.power=100000; T.G.stock.ingot=0; T.stepHusks(1/30); T.stepEconomy(1/30); }   // warm up: get crews tending
+    A.prio=hiPrio; B.prio=loPrio; A.prog=A.def.recipe.time-0.001; B.prog=B.def.recipe.time-0.001;   // both about to complete
+    const a0=A.cyc, b0=B.cyc; T.G.stock.bonesil=2; T.G.stock.power=1; T.G.stock.ingot=0;   // exactly one furnace's worth
+    T.stepHusks(1/30); T.stepEconomy(1/30);
+    return {A,B,a0,b0}; };
+  const r=arbitrate(9,1);
+  ok("with input for only one, the higher-priority refiner consumes it", r.A.cyc===r.a0+1 && r.B.cyc===r.b0, "hi "+r.a0+"->"+r.A.cyc+" lo "+r.b0+"->"+r.B.cyc);
+  const r2=arbitrate(1,9);   // flip: B is now higher priority
+  ok("priority order decides who wins the scarce input (flipped)", r2.B.cyc===r2.b0+1 && r2.A.cyc===r2.a0, "A "+r2.a0+"->"+r2.A.cyc+" B "+r2.b0+"->"+r2.B.cyc);
+  T.buildings.length=0; T.villagers.length=0; T.nodes.length=0; T.resetDreadField();
   T.G.mode=undefined; T.G.graceT=150; T.G.dread=0; T.G.over=null; T.G.time=0;
 }
 

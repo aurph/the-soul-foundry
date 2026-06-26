@@ -3,3 +3,5 @@
 node_modules/
 tools/_*.png
 tools/preview.png
+game/_*.html
+game/_*.js

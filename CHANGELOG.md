@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-06-25 — v4: Teeth & Payoff
+
+An automated 5-dimension audit found the literal cause of "zero challenge, where's
+the payoff": one Datacenter out-produced the *final* tithe from minute one, so the
+quota — the meter meant to force expansion — was never a threat, and meeting it fired
+only a bell. This pass puts teeth on the quota and a beat on the payoff. Full spec in
+`design/v4-teeth-and-payoff.md`.
+
+- **The quota scales to your own throughput.** Each paid tithe floors the next demand
+  to most of your peak output (`need = max(prev×1.55, peakRate×period×0.68)`), and the
+  period tightens as levels climb. You can no longer coast — you must expand to stay
+  ahead. The quota bar now **forecasts** pass/fail at your current rate ("on track" /
+  "SHORT by K") and shows "behind ×N" after a miss.
+- **Material reservation.** A per-resource reserve floor (± stepper on each resource
+  card) that *refiners respect* but *building and binding can still spend below* — so
+  a Furnace stops eating the Power or Remains you were saving to raise a Datacenter.
+  A refiner idled only by its reserve reads "idle — its inputs are held in reserve."
+- **Build priority.** Each refiner has a priority (default by tier: Datacenter highest,
+  Crematory lowest; ▾/▴ on the inspector). A Power or matter shortage now feeds the
+  high-value end of the chain first instead of whatever sits later in the array.
+- **The tithe is an event.** Paying one surges the valley light ~35% and swells the
+  Pyre's data-core for ~1.5s, then eases back (render-only, deterministic-safe). A
+  dead flicker path that pointed at a never-built hearth was removed.
+- **Save integrity.** Tempo/grace/pressure, breach time, the first-Compute flourish,
+  reservations, priorities, and the mid-countdown timers now persist — a Harsh run no
+  longer snaps to Standard on reload. `SAVE_VERSION` bumped; old saves drop cleanly.
+- **Events escalate.** Windfalls shrunk (no more +42-dead minute-skips), suppressed
+  when pointless (a dead-windfall while you're already swimming in dead), and weighted
+  toward threat as the tithe level climbs.
+- Tests: +9 assertions (quota floor + period tighten, reservation respect/override,
+  priority arbitration both ways). `node tools/sim3dtest.js` → 148 passed, 0 failed.
+
 ## 2026-06-24 — Second playtest pass: grip + pacing
 
 The game played like a checklist — too fast, too cheap, quota firing mid-tutorial,

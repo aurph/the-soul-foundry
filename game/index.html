@@ -281,6 +281,10 @@
   @keyframes flourish{0%{opacity:0}16%{opacity:1}100%{opacity:0}}
   #ledger.compflash{animation:compflash 1.6s ease-out}
   @keyframes compflash{0%,100%{box-shadow:none}28%{box-shadow:inset 0 -3px 0 #e8c24a,0 0 24px #e8c24a66}}
+  .titheflash{animation:titheflash 1.6s ease-out}
+  @keyframes titheflash{0%,100%{box-shadow:none}24%{box-shadow:0 0 28px #e8c24aaa,inset 0 0 14px #e8c24a55}}
+  .missflash{animation:missflash 2s ease-out}
+  @keyframes missflash{0%,100%{box-shadow:none}18%,58%{box-shadow:0 0 22px #b8402d,inset 0 0 12px #9e3b2c77}}
   /* tutorial green spotlight — bright + thick so the first build is unmistakable */
   #spot{position:fixed;z-index:44;border:3px solid #8fe86a;border-radius:8px;pointer-events:none;display:none;
     animation:spotpulse 1.2s ease-in-out infinite}
@@ -717,6 +721,13 @@ let _grainCv=null,_grainCtx=null,_grainT=0,_pauseEl=null,_dockT=0;
 function drawGrain(){ if(!_grainCv){ _grainCv=document.getElementById('grain'); if(!_grainCv)return; _grainCtx=_grainCv.getContext('2d'); _grainCv.width=160; _grainCv.height=100; }
   const id=_grainCtx.createImageData(160,100), d=id.data; for(let i=0;i<d.length;i+=4){ const v=(Math.random()*255)|0; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } _grainCtx.putImageData(id,0,0); }
 function tickRender(dt){ stepAsh(dt); stepBirds(dt); for(const m of mixers) m.update(dt); if(typeof updateStockpiles==="function") updateStockpiles(); if(typeof updateDreadViz==="function") updateDreadViz(dt); _grainT+=dt; if(_grainT>0.055){ _grainT=0; drawGrain(); }
+  // TITHE FLARE — paying a tithe brightens the whole valley and blazes the Pyre's data-core, easing back over ~1.5s
+  if(typeof G!=="undefined" && (G._titheFx||0)>0){ G._titheFx=Math.max(0,(G._titheFx||0)-dt); const k=clamp((G._titheFx||0)/1.5,0,1)*0.5;
+    hemi.intensity=0.95*(1+k); sun.intensity=0.75*(1+k*0.9);
+    const py=(typeof buildings!=="undefined")&&buildings.find&&buildings.find(b=>b.kind==="pyre");
+    if(py&&py.mesh&&py.mesh.userData.light) py.mesh.userData.light.intensity=2.4+k*6;
+    if(py&&py.mesh&&py.mesh.userData.flame) py.mesh.userData.flame.scale.setScalar(1+k*0.6);   // the data-core swells with the tithe
+  }
   _dockT=(_dockT||0)-dt; if(_dockT<=0){ _dockT=0.6; if(typeof renderDockInfo==="function") renderDockInfo(); }   // keep the economy panel live
   if(!_pauseEl)_pauseEl=document.getElementById('pausebar'); if(_pauseEl)_pauseEl.style.display=(paused&&!(typeof G!=="undefined"&&G.over))?'block':'none'; }
 function loop(now){
@@ -1229,12 +1240,17 @@ function ricon(r,s){ s=s||18; const t=(typeof resourceThumb==="function")?resour
 function gicon(n,s){ s=s||24; return `<img src="assets/ui/glyph/${n}.png" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle">`; }
 function resMadeBy(r){ const m=[]; for(const k of BLD_ORDER){ const d=BLD[k]; if(d.recipe&&d.recipe.out&&d.recipe.out[r])m.push(d.name); if(d.kind==='gather'&&d.res===r)m.push(d.name); } return m; }
 function resUsedBy(r){ const u=[]; for(const k of BLD_ORDER){ const d=BLD[k]; if(d.recipe&&d.recipe.in&&d.recipe.in[r])u.push(d.name); if(d.kind==='bind'&&r==='dead')u.push(d.name); } return u; }
+function bumpReserve(r,d){ G.reserve[r]=Math.max(0,Math.floor((G.reserve[r]||0)+d)); SND.sfx('click'); showResInfo(r); if(typeof renderLedger==='function')renderLedger(); }
 function showResInfo(r){ SND.resume(); const made=resMadeBy(r), used=resUsedBy(r);
+  const isInput=Object.values(BLD).some(d=>d.recipe&&d.recipe.in&&d.recipe.in[r]); const step=(r==='power')?1:5; const rsv=Math.floor(G.reserve[r]||0);
+  const reserveRow=isInput?`<div class="optrow"><span>Reserve floor</span><b style="font-variant-numeric:tabular-nums"><span class="btn" style="padding:1px 8px" onclick="bumpReserve('${r}',${-step})">−</span> ${rsv} <span class="btn" style="padding:1px 8px" onclick="bumpReserve('${r}',${step})">+</span></b></div>
+   <div style="color:var(--ink-dim);font-size:11px;margin:-2px 0 6px">Refiners won't spend ${RES[r].name} below this floor — but building and binding still can. Set it to hold matter back from automation.</div>`:'';
   showOverlayHTML(`<div style="display:flex;align-items:center;gap:12px;margin-bottom:2px">${ricon(r,42)}<h1 style="font-size:22px;margin:0">${RES[r].name}</h1></div>
    <p style="margin:6px 0 12px">${RES_HELP[r]||''}</p>
    <div class="optrow"><span>In stock</span><b>${Math.floor(G.stock[r]||0)}</b></div>
    <div class="optrow"><span>Made by</span><b>${made.length?made.join(', '):'— raw / extracted'}</b></div>
    <div class="optrow"><span>Used by</span><b>${used.length?used.join(', '):'— end product'}</b></div>
+   ${reserveRow}
    <p style="margin-top:10px"><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
 function showStatInfo(k){ SND.resume(); const titles={husks:'Husks',dread:'Dread',writ:'Bones'};
   showOverlayHTML(`<h1 style="font-size:22px">${titles[k]||k}</h1><p style="margin:8px 0 14px;line-height:1.6">${STAT_HELP[k]||''}</p><p><span class="btn" onclick="hideOverlay()">Close</span></p>`); }
@@ -1267,13 +1283,18 @@ function renderLedger(){
     h+=`<div class="stat resstat" title="${RES[r].name} — click for details" onclick="showResInfo('${r}')">${ricon(r,17)}<span class="v">${n}</span></div>`; }
   $('ledger').innerHTML=h;
 }
+// current Compute/s from running datacenters — drives the quota forecast (and the net-rate readouts elsewhere)
+function computeRate(){ let r=0; for(const b of buildings){ if(b.kind==="datacenter"&&b.active&&b.def.recipe) r+=(b.def.recipe.out.compute||0)/b.def.recipe.time; } return r; }
 function renderQuota(){
   if(modeCfg().timeLimit){ const left=Math.max(0,(G.challengeDur||0)-(G.time||0)); const m=Math.floor(left/60), s=Math.floor(left%60);
     const red=left<30; $('quota').innerHTML=`<b style="color:${red?'#9e3b2c':'var(--ember)'}">TIME ${m}:${String(s).padStart(2,'0')}</b> &nbsp;·&nbsp; score <b>${challengeScore()}</b>`; return; }
   const q=G.quota, t=Math.max(0,Math.ceil(q.t));
   const graceT=(G.graceT==null?300:G.graceT);
   if((G.time||0)<graceT){ $('quota').innerHTML=`<b>GRACE</b> &nbsp; the engine is patient &nbsp;·&nbsp; first tithe in <span style="color:var(--ink)">${Math.ceil(graceT-(G.time||0))}s</span>`; return; }
-  $('quota').innerHTML=`<b>QUOTA · Tithe ${q.level}/${WIN_LEVEL}</b> &nbsp; deliver <b>${q.need}</b> Compute &nbsp;·&nbsp; have ${Math.floor(G.stock.compute||0)} &nbsp;·&nbsp; <span style="color:${t<25?'#9e3b2c':'var(--ink)'}">${t}s</span>`;
+  const have=Math.floor(G.stock.compute||0), proj=have+computeRate()*q.t;   // forecast at current rate
+  const fc=proj>=q.need?`<span style="color:#7d9a55">on track</span>`:`<span style="color:#c06a52">SHORT by ${Math.ceil(q.need-proj)}</span>`;
+  const miss=(G.quotaMisses||0)>0?` &nbsp;·&nbsp; <span style="color:#c06a52">behind ×${G.quotaMisses} (Dread +26/miss)</span>`:'';
+  $('quota').innerHTML=`<b>QUOTA · Tithe ${q.level}/${WIN_LEVEL}</b> &nbsp; deliver <b>${q.need}</b> &nbsp;·&nbsp; have ${have} &nbsp;·&nbsp; ${fc} &nbsp;·&nbsp; <span style="color:${t<25?'#9e3b2c':'var(--ink)'}">${t}s</span>${miss}`;
 }
 // surface the single most pressing problem, with its cause and the fix — so the player always knows WHY
 function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.classList.remove('show'); return; }
@@ -1291,7 +1312,8 @@ function renderAlert(){ const el=$('alert'); if(!el) return; if(G.over){ el.clas
     return dreadBite(dreadAt(b.x,b.z)*dreadGuard(),cr)<0.85;   // >15% slowdown after crew resistance + any Grave-Salt rite
   }):null;
   let msg='';
-  if(pop===0) msg="No husks bound. Open the Binding Pyre at the centre and bind one — "+BIND_COST.worker.dead+" corpses + "+BIND_COST.worker.compute+" Compute.";
+  if((G.quotaMisses||0)>=2) msg="You've missed "+G.quotaMisses+" tithes — Dread is climbing toward a breach. Add a Datacenter or a Substation and staff the chain feeding it, NOW.";
+  else if(pop===0) msg="No husks bound. Open the Binding Pyre at the centre and bind one — "+BIND_COST.worker.dead+" corpses + "+BIND_COST.worker.compute+" Compute.";
   else if((G.stock.soulash||0)<=0.5) msg="Your husks are weakening — they run on soul-ash and you have none. Staff a Crematory to render the dead into soul-ash.";
   else if(!buildings.some(b=>b.def.kind==="gather"&&b.workers.length>0)) msg="Nothing feeds the line. Raise a Grave-Exhumer on a cemetery and staff it to bring in the dead.";
   else if(!buildings.some(b=>b.kind==="crematory"&&b.workers.length>0)) msg="The dead pile up unrendered. Staff a Crematory — rendering them is what holds the backlog (Dread) down.";
@@ -1517,8 +1539,11 @@ function refreshInspect(){
       const ok=Object.keys(d.recipe.out)[0], oneOut=d.recipe.out[ok];
       body+=`<div class="row"><span>Recipe</span><b style="font-size:11px">${ins2} → ${outs}</b></div>
       <div class="row"><span>Throughput</span><b style="font-size:11px">${oneOut}× ${ricon(ok,13)} / ${d.recipe.time.toFixed(1)}s · ${b.workers.length}/${d.workers} husks</b></div>
-      <div class="barwrap"><div class="t">${b.active?'working':'idle — needs inputs or husks'}</div><div class="pbar"><i style="width:${Math.round((b.prog/d.recipe.time)*100)}%;background:linear-gradient(90deg,#6f7a55,#e8c24a)"></i></div></div>
+      <div class="barwrap"><div class="t">${b.active?'working':(b._reservedIdle?'idle — its inputs are held in reserve':'idle — needs inputs or husks')}</div><div class="pbar"><i style="width:${Math.round((b.prog/d.recipe.time)*100)}%;background:linear-gradient(90deg,#6f7a55,#e8c24a)"></i></div></div>
       <div class="row"><span>Made so far</span><b>${b.cyc||0}</b></div>`; }
+    if(d.kind==="refine"||d.kind==="datacenter"){ const pr=(b.prio!=null)?b.prio:tierPrio(b.kind);
+      body+=`<div class="row"><span>Build priority</span><b style="font-variant-numeric:tabular-nums"><span class="btn" style="padding:1px 8px" onclick="bumpPrio(-1)">▾</span> ${pr} <span class="btn" style="padding:1px 8px" onclick="bumpPrio(1)">▴</span></b></div>
+      <div style="color:var(--ink-dim);font-size:10.5px;margin:-2px 0 2px">When Power or matter runs short, higher-priority refiners are fed first.</div>`; }
     if(d.kind==="bind"){ const pop=villagers.filter(v=>!v.dead).length;
       const bindRow=(c,role)=>{ const ct=BIND_COST[c]; const can=(G.stock.dead||0)>=ct.dead&&(G.stock.compute||0)>=ct.compute;
         return `<div style="margin:6px 0"><span class="btn${can?'':' bad'}" onclick="bindHusk('${c}')">Bind ${casteName(c)}</span>
@@ -1567,6 +1592,7 @@ function addWorker(){ if(!selBld)return; const idle=idleHusks(); if(!idle.length
   idle.sort((a,b)=>Math.hypot(a.obj.position.x-selBld.x,a.obj.position.z-selBld.z)-Math.hypot(b.obj.position.x-selBld.x,b.obj.position.z-selBld.z));
   if(selBld.workers.length<selBld.def.workers){ assignHusk(idle[0],selBld); refreshInspect(); } }
 function remWorker(){ if(!selBld||!selBld.workers.length)return; assignHusk(selBld.workers[selBld.workers.length-1],null); refreshInspect(); }
+function bumpPrio(dir){ if(!selBld)return; const b=selBld; const cur=(b.prio!=null)?b.prio:tierPrio(b.kind); b.prio=clamp(cur+dir,0,9); SND.sfx('click'); refreshInspect(); }
 function demolishSel(){ if(!selBld)return; const b=selBld; b.workers.slice().forEach(w=>assignHusk(w,null));
   for(const r in b.def.cost) addStock(r,Math.floor(b.def.cost[r]*0.5)); if(typeof removeSmoke==="function")removeSmoke(b); if(b._scaffold){ scene.remove(b._scaffold); b._scaffold=null; } scene.remove(b.mesh); const i=buildings.indexOf(b); if(i>=0)buildings.splice(i,1); clearInspect(); renderLedger(); buildDock(); toast("Structure dismantled (half materials reclaimed)."); }
 function sellRes(r){ if((G.stock[r]||0)>=1){ G.stock[r]-=1; G.writ+=2; SND.sfx('click'); renderLedger(); if($('ov').classList.contains('show'))showShop(); } else SND.sfx('deny'); }
@@ -1896,16 +1922,21 @@ function seedSettlement(){
    ===================================================================== */
 // bump when the world-gen / save shape changes enough that an old save would load a stale world.
 // v2: ashwood + silica nodes, denser deposits, the wave-of-the-dead. Old saves are dropped so the new valley generates.
-const SAVE_VERSION=2;
+// v3: persist tempo/grace/pressure, breach, payoff flags, mid-countdown timers, reserve + build priority.
+const SAVE_VERSION=3;
 function serializeState(){
   return { v:SAVE_VERSION, seed:WORLD_SEED,
     G:{ stock:Object.assign({},G.stock), writ:G.writ, dread:G.dread, popCap:G.popCap, grow:G.grow, time:G.time||0,
         quota:{need:G.quota.need,period:G.quota.period,t:G.quota.t,level:G.quota.level}, tech:Object.assign({},G.tech||{}),
         // run tallies — persisted so the campaign win screen reflects the WHOLE run, not just the last session
-        computeRendered:G.computeRendered||0, deadRendered:G.deadRendered||0, husksBoundRun:G.husksBoundRun||0, peakRate:G.peakRate||0 },
+        computeRendered:G.computeRendered||0, deadRendered:G.deadRendered||0, husksBoundRun:G.husksBoundRun||0, peakRate:G.peakRate||0,
+        // difficulty knobs + breach/payoff state + mid-countdown timers, so a reloaded run matches an un-reloaded same-seed run
+        tempo:G.tempo||'standard', basePressure:G.basePressure, graceT:G.graceT, breach:G.breach||0, _firstCompute:G._firstCompute||0,
+        quotaMisses:G.quotaMisses||0, reserve:Object.assign({},G.reserve||{}),
+        eventT:G.eventT, driftT:G.driftT, rateWinT:G.rateWinT, rateWinAccum:G.rateWinAccum||0 },
     paths:[...PATHS],
     dread: (typeof dreadSnapshot==="function"?dreadSnapshot():null),   // the spatial Dread field (re-derives if absent)
-    buildings: buildings.map(b=>({k:b.kind,x:b.x,z:b.z,prog:b.prog||0,cyc:b.cyc||0})),
+    buildings: buildings.map(b=>({k:b.kind,x:b.x,z:b.z,prog:b.prog||0,cyc:b.cyc||0,prio:b.prio})),
     nodes: nodes.map(n=>({t:n.type,x:n.x,z:n.z,a:n.amount,max:n.max})),
     villagers: villagers.filter(v=>!v.dead).map(v=>({c:v.caste,x:v.obj.position.x,z:v.obj.position.z,r:v.resolve,
         b:v.assigned?buildings.indexOf(v.assigned):-1, cr:v.carryRes||null, ca:v.carryAmt||0, job:v.job||"idle"})) };
@@ -1923,13 +1954,18 @@ function clearDynamic(){
 function applySave(s){
   if(!s||!s.G) return false;
   clearDynamic();
-  Object.assign(G.stock,s.G.stock); G.writ=s.G.writ; G.dread=s.G.dread; G.popCap=s.G.popCap; G.grow=s.G.grow; G.time=s.G.time||0; G.over=null; G.breach=0;
+  Object.assign(G.stock,s.G.stock); G.writ=s.G.writ; G.dread=s.G.dread; G.popCap=s.G.popCap; G.grow=s.G.grow; G.time=s.G.time||0; G.over=null;
   G.quota={need:s.G.quota.need,period:s.G.quota.period,t:s.G.quota.t,level:s.G.quota.level}; G.tech=Object.assign({},s.G.tech||{});
   if(G.tech.embers&&!G.tech.salt){ G.tech.salt=true; delete G.tech.embers; }   // migrate the retired 'embers' rite -> Grave-Salt (paid-for upgrade stays effective)
   // restore the run tallies so a campaign won across sessions reports its whole-run totals
   G.computeRendered=s.G.computeRendered||0; G.deadRendered=s.G.deadRendered||0; G.husksBoundRun=s.G.husksBoundRun||0; G.peakRate=s.G.peakRate||0;
+  // restore difficulty + breach/payoff state + timers DIRECTLY (do NOT call setTempo — it would clobber quota.t)
+  const _tc=TEMPO[s.G.tempo]||TEMPO.standard;
+  G.tempo=s.G.tempo||'standard'; G.basePressure=(s.G.basePressure!=null)?s.G.basePressure:_tc.base; G.graceT=(s.G.graceT!=null)?s.G.graceT:_tc.grace;
+  G.breach=s.G.breach||0; G._firstCompute=s.G._firstCompute||0; G.quotaMisses=s.G.quotaMisses||0; G.reserve=Object.assign({},s.G.reserve||{});
+  G.eventT=s.G.eventT; G.driftT=s.G.driftT; G.rateWinT=(s.G.rateWinT!=null)?s.G.rateWinT:PEAK_WIN; G.rateWinAccum=s.G.rateWinAccum||0;
   for(const n of (s.nodes||[])){ const nn=placeNode(n.t,n.x,n.z); nn.amount=n.a; nn.max=n.max; if(nn.amount<=0) depleteNode(nn); }
-  for(const b of (s.buildings||[])){ const bb=placeBuildingFree(b.k,b.x,b.z); bb.prog=b.prog||0; bb.cyc=b.cyc||0; }
+  for(const b of (s.buildings||[])){ const bb=placeBuildingFree(b.k,b.x,b.z); bb.prog=b.prog||0; bb.cyc=b.cyc||0; if(b.prio!=null) bb.prio=b.prio; }
   for(const k of (s.paths||[])){ const rz=(k%4096)-1024, rx=Math.floor(k/4096)-1024; restorePath(rx,rz); }
   if(typeof loadDreadField==="function" && s.dread) loadDreadField(s.dread);   // restore the Dread field (or let it rebuild)
   for(const vd of (s.villagers||[])){ const v=spawnVillager(vd.x,vd.z,vd.c); v.resolve=vd.r; v.carryRes=vd.cr||null; v.carryAmt=vd.ca||0; v.job=vd.job||"idle";
@@ -1992,6 +2028,13 @@ function firstComputeReward(){ try{ if(typeof SND!=="undefined"){ SND.sfx('bell'
   const lg=(typeof document!=="undefined")&&document.getElementById('ledger');
   if(lg){ lg.classList.remove('compflash'); void lg.offsetWidth; lg.classList.add('compflash'); setTimeout(()=>lg.classList.remove('compflash'),1600); }
 }catch(e){} }
+// PAYOFF — every tithe paid is now an event: re-fire the screen flourish, flash the quota bar gold (the valley
+// brightens + the Pyre blazes from tickRender via G._titheFx). Render-only; never touches the sim.
+function titheReward(level){ try{ if(typeof SND!=="undefined") SND.sfx('win');
+  const f=document.getElementById('flourish'); if(f){ f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
+  const q=document.getElementById('quota'); if(q){ q.classList.remove('titheflash'); void q.offsetWidth; q.classList.add('titheflash'); setTimeout(()=>{try{q.classList.remove('titheflash');}catch(e){}},1600); }
+}catch(e){} }
+function titheMissFx(){ try{ const q=document.getElementById('quota'); if(q){ q.classList.remove('missflash'); void q.offsetWidth; q.classList.add('missflash'); setTimeout(()=>{try{q.classList.remove('missflash');}catch(e){}},2000); } }catch(e){} }
 start();
 
 /* =====================================================================
@@ -2300,8 +2343,15 @@ function hubAt(x,z){ return nearestStockpile(x,z) || buildings.find(b=>b.kind===
    === ECONOMY: state, buildings, jobs, needs, quota, dread ===
    ===================================================================== */
 const STORE=260, WIN_LEVEL=8;
-const G={ stock:{}, writ:25, dread:0, warmthRatio:1, popCap:6, over:null,
-  quota:{need:5, period:150, t:150, level:1}, grow:24, tech:{} };
+// QUOTA WITH TEETH — each tithe scales with your OWN peak throughput, so meeting it eats most of your output
+// and staying ahead means EXPANDING. QUOTA_MULT is the scripted floor; QUOTA_FLOOR_FRAC is the throughput floor.
+const QUOTA_START=6, QUOTA_MULT=1.55, QUOTA_FLOOR_FRAC=0.68;
+// build priority — when an input is scarce, the high-value end of the chain drains first (default by tier)
+const TIER_PRIO={datacenter:7, ossuary:6, litho:5, mill:4, furnace:3, substation:2, crematory:1};
+function tierPrio(kind){ return TIER_PRIO[kind]!=null?TIER_PRIO[kind]:0; }
+function bldPrio(b){ return (b.prio!=null)?b.prio:tierPrio(b.kind); }
+const G={ stock:{}, reserve:{}, writ:25, dread:0, warmthRatio:1, popCap:6, over:null,
+  quota:{need:QUOTA_START, period:150, t:150, level:1}, grow:24, tech:{}, quotaMisses:0 };
 RES_ORDER.forEach(r=>G.stock[r]=0);
 // --- game modes: campaign (the tithe-survival game) | challenge (timed score run) ---
 const MODES = {
@@ -2997,15 +3047,27 @@ function regrowNode(n){ n.amount=n.max;
 }
 
 /* ---- random events: the dead world intrudes ---- */
+// events are texture, not windfalls — small gains (gathering still matters) and threats that ESCALATE with the
+// tithe level. State-aware: a dead-windfall is suppressed when you're already swimming in dead, a power surge
+// when you have nothing that runs on Power. All seeded (rnd/rr), so determinism holds.
 const EVENTS=[
-  {n:"A mass grave is uncovered — a windfall of the dead.", bad:false, f:()=>addStock('dead',rr(22,42))},
-  {n:"A buried cache of soul-ash is found beneath the ruins.", bad:false, f:()=>addStock('soulash',rr(16,30))},
-  {n:"Ichor wells up cold through the cracks.", bad:false, f:()=>addStock('ichor',rr(14,26))},
-  {n:"A seam of bone-silica is unearthed.", bad:false, f:()=>addStock('bonesil',rr(18,34))},
-  {n:"The backlog of the unprocessed dead presses in. Dread rises.", bad:true, f:()=>{ G.dread=clamp(G.dread+11,0,100); }},
-  {n:"A power surge guts the grid.", bad:true, f:()=>{ G.stock.power=Math.max(0,(G.stock.power||0)-rr(6,14)); }},
+  {k:'good',n:"A mass grave is uncovered — a small windfall of the dead.", f:()=>addStock('dead',rr(8,16))},
+  {k:'good',n:"A buried cache of soul-ash is found beneath the ruins.", f:()=>addStock('soulash',rr(8,15))},
+  {k:'good',n:"Ichor wells up cold through the cracks.", f:()=>addStock('ichor',rr(6,12))},
+  {k:'good',n:"A seam of bone-silica is unearthed.", f:()=>addStock('bonesil',rr(8,15))},
+  {k:'bad', n:"The backlog of the unprocessed dead presses in — Dread climbs.", f:()=>{ G.dread=clamp(G.dread+8+driftLevel()*2,0,100); }},
+  {k:'bad', n:"A power surge guts the grid — Power is lost.", f:()=>{ G.stock.power=Math.max(0,(G.stock.power||0)-rr(6,12)-driftLevel()*2); }},
+  {k:'bad', n:"A haunting surge ripples out from the foundry — the dead stir.", f:()=>{ G.dread=clamp(G.dread+10+driftLevel()*2.5,0,100); const cand=villagers.filter(v=>!v.dead&&v.assigned); if(cand.length){ pick(cand).resolve*=0.7; } }},
 ];
-function fireEvent(){ const e=pick(EVENTS); e.f(); if(typeof toast==="function")toast(e.n, e.bad?"bad":"good"); if(e.bad)SND.sfx('haunt'); }
+function fireEvent(){ const lv=driftLevel();
+  const pool=EVENTS.filter(e=>{
+    if(e.n.indexOf('windfall of the dead')>=0 && (G.stock.dead||0)>120) return false;     // already swimming in dead
+    if(e.n.indexOf('power surge')>=0 && !buildings.some(b=>(b.def.kind==='refine'||b.def.kind==='datacenter')&&b.def.recipe&&b.def.recipe.in.power)) return false;
+    return true; });
+  const wantBad = rnd() < clamp(0.28+(lv-1)*0.08, 0.25, 0.78);   // more threats as the tithes climb
+  const subset = pool.filter(e=> wantBad ? e.k==='bad' : e.k==='good');
+  const e = pick(subset.length?subset:pool); e.f();
+  if(typeof toast==="function")toast(e.n, e.k==='bad'?"bad":"good"); if(e.k==='bad')SND.sfx('haunt'); }
 
 /* ---- the economy tick ---- */
 function stepEconomy(dt){
@@ -3024,11 +3086,16 @@ function stepEconomy(dt){
   if(upkeepOk) G.stock.soulash=Math.max(0,G.stock.soulash-upDemand*dt);
   // production (refine/datacenter); track crematories rendering the dead — that's what holds the backlog down
   let renderers=0;
-  for(const b of buildings){
-    if(b.def.kind!=="refine"&&b.def.kind!=="datacenter") continue;
+  // refiners drain in PRIORITY order (high-value end first), stable placement-order tie-break, so a scarce
+  // input (above all Power) feeds the Datacenter before a low-tier Crematory.
+  const refiners=buildings.map((b,i)=>[b,i]).filter(p=>p[0].def.kind==="refine"||p[0].def.kind==="datacenter").sort((a,b)=>(bldPrio(b[0])-bldPrio(a[0]))||(a[1]-b[1]));
+  for(const [b] of refiners){
     const presentW=b.workers.filter(w=>w.atWork&&!w.dead), present=presentW.length;
     const aff=present?presentW.reduce((s,w)=>s+affinity(w.caste,b.kind),0)/present:1;   // avg caste fit for this building
-    const rec=b.def.recipe; const inOk=Object.keys(rec.in).every(r=>(G.stock[r]||0)>=rec.in[r]);
+    // reservation: a refiner won't consume an input below its reserved floor (but building/binding can dip under)
+    const rec=b.def.recipe; const inOk=Object.keys(rec.in).every(r=>(G.stock[r]||0)-(G.reserve[r]||0)>=rec.in[r]);
+    const reservedOnly=!inOk && Object.keys(rec.in).every(r=>(G.stock[r]||0)>=rec.in[r]);   // would run if not for the reserve
+    b._reservedIdle=reservedOnly;
     const outOk=Object.keys(rec.out).every(r=>storeRoom(r));
     // local Dread BITES production: a building in the pooled dead works slower (placement matters) — but a
     // Reaper-staffed crew resists the haze, so WHO you assign and WHERE you build are one decision.
@@ -3073,10 +3140,17 @@ function stepEconomy(dt){
   // quota — frozen during the opening grace
   if(modeCfg().quota && !grace){ G.quota.t-=dt;
   if(G.quota.t<=0){ const need=G.quota.need;
-    if((G.stock.compute||0)>=need){ G.stock.compute-=need; G.writ+=need*8; G.dread=Math.max(0,G.dread-12); G.quota.level++;
-      G.quota.need=Math.ceil(need*1.4); SND.sfx('bell'); toast("Quota met. The engine endures. (Tithe paid: "+(need*8)+" Bones)","good");
+    if((G.stock.compute||0)>=need){ G.stock.compute-=need; G.writ+=need*8; G.dread=Math.max(0,G.dread-12); G.quota.level++; G.quotaMisses=0;
+      const basePeriod=(TEMPO[G.tempo||'standard']||TEMPO.standard).period;
+      G.quota.period=Math.max(120, basePeriod-(G.quota.level-1)*10);   // tithes come faster as they climb
+      // floor the NEXT tithe to your own peak throughput — meeting it takes most of your output, so you must expand
+      G.quota.need=Math.max(Math.ceil(need*QUOTA_MULT), Math.ceil((G.peakRate||0)*(G.quota.period/60)*QUOTA_FLOOR_FRAC));
+      G._titheFx=1.2+G.quota.level*0.12;   // render-only payoff pulse (read in tickRender)
+      SND.sfx('bell'); if(typeof titheReward==="function") titheReward(G.quota.level-1);
+      toast("Tithe "+(G.quota.level-1)+" paid — the engine endures (+"+(need*8)+" Bones). Next: "+G.quota.need+" Compute in "+Math.round(G.quota.period)+"s.","good");
       if(G.quota.level>WIN_LEVEL) endGame(true); }
-    else { G.dread=clamp(G.dread+26,0,100); SND.sfx('deny'); toast("Quota missed — the backlog of the dead swells. Dread surges.","bad"); }
+    else { G.dread=clamp(G.dread+26,0,100); G.quotaMisses=(G.quotaMisses||0)+1; SND.sfx('deny'); if(typeof titheMissFx==="function") titheMissFx();
+      toast("Tithe MISSED ("+(Math.floor(G.stock.compute||0))+"/"+need+") — the backlog swells, Dread +26."+(G.quotaMisses>=2?" A breach is coming.":""),"bad"); }
     G.quota.t=G.quota.period;
   } }
   // random events
