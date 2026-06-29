@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-06-29 — v5: Onboarding & Placement
+
+A first-time playtester (someone who does not play these games) surfaced two real
+snags: he did not realize the side panel was a tutorial to follow, and the build
+arrows pointed dead-center at the grave/seam while the label said BUILD BESIDE, so he
+tried to build on the deposit and got a deny. Spec in `design/v5-onboarding-and-placement.md`.
+
+- **Tutorial is louder on first play, gently.** A one-time toast names the panel
+  ("the panel on the right marks each step"), the panel slides in with a single ember
+  flare the first time it shows, and step 1's header reads DO THIS FIRST. All first-run
+  only, guarded so a returning player never sees it. No modal wall, no input-locking.
+- **The arrow points where you can actually build.** New `besideCell()` helper finds
+  the nearest grid cell that genuinely passes the placement rules in the valid ring
+  around a node (and the middle of the Excavator's thin seam-band). The tutorial arrow
+  now points at that open ground, not the unbuildable node center. Verified: 359/359
+  deposits across 6 randomized valleys resolve to a real buildable cell.
+- **Placement forgives a near-miss.** Drop a gatherer on or right next to its deposit
+  and, instead of denying, it raises alongside the deposit you aimed at ("No room on
+  the Cemetery itself. Raised the Grave-Exhumer alongside it."). If genuinely boxed in,
+  the old deny still fires.
+- All changes are render/click-thread only. `besideCell` uses no RNG and is never
+  called from the sim; `buildingFits`/`nodeLockOk`/`placeBuilding` are untouched.
+  `node tools/sim3dtest.js` 148 passed, 0 failed; boot gate green; 0 console errors.
+
 ## 2026-06-25 — v4: Teeth & Payoff
 
 An automated 5-dimension audit found the literal cause of "zero challenge, where's

@@ -218,6 +218,11 @@
   #goals .gp{margin-top:6px;text-align:right}
   #goals .gskip{font-size:10px;color:var(--ink-dim);cursor:pointer;text-decoration:underline}
   #goals .gskip:hover{color:var(--ink-bright)}
+  /* first-play only: the panel slides in and gives one ember edge-flare so a newcomer's eye lands on it */
+  @keyframes goalsin{0%{transform:translateX(26px);opacity:0}100%{transform:translateX(0);opacity:1}}
+  @keyframes goalsflare{0%,100%{border-left-color:var(--ember)}45%{border-left-color:#e8c24a;box-shadow:-3px 0 20px #e8a23a44}}
+  #goals.firstshow{animation:goalsin .5s ease-out, goalsflare 2.2s ease-in-out .5s 1}
+  #goals .gh.dofirst{font-size:11px;color:#e8c24a}
   #hint{position:fixed;left:50%;top:128px;transform:translateX(-50%);z-index:45;padding:5px 13px;border-radius:5px;
     font-size:12px;color:var(--ember-soft);background:#0d0e12cc;border:1px solid var(--line);pointer-events:none;display:none;white-space:nowrap}
   #dev{position:fixed;left:6px;bottom:116px;color:#6c8;font:11px monospace;z-index:60;display:none}
@@ -1114,10 +1119,18 @@ function pickAt(sx,sy){
   if(placeKind){ const p=groundPoint(sx,sy); if(!p) return;
     if(BLD[placeKind].kind==='path'){ addPath(p.x,p.z); renderLedger(); return; }
     const gx=snapG(p.x), gz=snapG(p.z), pdef=BLD[placeKind];
-    const b=placeBuilding(placeKind,gx,gz);   // snap buildings to the grid
-    if(b){ b.mesh.rotation.y=placeRot; SND.sfx('place'); renderLedger(); buildDock(); toast("Raising the "+BLD[placeKind].name+"…"); if(!canAfford(BLD[placeKind].cost)){ placeKind=null; setHint(''); buildDock(); showGrid(false); } }
+    let b=placeBuilding(placeKind,gx,gz), moved=false;   // try the exact snapped cell first (unchanged path for already-valid drops)
+    // FORGIVING RESCUE: he aimed a gatherer at the deposit itself (which the no-build ring forbids). Relocate it beside THAT deposit instead of denying.
+    if(!b && pdef.nodeType && canAfford(pdef.cost)){
+      const n=nearestNode(pdef.nodeType,gx,gz);
+      if(n && n.dist < (2.0+pdef.foot*0.4)+GRID){            // the click was on/just outside the deposit's no-build ring
+        const alt=besideCell(pdef,n.node.x,n.node.z);        // open ground beside that exact node (null = genuinely boxed in)
+        if(alt){ const nb=placeBuilding(placeKind,alt.x,alt.z); if(nb){ b=nb; moved=true; } } } }
+    if(b){ b.mesh.rotation.y=placeRot; SND.sfx('place'); renderLedger(); buildDock();
+      toast(moved?("No room on the "+(NODE[pdef.nodeType]?NODE[pdef.nodeType].name:"deposit")+" itself. Raised the "+pdef.name+" alongside it."):("Raising the "+pdef.name+"…"));
+      if(!canAfford(pdef.cost)){ placeKind=null; setHint(''); buildDock(); showGrid(false); } }
     else if(pdef.lockNode && buildingFits(gx,gz,pdef.foot) && !nodeLockOk(pdef,gx,gz)){ SND.sfx('deny'); toast("The "+pdef.name+" can only stand on a "+(NODE[pdef.lockNode]?NODE[pdef.lockNode].name:pdef.lockNode)+".","bad"); }
-    else { SND.sfx('deny'); toast("Can't build there — too close to something, or off the valley.","bad"); }
+    else { SND.sfx('deny'); toast("Can't build there. Too close to something, or off the valley.","bad"); }
     return; }
   const vh=ray.intersectObjects(villagers.filter(v=>!v.dead).map(v=>v.obj),true);
   if(vh.length){ let r=vh[0].object; while(r.parent&&!villagers.find(v=>v.obj===r)) r=r.parent;
@@ -1789,7 +1802,7 @@ const TUT=[
   {t:"The dead are your raw matter. Open the GATHERING tab below.",
    why:"Tabs group the buildings. You can also bind husks at the Binding Pyre (centre) for 2 corpses + 4 Compute.", d:()=>curTab==="gather", sel:()=>'[data-tab="gather"]'},
   {t:"Raise a Grave-Exhumer BESIDE a cemetery (the arrow marks one) and staff it — place it on open ground next to the headstones, then tap it and press + assign.",
-   why:"The Exhumer works the cemetery next to it and hauls the dead to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), mkb:'exhumer', sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
+   why:"The Exhumer works the cemetery next to it and hauls the dead to the stockpile. Nothing in the foundry runs without the dead.", d:()=>staffed("exhumer"), mkb:'exhumer', sel:bldTarget('exhumer'), at:()=>{const n=nearestNode('grave',Cam.target.x,Cam.target.z);if(!n)return null;return besideCell(BLD.exhumer,n.node.x,n.node.z)||{x:n.node.x,z:n.node.z};}},
   {t:"Raise a Crematory and staff it.",
    why:"It renders corpses into bone-silica, soul-ash and ichor, and rendering the dead is what holds the backlog (Dread) down. The dead you leave lying out pool as a Dread haze (a dark stain on the ground) that slows whatever stands in it — render them, or raise a Ward. Soul-ash is also your husks' upkeep — keep a little flowing or they weaken and crumble.", d:()=>worked("crematory"), sel:bldTarget('crematory')},
   {t:"Open the REFINING tab and raise a SUBSTATION, then staff it. Almost everything runs on Power.",
@@ -1803,7 +1816,7 @@ const TUT=[
   {t:"Raise an Assembly Ossuary and staff it.",
    why:"Etched dies are packaged into reliquary cores — the chips. (Runs on Power.)", d:()=>worked("ossuary"), sel:bldTarget('ossuary')},
   {t:"Raise a Silica Excavator on a silica seam (the pale crystals the glow marks) and staff it.",
-   why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), mkb:'excavator', sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);return n?{x:n.node.x,z:n.node.z}:null;}},
+   why:"The Excavator only stands on a seam. It bores raw silica — the Spectral Datacenter is cut from it.", d:()=>staffed("excavator"), mkb:'excavator', sel:bldTarget('excavator'), at:()=>{const n=nearestNode('silica',Cam.target.x,Cam.target.z);if(!n)return null;return besideCell(BLD.excavator,n.node.x,n.node.z)||{x:n.node.x,z:n.node.z};}},
   {t:"Raise a Spectral Datacenter and staff it.",
    why:"Cores + Power + Ichor (coolant) render into Compute — the engine's quota.", d:()=>worked("datacenter"), sel:bldTarget('datacenter')},
   {t:"Now wait — your first Compute appears in the ledger up top.",
@@ -1811,7 +1824,7 @@ const TUT=[
   {t:"The foundry breathes. Pay each tithe of Compute once the grace ends, and keep rendering the dead. You're on your own now.",
    why:"Watch the violet Dread haze: the dead you leave unrendered pool it on the ground, and it slows the husks and buildings caught in it. Harvest your cemeteries down and raise Ward Obelisks beside the worst of it to push it back. Press V to show or hide the haze.", d:()=>G.quota.level>1, sel:()=>'#quota'},
 ];
-let tutIdx=0, tutDone=false, _tutShown=-1;
+let tutIdx=0, tutDone=false, _tutShown=-1, _tutIntroDone=false;
 function loadTut(){ try{ tutDone=localStorage.getItem('sf_tut')==='done'; }catch(e){} }
 function skipTut(){ tutDone=true; try{localStorage.setItem('sf_tut','done');}catch(e){} const g=$('goals'); if(g)g.style.display='none'; }
 function updateTutorial(){ const g=$('goals'); if(!g) return;
@@ -1820,12 +1833,36 @@ function updateTutorial(){ const g=$('goals'); if(!g) return;
   if(tutIdx>=TUT.length){ skipTut(); if(typeof toast==="function")toast("Tutorial complete. The foundry stands on its own now.","good"); return; }
   const step=TUT[tutIdx];
   g.style.display='block';
+  // resolve + cache the world-arrow target here (~3x/sec) so positionSpotlight (every frame) never re-runs the geometry sweep
+  if(step.at){ const builtIt=step.mkb && buildings.some(b=>b.kind===step.mkb); step._arrowPt=builtIt?null:step.at(); }
   if(tutIdx!==_tutShown){ _tutShown=tutIdx;
-    g.innerHTML=`<div class="gh">Tutorial &middot; step ${tutIdx+1} of ${TUT.length}</div>
+    if(!_tutIntroDone){ _tutIntroDone=true; g.classList.add('firstshow'); setTimeout(()=>{ const gg=$('goals'); if(gg)gg.classList.remove('firstshow'); },3200); }
+    const hdr=tutIdx===0
+      ? `<div class="gh dofirst">DO THIS FIRST &middot; step 1 of ${TUT.length}</div>`
+      : `<div class="gh">Tutorial &middot; step ${tutIdx+1} of ${TUT.length}</div>`;
+    g.innerHTML=`${hdr}
     <div class="gt">${step.t}</div>
     ${step.why?`<div class="gw">${step.why}</div>`:''}
     <div class="gbar"><i style="width:${Math.round(tutIdx/TUT.length*100)}%"></i></div>
     <div class="gp"><span class="gskip" onclick="skipTut()">skip tutorial</span></div>`; }
+}
+// nearest GRID-snapped, genuinely-buildable cell BESIDE a node — the open ground a gatherer must stand on.
+// read-only: reads buildingFits/nodeLockOk/snapG only, mutates nothing, no RNG, no performance.now.
+// only ever called from the render/click thread (positionSpotlight, updateTutorial, pickAt), never the sim.
+function besideCell(def,nx,nz){ if(!def) return null;
+  const foot=def.foot, ring=2.0+foot*0.4, reach=def.lockNode?(foot*0.8+3.2):Infinity;   // buildingFits no-build radius / nodeLockOk ceiling (strict <)
+  const target=isFinite(reach)?(ring+reach)/2:ring+GRID;   // aim the MIDDLE of the valid annulus (locked) or one grid past the ring (unlocked)
+  const cx=snapG(nx), cz=snapG(nz); let best=null, bestS=Infinity;
+  for(let R=1; R<=4; R++){   // ring-shell sweep, nearest shell wins; R<=4 (8u) covers the excavator annulus + crowded pockets
+    for(let dx=-R; dx<=R; dx++) for(let dz=-R; dz<=R; dz++){
+      if(Math.max(Math.abs(dx),Math.abs(dz))!==R) continue;   // shell perimeter only
+      const x=cx+dx*GRID, z=cz+dz*GRID;
+      if(!buildingFits(x,z,foot)) continue;                   // exact predicate placeBuilding uses
+      if(!nodeLockOk(def,x,z)) continue;                      // no-op for unlocked exhumer/dredge
+      const d=Math.hypot(x-nx,z-nz); if(d<ring||d>=reach) continue;   // validate the SNAPPED cell against this node (no snap-drift back in-ring or past reach)
+      const s=Math.abs(d-target); if(s<bestS){ bestS=s; best={x,z}; } }
+    if(best) return best; }
+  return null;   // genuinely boxed in
 }
 // green spotlight: highlight the UI element (or cemetery) the current tutorial step points at
 function positionSpotlight(){ const s=document.getElementById('spot'), w=document.getElementById('wspot'); if(!s||!w) return;
@@ -1837,9 +1874,9 @@ function positionSpotlight(){ const s=document.getElementById('spot'), w=documen
   if(!shown) s.style.display='none';
   // hide the world arrow once you've actually built the thing this step points at (then the dock/assign ring guides you)
   const builtIt=step.mkb && buildings.some(b=>b.kind===step.mkb);
-  if(step.at && !builtIt){ const p=step.at();
+  if(step.at && !builtIt){ const p=step._arrowPt;   // cached in updateTutorial (~3x/sec); never recomputed per-frame
     if(p){ const v=new THREE.Vector3(p.x,terrainHeight(p.x,p.z)+1.4,p.z); v.project(camera);
-      if(v.z<1){ w.style.left=((v.x*0.5+0.5)*innerWidth)+'px'; w.style.top=((-v.y*0.5+0.5)*innerHeight)+'px'; w.style.display='block'; } else w.style.display='none'; }
+      if(v.z<1 && v.x>-1 && v.x<1 && v.y>-1 && v.y<1){ w.style.left=((v.x*0.5+0.5)*innerWidth)+'px'; w.style.top=((-v.y*0.5+0.5)*innerHeight)+'px'; w.style.display='block'; } else w.style.display='none'; }   // hide when behind camera or off-viewport (no edge-clamping)
     else w.style.display='none'; }
   else w.style.display='none';
 }
@@ -2007,7 +2044,9 @@ function start(){
     paused=true; if(typeof buildRail==="function") buildRail();   // start paused — let the player read in and look around first
   });
 }
-function beginPlay(){ paused=false; if(typeof buildRail==="function")buildRail(); }
+function beginPlay(){ paused=false; if(typeof buildRail==="function")buildRail();
+  // first real play only: name the panel so a newcomer knows to follow it (G._tutPinged + !tutDone make it fire once, never for veterans)
+  if(!tutDone && !G._tutPinged){ G._tutPinged=true; if(typeof toast==="function") toast("The engine walks you through the first build. The panel on the right marks each step.","good"); } }
 let _abandoning=false;   // set by newValley() so the autosave below can't re-write the save we just cleared
 addEventListener('beforeunload',()=>{ try{ if(!_abandoning && !G.over && shouldAutosave()) saveGame(); }catch(e){} });
 // messages linger on-screen (~9s) and stack, so a notice never flashes past before you can read it.
